@@ -9,16 +9,14 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-domain      = [ 3000, 900 ];
-numcells    = 50;
+domain      = [ 2000, 700 ];
 
 % Init a new object
 GC = c_twoLevelGratingCell(  'discretization', disc, ...
                             'units', units, ...
                             'lambda', lambda, ...
                             'domain_size', domain, ...
-                            'background_index', index_clad, ...
-                            'numcells', numcells )
+                            'background_index', index_clad )
 
 % draw cell
 % draw two levels using two level builder function
@@ -37,7 +35,7 @@ GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
                                  
                                  
 % DEBUG plot the index
-GC.plotIndex();
+Q.plotIndex();
 
 % run simulation
 num_modes   = 20;
@@ -49,55 +47,61 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 pml_options = [ 1, 200, 500, 2 ];
 
 % run simulation
-GC = GC.runSimulation( num_modes, BC, pml_options );
+Q = Q.runSimulation( num_modes, BC, pml_options );
 
-% % DEBUG plot physical fields and all fields
-% k_all       = GC.debug.k_all;
-% ka_2pi_all  = k_all*domain(2)/(2*pi);
-% 
-% for ii = 1:length( k_all )
-%     % Plotting physical fields
-%     % plot field, abs
-%     figure;
-%     imagesc( GC.x_coords, GC.y_coords, abs( GC.debug.phi_all(:,:,ii) ) );
-%     colorbar;
-%     set( gca, 'YDir', 'normal' );
-%     title( sprintf( 'Field (abs) for mode %i, k*a/2pi real = %f', ii, real( ka_2pi_all(ii) ) ) );
-% end
-% 
-% % plot real and imag k
-% k_labels = {};
-% for ii = 1:length( k_all )
-%     k_labels{end+1} = [ ' ', num2str(ii) ];
-% end
-% figure;
-% plot( real( ka_2pi_all ), imag( ka_2pi_all ), 'o' ); 
-% text( real( ka_2pi_all ), imag( ka_2pi_all ), k_labels );
-% xlabel('real k*a/2pi'); ylabel('imag k*a/2pi');
-% title('real vs imag k');
-% makeFigureNice();
+% DEBUG plot physical fields and all fields
+k_all       = Q.debug.k_all;
+ka_2pi_all  = k_all*domain(2)/(2*pi);
+
+for ii = 1:length( k_all )
+    % Plotting physical fields
+    % plot field, abs
+    figure;
+    imagesc( Q.x_coords, Q.y_coords, abs( Q.debug.phi_all(:,:,ii) ) );
+    colorbar;
+    set( gca, 'YDir', 'normal' );
+    title( sprintf( 'Field (abs) for mode %i, k*a/2pi real = %f', ii, real( ka_2pi_all(ii) ) ) );
+end
+
+% plot real and imag k
+k_labels = {};
+for ii = 1:length( k_all )
+    k_labels{end+1} = [ ' ', num2str(ii) ];
+end
+figure;
+plot( real( ka_2pi_all ), imag( ka_2pi_all ), 'o' ); 
+text( real( ka_2pi_all ), imag( ka_2pi_all ), k_labels );
+xlabel('real k*a/2pi'); ylabel('imag k*a/2pi');
+title('real vs imag k');
+makeFigureNice();
 
 % Plot the accepted mode
 figure;
-imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
+imagesc( Q.x_coords, Q.y_coords, abs( Q.Phi ) );
 colorbar;
 set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*domain(2)/(2*pi) ) ) );
+title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( Q.k*domain(2)/(2*pi) ) ) );
+
+% % % DEBUG display the unguided power
+% % Q.debug.unguided_power
+% Q.debug.P_rad_up_Hx_only
+% Q.debug.P_rad_up_Hx_Hy 
+% Q.debug.P_rad_down_Hx_only
+% Q.debug.P_rad_down_Hx_Hy
 
 % display calculated k
-fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
+fprintf('\nComplex k = %f + %fi\n', real(Q.k), imag(Q.k) );
 
 % display radiated power
-fprintf('\nRad power up = %e\n', GC.P_rad_up);
-fprintf('Rad power down = %e\n', GC.P_rad_down);
-fprintf('Up/down power directivity = %f\n', GC.directivity);
+fprintf('\nRad power up = %e\n', Q.P_rad_up);
+fprintf('Rad power down = %e\n', Q.P_rad_down);
+fprintf('Up/down power directivity = %f\n', Q.directivity);
 
 % display angle of radiation
-fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
+fprintf('\nAngle of maximum radiation = %f deg\n', Q.max_angle_up);
 
-% plot full Ez with grating geometry overlaid
-GC.plotEz_w_edges();
-axis equal;
+
+
 
 
 

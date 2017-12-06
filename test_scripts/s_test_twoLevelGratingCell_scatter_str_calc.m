@@ -12,7 +12,7 @@ addpath([ '..' filesep 'main' ]);
 % initial settings
 disc        = 10;
 units       = 'nm';
-lambda      = 1300;
+lambda      = 1550;
 index_clad  = 1.0;
 domain      = [ 2000, 800 ];
 
