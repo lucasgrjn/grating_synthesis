@@ -6,12 +6,15 @@
 
 clear; close all;
 
+% add main code
+addpath([ '..' filesep 'main' ]);
+
 % initial settings
 disc        = 10;
 units       = 'nm';
-lambda      = 1550;
+lambda      = 1300;
 index_clad  = 1.0;
-domain      = [ 3000, 800 ];
+domain      = [ 2000, 800 ];
 
 % directory to save data to
 % unused for this script
@@ -69,12 +72,12 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % -------------------------------------------------------------------------
         
 % grating cell params
-period  = 1100;
+period  = 900;
 ratio   = 1;
 offset  = 0.0;
 
 % choose fills to loop through
-fills = linspace(0.2, 0.9, 20);
+fills = linspace(0.5, 0.8, 4);
 
 % init variables
 power_ins   = zeros( size(fills) );
@@ -100,10 +103,28 @@ for ii = 1:length(fills)
     p_rad_dwns(ii)  = GC.P_rad_down;
     angle_ups(ii)   = GC.max_angle_up;
     angle_downs(ii) = GC.max_angle_down;
+    sx_up           = GC.debug.Sx_up;
+    sx_down         = GC.debug.Sx_down;
+    sy_up           = GC.debug.Sy_up;
+    sy_down         = GC.debug.Sy_down;
+    s_up            = sqrt( sx_up.^2 + sy_up(2:end-1).^2 );
+    s_down          = sqrt( sx_down.^2 + sy_down(2:end-1).^2 );
     
-    % plot stuff
-    GC.plotIndex(); title( num2str(ii) );
-    GC.plotEz(); title( num2str(ii) );
+%     % plot stuff
+%     GC.plotIndex(); title( num2str(ii) );
+%     GC.plotEz(); title( num2str(ii) );
+
+    % plot poynting
+    figure;
+    plot( 1:length(s_up), s_up );
+    xlabel('length'); ylabel('Poynting vector mag up');
+    title(['poynting vector up, fill = ' num2str(fills(ii)) ]);
+    makeFigureNice();
+    figure;
+    plot( 1:length(s_down), s_down );
+    xlabel('length'); ylabel('Poynting vector mag down');
+    title(['poynting vector down, fill = ' num2str(fills(ii)) ]);
+    makeFigureNice();
     
 end
 
@@ -214,7 +235,106 @@ makeFigureNice();
 % makeFigureNice();
 
 
+% -------------------------------------------------------------------------
+% loop through a range of periods and calculate the scattering strength
+% -------------------------------------------------------------------------
 
+
+% % grating cell params
+% fill            = 0.8;
+% ratio           = 1;
+% offset          = 0.0;
+% waveguide_length = 500;
+% 
+% % choose fills to loop through
+% periods = 900:50:900;
+% 
+% % init variables
+% power_ins   = zeros( size(periods) );
+% alpha_ups   = zeros( size(periods) );
+% alpha_dwns  = zeros( size(periods) );
+% p_rad_ups   = zeros( size(periods) );
+% p_rad_dwns  = zeros( size(periods) );
+% angle_ups   = zeros( size(periods) );
+% angle_downs = zeros( size(periods) );
+% % sx_up       = zeros( size(periods) );
+% % sx_down     = zeros( size(periods) );
+% % sy_up       = zeros( size(periods) );
+% % sy_down     = zeros( size(periods) );
+% % s_up        = zeros( size(periods) );   % magnitude of poynting vector
+% % s_down      = zeros( size(periods) );   % magnitude of poynting vector
+% 
+% for ii = 1:length(periods)
+%    
+%     fprintf( 'Loop %i of %i\n', ii, length(periods) );
+%     
+%     % make/run grating cell
+%     [Q, GC] = Q.testMakeGratingCell( periods(ii), fill, ratio, offset );
+% %     [Q, GC] = Q.testMakeGratingCell( periods(ii), waveguide_length/periods(ii), ratio, offset );    % hold wg length constant
+%     
+%     % save variables and stuff
+%     power_ins(ii)   = GC.P_in;
+%     alpha_ups(ii)   = GC.alpha_up;
+%     alpha_dwns(ii)  = GC.alpha_down;
+%     p_rad_ups(ii)   = GC.P_rad_up;
+%     p_rad_dwns(ii)  = GC.P_rad_down;
+%     angle_ups(ii)   = GC.max_angle_up;
+%     angle_downs(ii) = GC.max_angle_down;
+%     sx_up           = GC.debug.Sx_up;
+%     sx_down         = GC.debug.Sx_down;
+%     sy_up           = GC.debug.Sy_up;
+%     sy_down         = GC.debug.Sy_down;
+%     s_up            = sqrt( sx_up.^2 + sy_up(2:end-1).^2 );
+%     s_down          = sqrt( sx_down.^2 + sy_down(2:end-1).^2 );
+%     
+%     % plot stuff
+% %     GC.plotIndex(); title( num2str(periods(ii)) );
+% %     GC.plotEz(); title( num2str(periods(ii)) );
+% 
+%     % plot poynting
+%     figure;
+%     plot( 1:length(s_up), s_up );
+%     xlabel('length'); ylabel('Poynting vector mag up');
+%     title(['poynting vector up, period = ' num2str(periods(ii)) ]);
+%     makeFigureNice();
+%     figure;
+%     plot( 1:length(s_down), s_down );
+%     xlabel('length'); ylabel('Poynting vector mag down');
+%     title(['poynting vector down, period = ' num2str(periods(ii)) ]);
+%     makeFigureNice();
+%     
+% end
+% 
+% % plot input power vs. fill
+% figure;
+% plot( periods, power_ins, '-o' );
+% xlabel('Period (nm)'); ylabel('input power');
+% title(['Input power vs. period for fill ' num2str(fill) ]);
+% makeFigureNice();
+% 
+% % plot alphas vs. fill
+% figure;
+% plot( periods, alpha_ups, '-o', periods, alpha_dwns, '-o' );
+% xlabel('Period (nm)'); ylabel('\alpha');
+% title(['Alpha vs. period for fill ' num2str(fill) ]);
+% legend('alpha up', 'alpha down');
+% makeFigureNice();
+% 
+% % plot radiated power
+% figure;
+% plot( periods, p_rad_ups, '-o', periods, p_rad_dwns, '-o' );
+% xlabel('Period (nm)'); ylabel('power');
+% title(['Radiated power vs. period for fill ' num2str(fill) ]);
+% legend('up', 'down');
+% makeFigureNice();
+% 
+% % plot angle vs. fill
+% figure;
+% plot( periods, angle_ups, '-o', periods, angle_downs, '-o' );
+% xlabel('Period (nm)'); ylabel('angle');
+% title(['angle vs. period for fill ' num2str(fill) ]);
+% legend('up', 'down');
+% makeFigureNice();
 
 
 

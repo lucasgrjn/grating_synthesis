@@ -88,7 +88,7 @@ classdef c_twoLevelGratingCell
         % DEBUG struct for holding temporary values that are useful during
         % debugging
         %   Current fields: k_all, phi_all, unguided_power, guided_power,
-        %                   p_rad_up
+        %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down
         debug;
         
     end
@@ -466,8 +466,8 @@ classdef c_twoLevelGratingCell
             H_y_up( ( 1:length(H_y_up2) )*2 )       = H_y_up2;
 
             % power radiated up
-            Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                  % Sy = real( Ez Hx* )
-            Sx_up = real( -H_y_up(:)' .* E_z( y_up, 2:end-1 ) );        % Sx = real( -Ez Hy* )
+            Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                          % Sy = real( Ez Hx* )
+            Sx_up = real( (-1) * H_y_up(:)' .* E_z( y_up, 2:end-1 ) );          % Sx = real( -Ez Hy* )
 %             P_rad_up_Hx_only    = sum( abs(Sy_up) )*obj.dx;                                    % only using Sy component
             P_rad_up      = sum( sqrt( Sy_up( 2:end-1 ).^2 + Sx_up.^2 ) )*obj.dx;        % using both Sx and Sy compmonents
 
@@ -504,6 +504,12 @@ classdef c_twoLevelGratingCell
 %             P_rad_down = P_rad_down_Hx_Hy;
             obj.P_rad_down    = P_rad_down;
             obj.P_rad_up      = P_rad_up;
+            
+            % DEBUG save Sx and Sy
+            obj.debug.Sx_up     = Sx_up;
+            obj.debug.Sx_down   = Sx_down;
+            obj.debug.Sy_up     = Sy_up;
+            obj.debug.Sy_down   = Sy_down;
             
         end     % end function calc_radiated_power()
         
@@ -622,9 +628,18 @@ classdef c_twoLevelGratingCell
             Sy_in = real( conj(H_x_in(:)) .* E_z( 2:end-1, 2 ) );           % Sy = real( Ez Hx* )
             Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( 2:end-1, 2 ) );      % Sx = real( -Ez Hy* )
             P_in  = sum( sqrt( Sy_in.^2 + Sx_in.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
+%             % DEBUG use just Sx
+%             P_in = sum( Sx_in(:) );
+
+            % DEBUG let H_y_in be on half step'
+            H_y_in_half = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 2 ) - E_z( 2:end-1, 1 ) )/(obj.dx);   % dy, term staggered 1
+            Sx_in_athalf = real( -1 * conj(H_y_in_half(:)) .* E_z( 2:end-1, 1 ) );                         % Sx = real( -Ez Hy* )
+            P_in_athalf  = sum( sqrt( Sy_in.^2 + Sx_in_athalf.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
             
             % save input power
             obj.P_in = P_in;
+            % TEMP DEBUG
+%             obj.P_in = P_in_athalf;
             
             % calculate alpha efficiency (in 1/units)
             period          = obj.domain_size(2);
