@@ -54,7 +54,7 @@ for ii = 1:2:( length(inputs)-1 )
             end
         else
             % this input has a default, set the default
-            fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, inputs{ii+1} );
+            fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, num2str(inputs{ii+1}) );
             p.(inputs{ii}) = inputs{ii+1};
         end
 

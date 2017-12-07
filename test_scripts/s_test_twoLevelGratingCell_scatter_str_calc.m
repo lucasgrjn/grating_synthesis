@@ -12,7 +12,7 @@ addpath([ '..' filesep 'main' ]);
 % initial settings
 disc        = 10;
 units       = 'nm';
-lambda      = 1550;
+lambda      = 1700;
 index_clad  = 1.0;
 domain      = [ 2000, 800 ];
 
@@ -72,12 +72,12 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % -------------------------------------------------------------------------
         
 % grating cell params
-period  = 900;
+period  = 1000;
 ratio   = 1;
 offset  = 0.0;
 
 % choose fills to loop through
-fills = linspace(0.5, 0.8, 4);
+fills = linspace(0.2, 1, 30);
 
 % init variables
 power_ins   = zeros( size(fills) );
@@ -103,28 +103,28 @@ for ii = 1:length(fills)
     p_rad_dwns(ii)  = GC.P_rad_down;
     angle_ups(ii)   = GC.max_angle_up;
     angle_downs(ii) = GC.max_angle_down;
-    sx_up           = GC.debug.Sx_up;
-    sx_down         = GC.debug.Sx_down;
-    sy_up           = GC.debug.Sy_up;
-    sy_down         = GC.debug.Sy_down;
-    s_up            = sqrt( sx_up.^2 + sy_up(2:end-1).^2 );
-    s_down          = sqrt( sx_down.^2 + sy_down(2:end-1).^2 );
+%     sx_up           = GC.debug.Sx_up;
+%     sx_down         = GC.debug.Sx_down;
+%     sy_up           = GC.debug.Sy_up;
+%     sy_down         = GC.debug.Sy_down;
+%     s_up            = sqrt( sx_up.^2 + sy_up(2:end-1).^2 );
+%     s_down          = sqrt( sx_down.^2 + sy_down(2:end-1).^2 );
     
 %     % plot stuff
 %     GC.plotIndex(); title( num2str(ii) );
 %     GC.plotEz(); title( num2str(ii) );
 
-    % plot poynting
-    figure;
-    plot( 1:length(s_up), s_up );
-    xlabel('length'); ylabel('Poynting vector mag up');
-    title(['poynting vector up, fill = ' num2str(fills(ii)) ]);
-    makeFigureNice();
-    figure;
-    plot( 1:length(s_down), s_down );
-    xlabel('length'); ylabel('Poynting vector mag down');
-    title(['poynting vector down, fill = ' num2str(fills(ii)) ]);
-    makeFigureNice();
+%     % plot poynting
+%     figure;
+%     plot( 1:length(s_up), s_up );
+%     xlabel('length'); ylabel('Poynting vector mag up');
+%     title(['poynting vector up, fill = ' num2str(fills(ii)) ]);
+%     makeFigureNice();
+%     figure;
+%     plot( 1:length(s_down), s_down );
+%     xlabel('length'); ylabel('Poynting vector mag down');
+%     title(['poynting vector down, fill = ' num2str(fills(ii)) ]);
+%     makeFigureNice();
     
 end
 

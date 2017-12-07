@@ -10,34 +10,13 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-% domain      = [ 1600, 470 ];
-% domain      = [ 1600, 700 ];
-
-% quick back of envelope calculation for period
-theta   = 15 * pi/180;
-neff    = 2.25;    % very approximate
-kg      = 2*pi*neff/lambda;
-kclad   = 2*pi*index_clad/lambda;
-period_approx = (2*pi)/( kg - kclad*sin(theta) );
-
-% round the period and set the domain
-period_approx_round = round( period_approx * 1e-1 )/1e-1;
-period              = period_approx_round;
-domain              = [ 1600, period ];
-
-% % Init a new object
-% Q = c_twoLevelGratingCell(  'discretization', disc, ...
-%                             'units', units, ...
-%                             'lambda', lambda, ...
-%                             'domain_size', domain, ...
-%                             'background_index', index_clad )
-
+domain      = [ 2000, 900 ];
 
 % draw two levels using two level builder function
-wg_thick        = [ 80, 80 ];
+wg_thick        = [ 100, 100 ];
 wg_min_y        = [ domain(1)/2-wg_thick(1), domain(1)/2 ];
 wg_indx         = [ 3.4, 3.4 ];
-wgs_duty_cycles = [ 0.5, 0.5 ];
+wgs_duty_cycles = [ 0.7, 0.7 ];
 
 % DEBUG plot the index
 % Q.plotIndex();
@@ -54,10 +33,11 @@ pml_options = [ 1, 200, 500, 2 ];
 % Sweep offsets and run simulations
 % max_offset_top  = domain(2) - domain(2)*wgs_duty_cycles(2);
 offset_bot  = domain(2) - domain(2)*wgs_duty_cycles(1);
-offsets         = 0:20:domain(2);
+offsets     = 0:20:domain(2)/2;
 % offsets     = 0:10:20;                                  % DEBUG 
 % offsets     = [ 0, 500, 800 ];
-wgs_offsets = [ offset_bot*ones(size(offsets)); offsets ];
+% wgs_offsets = [ offset_bot*ones(size(offsets)); offsets ];
+% wgs_offsets = [ offset_bot*ones(size(offsets)); offsets ];
 
 % saving results in these variables
 k_all           = [];
@@ -77,11 +57,12 @@ for ii = 1:length(offsets)
                                 'units', units, ...
                                 'lambda', lambda, ...
                                 'domain_size', domain, ...
-                                'background_index', index_clad );
+                                'background_index', index_clad, ...
+                                'numcells', 5 );
       
     % draw grating
     Q = Q.twoLevelBuilder( wg_min_y, wg_thick, wg_indx, ...
-                           wgs_duty_cycles, wgs_offsets( :, ii ) );
+                           wgs_duty_cycles, [0, offsets(ii)] );
     
     % run simulation
     Q = Q.runSimulation( num_modes, BC, pml_options );

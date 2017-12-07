@@ -93,7 +93,8 @@ classdef c_twoLevelGratingCell
         % DEBUG struct for holding temporary values that are useful during
         % debugging
         %   Current fields: k_all, phi_all, unguided_power, guided_power,
-        %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down
+        %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down, Sx_in
+        %   Some of the above fields may have been removed.
         debug;
         
     end
@@ -114,7 +115,7 @@ classdef c_twoLevelGratingCell
                         'lambda',           'none', ...
                         'background_index', 1.0,    ...
                         'domain_size',      'none', ...
-                        'numcells',         5 ...
+                        'numcells',         10 ...
                      }; 
                  
             p = f_parse_varargin( inputs, varargin{:} );
@@ -475,9 +476,10 @@ classdef c_twoLevelGratingCell
 
             % power radiated up
             Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                          % Sy = real( Ez Hx* )
-            Sx_up = real( (-1) * H_y_up(:)' .* E_z( y_up, 2:end-1 ) );          % Sx = real( -Ez Hy* )
+%             Sx_up = real( (-1) * H_y_up(:)' .* E_z( y_up, 2:end-1 ) );          % Sx = real( -Ez Hy* )
 %             P_rad_up_Hx_only    = sum( abs(Sy_up) )*obj.dx;                                    % only using Sy component
-            P_rad_up      = sum( sqrt( Sy_up( 2:end-1 ).^2 + Sx_up.^2 ) )*obj.dx;        % using both Sx and Sy compmonents
+%             P_rad_up      = sum( sqrt( Sy_up( 2:end-1 ).^2 + Sx_up.^2 ) )*obj.dx;        % using both Sx and Sy compmonents
+            P_rad_up      = sum( abs(Sy_up) )*obj.dx;        % using both Sx and Sy compmonents
 
             % DEBUG save p rad up
 %             obj.debug.P_rad_up_Hx_only  = P_rad_up_Hx_only;
@@ -499,9 +501,9 @@ classdef c_twoLevelGratingCell
 
             % power radiated down
             Sy_down = real( H_x_down(:)' .* E_z(y_down,:) );                % Sy = real( Ez Hx* )
-            Sx_down = real( -H_y_down(:)' .* E_z(y_down, 2:end-1 ) );       % Sx = real( -Ez Hy* )
+%             Sx_down = real( -H_y_down(:)' .* E_z(y_down, 2:end-1 ) );       % Sx = real( -Ez Hy* )
 %             P_rad_down_Hx_only  = sum( abs(Sy_down) );                      % only using Sy component
-            P_rad_down    = sum( sqrt( Sy_down( 2:end-1 ).^2 + Sx_down.^2 ) )*obj.dx;   % using both Sx and Sy compmonents
+            P_rad_down    = sum( abs(Sy_down) )*obj.dx;     % using both Sx and Sy compmonents
 
             % DEBUG save p rad down
 %             obj.debug.P_rad_down_Hx_only  = P_rad_down_Hx_only;
@@ -514,8 +516,8 @@ classdef c_twoLevelGratingCell
             obj.P_rad_up      = P_rad_up;
             
             % DEBUG save Sx and Sy
-            obj.debug.Sx_up     = Sx_up;
-            obj.debug.Sx_down   = Sx_down;
+%             obj.debug.Sx_up     = Sx_up;
+%             obj.debug.Sx_down   = Sx_down;
             obj.debug.Sy_up     = Sy_up;
             obj.debug.Sy_down   = Sy_down;
             
@@ -643,20 +645,26 @@ classdef c_twoLevelGratingCell
             H_x_in( ( 1:length(H_x_in2) )*2 )       = H_x_in2;
             
             % H y in (on the same grid as Hx in)
-            H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
+%             H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
+            
+            % NEW: H y in , on half step, using entire E_z slice
+            H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 2 ) - E_z( :, 1 ) )/(obj.dx);   % dy, term staggered 1
             
             % power in (at left edge)
-            Sy_in = real( conj(H_x_in(:)) .* E_z( 2:end-1, 2 ) );           % Sy = real( Ez Hx* )
-            Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( 2:end-1, 2 ) );      % Sx = real( -Ez Hy* )
-            P_in  = sum( sqrt( Sy_in.^2 + Sx_in.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
-%             % DEBUG use just Sx
-%             P_in = sum( Sx_in(:) );
+%             Sy_in = real( conj(H_x_in(:)) .* E_z( 2:end-1, 2 ) );           % Sy = real( Ez Hx* )
+            Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );      % Sx = real( -Ez Hy* )
+%             P_in  = sum( sqrt( Sy_in.^2 + Sx_in.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
+%             % NEW use just Sx
+            P_in = sum( Sx_in(:) )*obj.dy;
 
-            % DEBUG let H_y_in be on half step'
-            H_y_in_half = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 2 ) - E_z( 2:end-1, 1 ) )/(obj.dx);   % dy, term staggered 1
-            Sx_in_athalf = real( -1 * conj(H_y_in_half(:)) .* E_z( 2:end-1, 1 ) );                         % Sx = real( -Ez Hy* )
-            P_in_athalf  = sum( sqrt( Sy_in.^2 + Sx_in_athalf.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
+%             % DEBUG let H_y_in be on half step'
+%             H_y_in_half = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 2 ) - E_z( 2:end-1, 1 ) )/(obj.dx);   % dy, term staggered 1
+%             Sx_in_athalf = real( -1 * conj(H_y_in_half(:)) .* E_z( 2:end-1, 1 ) );                         % Sx = real( -Ez Hy* )
+%             P_in_athalf  = sum( sqrt( Sy_in.^2 + Sx_in_athalf.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
             
+            % DEBUG save Sx_in
+            obj.debug.Sx_in = Sx_in;
+
             % save input power
             obj.P_in = P_in;
             % TEMP DEBUG

@@ -9,8 +9,8 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-domain      = [ 3000, 900 ];
-numcells    = 50;
+domain      = [ 2000, 900 ];
+numcells    = 10;
 
 % Init a new object
 GC = c_twoLevelGratingCell(  'discretization', disc, ...
@@ -31,7 +31,8 @@ wg_index        = [ 3.4, 3.4 ];
 wg_thick        = [ 100, 100 ];
 wg_min_y        = [ domain(1)/2, domain(1)/2-wg_thick(1) ];
 wgs_duty_cycles = [ fill*ratio, fill ];
-wgs_offsets     = [ 0, offset*period ];
+% wgs_offsets     = [ 0, offset*period ];
+wgs_offsets     = [ 0, 200 ];
 GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
                                         wgs_duty_cycles, wgs_offsets );
                                  
@@ -98,6 +99,51 @@ fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
 % plot full Ez with grating geometry overlaid
 GC.plotEz_w_edges();
 axis equal;
+
+% % plot a slice of Eup vs. Sup
+% y_up    = 279;
+% E_slice = GC.E_z( y_up, : );
+% figure;
+% plot( 1:length(E_slice), abs(E_slice)./max(abs(E_slice(:))) ); hold on;
+% % plot( 1:length(E_slice), GC.debug.Sy_up./max(abs(GC.debug.Sy_up(:))) );
+% plot( 1:length(E_slice), GC.debug.Sy_down./max(abs(GC.debug.Sy_down(:))) );
+% legend('E field (abs)', 'S_y');
+% title('E field and S_y, normalized to 1');
+% makeFigureNice();
+% 
+% % plot input S and E
+% E_in = GC.E_z( :, 1 );
+% figure;
+% plot( 1:length(E_in), abs(E_in)./max(abs(E_in(:))) ); hold on;
+% plot( 1:length(E_in), GC.debug.Sx_in./max(abs(GC.debug.Sx_in(:))) );
+% % plot( 1:length(E_slice), GC.debug.Sy_down./max(abs(GC.debug.Sy_down(:))) );
+% legend('E field (abs)', 'S_x');
+% title('E field and S_x at input, normalized to 1');
+% makeFigureNice();
+% 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
