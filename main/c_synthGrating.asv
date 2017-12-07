@@ -20,26 +20,21 @@ classdef c_synthGrating
 %           % makes and returns a c_twoLevelGratingCell object
 % 
 %           inputs:
-%               synth_obj
-%               type: c_synthGrating object AS STRUCT
-%               desc: c_synthGrating object AS STRUCT
-%           period
-%               type: double, scalar
-%               desc: period of the grating cell
-%           fill
-%               type: double, scalar
-%               desc: ratio of bottom layer to period
-%           ratio
-%               type: double, scalar
-%               desc: ratio of top layer to bottom layer
-%           offset_ratio
-%               type: double, scalar
-%               desc: ratio of bottom layer offset to period
-%
-%   As an example:
-%       see the default makeGratingCell() function that's included at the
-%       end of this class definition. It makes a simple waveguide + air
-%       cladding grating, no fancyness
+%   synth_obj
+%       type: c_synthGrating object AS STRUCT
+%       desc: c_synthGrating object AS STRUCT
+%   period
+%       type: double, scalar
+%       desc: period of the grating cell
+%   fill
+%       type: double, scalar
+%       desc: ratio of bottom layer to period
+%   ratio
+%       type: double, scalar
+%       desc: ratio of top layer to bottom layer
+%   offset_ratio
+%       type: double, scalar
+%       desc: ratio of bottom layer offset to period
 %
 % outputs:
 %   GC
@@ -315,12 +310,7 @@ classdef c_synthGrating
             %       type: Function handle
             %       desc: Handle to function that will instantiate and
             %             return a grating cell object, which can then be
-            %             simulated in this parameter sweep code.
-            %             MAKE SURE THE FUNCTION FOLLOWS THE EXACT CRITERIA
-            %             OUTLINED IN THE TOP CLASS DOCUMENTATION
-            %
-            % example:
-            %   obj = obj.runParameterSweep( @makeMyGratingCell )
+            %             simulated in this parameter sweep code
             
             fprintf('Running parameter sweep...\n\n');
             
@@ -329,7 +319,8 @@ classdef c_synthGrating
                 fprintf('No user-defined grating cell function was passed as an input. Defaulting to dummy grating\n\n');
                 h_makeGratingCell = @makeGratingCell;
             end
-         
+  
+            
             % extract some variables from the object
             fill_vec    = obj.fill_vec;
             ratio_vec   = obj.ratio_vec;

@@ -41,17 +41,11 @@ classdef c_twoLevelGratingCell
 %             drawing/calculating Ez
     
     properties
-%         OPTS
-%         dims
-%         indexes
+
         N;       % index profile
-%         domain
         dx;      % discretization in x (dir of propagation)
         dy;      % discretization in y (transverse direction)
-%         inputs
-%         constants
-%         alpha
-        
+
         % -----------
         % new properties
         units;          % name and scaling of spatial units, supports 'm', 'mm', 'um', 'nm'
