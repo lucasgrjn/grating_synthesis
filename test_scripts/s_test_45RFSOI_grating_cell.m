@@ -66,3 +66,29 @@ Q = c_synthGrating( 'discretization',   disc,       ...
                     'data_mode',        'new', ...
                     'num_par_workers',  n_workers ...
             );
+        
+% test the make 45RFSOI function
+period          = 800;
+fill            = 0.8;
+ratio           = 1.0;
+offset_ratio    = 0.0;
+GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill, ratio, offset_ratio );
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

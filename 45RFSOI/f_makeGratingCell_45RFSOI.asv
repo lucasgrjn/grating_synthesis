@@ -25,11 +25,6 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill, ratio, offset_
 %       desc: two level grating cell object
 %
 % example:
-%   period          = 800;
-%   fill            = 0.8;
-%   ratio           = 1.0;
-%   offset_ratio    = 0.0;
-%   GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill, ratio, offset_ratio );
 
 
 % set domain 
@@ -41,7 +36,7 @@ GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
                             'units', synth_obj.units.name, ...
                             'lambda', synth_obj.lambda, ...
                             'domain_size', domain_size, ...
-                            'background_index', 1.0 );
+                            'background_index', synth_obj.background_index );
 
 % draw layers
 
