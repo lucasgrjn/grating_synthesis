@@ -5,14 +5,19 @@
 
 clear; close all;
 
+addpath(['..' filesep 'main']);
+
+% TEMPORARY add breakpoint on error
+dbstop if error;
+
 % directory to save data to
 % data_dir        = [ pwd, filesep, 'test_datasave' ];
-% % 11/28/17 data -------------
-% data_dir        = 'C:\Users\bz\Google Drive\research\popovic group\code\grating_synthesis\grating_synth_refactor\test_datasave\2017 11 28 sweep fill\sweep_fill';
-% data_filename   = 'sweep fill combined.mat';
-% 11/29/17 data -------------
-data_dir        = 'C:\Users\bz\Google Drive\research\popovic group\code\grating_synthesis\grating_synth_refactor\test_datasave\2017 11 29 sweep fill\sweep_fill';
+% 11/28/17 data -------------
+data_dir        = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\test_datasave\2017 11 28 sweep fill\sweep_fill';
 data_filename   = 'sweep fill combined.mat';
+% % 11/29/17 data -------------
+% data_dir        = 'C:\Users\bz\Google Drive\research\popovic group\code\grating_synthesis\grating_synth_refactor\test_datasave\2017 11 29 sweep fill\sweep_fill';
+% data_filename   = 'sweep fill combined.mat';
 
 % make object
 Q = c_synthGrating( 'data_directory',   data_dir, ...

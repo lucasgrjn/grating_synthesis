@@ -1303,25 +1303,30 @@ classdef c_synthGrating
                 % TRICK - i can use the twoLeveLgratingcell to build the
                 % dielectric for the emeSim
                 % make grating cell, in units of um
-                cur_period_um   = periods_synth(ii) * obj.units.scale * um;                     % um
-                domain_um       = [ xf, cur_period_um ];                                        % in um
-                gratingcell     = c_twoLevelGratingCell(  'discretization', [ dx, dz ], ...
-                                            'units', 'um', ...
-                                            'lambda', lambda_um, ...
-                                            'domain_size', domain_um, ...
-                                            'background_index', obj.background_index );
+%                 cur_period_um   = periods_synth(ii) * obj.units.scale * um;                     % um
+%                 domain_um       = [ xf, cur_period_um ];                                        % in um
+%                 gratingcell     = c_twoLevelGratingCell(  'discretization', [ dx, dz ], ...
+%                                             'units', 'um', ...
+%                                             'lambda', lambda_um, ...
+%                                             'domain_size', domain_um, ...
+%                                             'background_index', obj.background_index );
+                gratingcell = obj.h_makeGratingCell(  obj_as_struct, ...
+                                                     periods_synth(ii), ...
+                                                     fills_synth(ii), ...
+                                                     ratios_synth(ii), ...
+                                                     offsets_synth(ii) );
                                         
-                % draw cell
-                % draw two levels using two level builder function
-                wg_thick_um     = obj.waveguide_thicks * obj.units.scale * um;     % in um
-                wg_min_y        = [ domain_um(1)/2, domain_um(1)/2-wg_thick_um(1) ];
-                wgs_duty_cycles = [ fills_synth(ii)*ratios_synth(ii), fills_synth(ii) ];
-                wgs_offsets     = [ 0, offsets_synth(ii) * cur_period_um ];
-                gratingcell     = gratingcell.twoLevelBuilder(  wg_min_y, wg_thick_um, obj.waveguide_index, ...
-                                                                wgs_duty_cycles, wgs_offsets );
+%                 % draw cell
+%                 % draw two levels using two level builder function
+%                 wg_thick_um     = obj.waveguide_thicks * obj.units.scale * um;     % in um
+%                 wg_min_y        = [ domain_um(1)/2, domain_um(1)/2-wg_thick_um(1) ];
+%                 wgs_duty_cycles = [ fills_synth(ii)*ratios_synth(ii), fills_synth(ii) ];
+%                 wgs_offsets     = [ 0, offsets_synth(ii) * cur_period_um ];
+%                 gratingcell     = gratingcell.twoLevelBuilder(  wg_min_y, wg_thick_um, obj.waveguide_index, ...
+%                                                                 wgs_duty_cycles, wgs_offsets );
                                                             
                 % create cell dielectric
-                cell_diel = gratingcell.N;
+%                 cell_diel = gratingcell.N;
 
                 % draw to diel
                 try

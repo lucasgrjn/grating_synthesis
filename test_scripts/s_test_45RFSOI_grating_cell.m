@@ -68,17 +68,49 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
         
 % test the make 45RFSOI function
-period          = 800;
+period          = 700;
 fill            = 0.8;
 ratio           = 1.0;
-offset_ratio    = 0.0;
+offset_ratio    = 0.3;
 GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill, ratio, offset_ratio );
 
+% plot index
+GC.plotIndex();
         
-        
-        
-        
-        
+% simulate
+% run simulation
+num_modes   = 20;
+BC          = 0;     % 0 for PEC, 1 for PMC
+% PML_options(1): PML in y direction (yes=1 or no=0)
+% PML_options(2): length of PML layer in nm
+% PML_options(3): strength of PML in the complex plane
+% PML_options(4): PML polynomial order (1, 2, 3...)
+pml_options = [ 1, 200, 500, 2 ];
+
+% run simulation
+GC = GC.runSimulation( num_modes, BC, pml_options );
+
+% Plot the accepted mode
+figure;
+imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
+colorbar;
+set( gca, 'YDir', 'normal' );
+title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*domain(2)/(2*pi) ) ) );
+
+% display calculated k
+fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
+
+% display radiated power
+fprintf('\nRad power up = %e\n', GC.P_rad_up);
+fprintf('Rad power down = %e\n', GC.P_rad_down);
+fprintf('Up/down power directivity = %f\n', GC.directivity);
+
+% display angle of radiation
+fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
+
+% plot full Ez with grating geometry overlaid
+GC.plotEz_w_edges();
+axis equal;
         
         
         
