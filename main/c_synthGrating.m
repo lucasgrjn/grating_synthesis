@@ -1088,42 +1088,42 @@ classdef c_synthGrating
             title('Offset ratio for best directionality vs. layer ratio');
             makeFigureNice();
             
-            % DEBUG
-            % unfortunately I fucked up and didn't simulate the scattering
-            % strength correctly, so as a workaround I have to re-simulate
-            % these gratings again
-%             tic;
-            
-            % start parpool
-            poolobj = gcp('nocreate'); % If no pool, do not create new one.
-            if ~isempty(poolobj)
-                % shut down previously made parallel pool
-                delete(gcp('nocreate'));
-            end
-            parpool('local', 4);
-
-            n_loops     = length(obj.ratio_vec);
-            parfor ii = 1:length( obj.ratio_vec )
-               
-                fprintf('DEBUG running re-sim loop %i of %i\n', ii, n_loops );
-                
-                % simulate grating
-                GC = obj.h_makeGratingCell( obj.convertObjToStruct(), best_period_v_ratio(ii), best_fill_v_ratio(ii), ...
-                                            obj.ratio_vec(ii), best_offset_v_ratio(ii) );
-                                        
-                % run simulation
-                GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-                
-                % save scattering strength
-                if strcmp(obj.coupling_direction, 'up')
-                    best_scatter_v_ratio(ii) = GC.alpha_up;
-                else
-                    best_scatter_v_ratio(ii) = GC.alpha_down;
-                end
-                
-%                 toc;
-                
-            end     % end for ii = 1:length(obj.ratio_vec)
+%             % DEBUG
+%             % unfortunately I fucked up and didn't simulate the scattering
+%             % strength correctly, so as a workaround I have to re-simulate
+%             % these gratings again
+% %             tic;
+%             
+%             % start parpool
+%             poolobj = gcp('nocreate'); % If no pool, do not create new one.
+%             if ~isempty(poolobj)
+%                 % shut down previously made parallel pool
+%                 delete(gcp('nocreate'));
+%             end
+%             parpool('local', 4);
+% 
+%             n_loops     = length(obj.ratio_vec);
+%             parfor ii = 1:length( obj.ratio_vec )
+%                
+%                 fprintf('DEBUG running re-sim loop %i of %i\n', ii, n_loops );
+%                 
+%                 % simulate grating
+%                 GC = obj.h_makeGratingCell( obj.convertObjToStruct(), best_period_v_ratio(ii), best_fill_v_ratio(ii), ...
+%                                             obj.ratio_vec(ii), best_offset_v_ratio(ii) );
+%                                         
+%                 % run simulation
+%                 GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
+%                 
+%                 % save scattering strength
+%                 if strcmp(obj.coupling_direction, 'up')
+%                     best_scatter_v_ratio(ii) = GC.alpha_up;
+%                 else
+%                     best_scatter_v_ratio(ii) = GC.alpha_down;
+%                 end
+%                 
+% %                 toc;
+%                 
+%             end     % end for ii = 1:length(obj.ratio_vec)
             
             % plot scatter
             figure;
@@ -1271,26 +1271,16 @@ classdef c_synthGrating
             % draw the input waveguide section
             % using the trick that i can write and return the index from
             % the two level grating cell
-            domain_um       = [ xf, z_in ];
             % first override the discretization
             obj_as_struct = obj.convertObjToStruct();
             obj_as_struct.discretization = [ dx, dz ] / ( um * obj.units.scale );
+            % now make the grating cell
             gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
                                                      z_in/(um*obj.units.scale), ...
                                                      1.0, ...
                                                      0.0, ...
                                                      0.0 );
-% %             gratingcell_in  = c_twoLevelGratingCell(  'discretization', [ dx, dz ], ...
-% %                                         'units', 'um', ...
-% %                                         'lambda', lambda_um, ...
-% %                                         'domain_size', domain_um, ...
-% %                                         'background_index', obj.background_index );
-%             % draw input wg
-%             % TEMPORARY - currently assuming the inverted design
-%             wg_thick_um     = [0, obj.waveguide_thicks(2) * obj.units.scale * um];     % in um
-%             wg_min_y        = [ domain_um(1)/2, domain_um(1)/2-wg_thick_um(2) ];
-%             gratingcell_in  = gratingcell_in.twoLevelBuilder(  wg_min_y, wg_thick_um, obj.waveguide_index, ...
-%                                                             [ 1, 1 ], [ 0, 0 ] );
+
             % draw to diel
             diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + z_in ) = gratingcell_in.N;
             % update z
@@ -1302,30 +1292,14 @@ classdef c_synthGrating
                
                 % TRICK - i can use the twoLeveLgratingcell to build the
                 % dielectric for the emeSim
-                % make grating cell, in units of um
-                cur_period_um   = periods_synth(ii) * obj.units.scale * um;                     % um
-                domain_um       = [ xf, cur_period_um ];                                        % in um
-                gratingcell     = c_twoLevelGratingCell(  'discretization', [ dx, dz ], ...
-                                            'units', 'um', ...
-                                            'lambda', lambda_um, ...
-                                            'domain_size', domain_um, ...
-                                            'background_index', obj.background_index );
-                                        
-                % draw cell
-                % draw two levels using two level builder function
-                wg_thick_um     = obj.waveguide_thicks * obj.units.scale * um;     % in um
-                wg_min_y        = [ domain_um(1)/2, domain_um(1)/2-wg_thick_um(1) ];
-                wgs_duty_cycles = [ fills_synth(ii)*ratios_synth(ii), fills_synth(ii) ];
-                wgs_offsets     = [ 0, offsets_synth(ii) * cur_period_um ];
-                gratingcell     = gratingcell.twoLevelBuilder(  wg_min_y, wg_thick_um, obj.waveguide_index, ...
-                                                                wgs_duty_cycles, wgs_offsets );
-                                                            
-                % create cell dielectric
-                cell_diel = gratingcell.N;
+                gratingcell = obj.h_makeGratingCell(  obj_as_struct, ...
+                                                     periods_synth(ii), ...
+                                                     fills_synth(ii), ...
+                                                     ratios_synth(ii), ...
+                                                     offsets_synth(ii) );                                                
 
                 % draw to diel
                 try
-%                     diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + cur_period_um ) = gratingcell.N;
                     diel( :, cur_z_indx:( cur_z_indx + size(gratingcell.N,2) - 1) ) = gratingcell.N;
                 catch ME
                     fprintf('ERROR dielectric sizes don''t match ya better debug this bud\n');
@@ -1378,7 +1352,7 @@ classdef c_synthGrating
         
         
         function obj  = sweepPeriodFill(obj)
-            % CURRENTLY ONLY FOR TESTING
+            % DEPRECATED
             % Sweeps extrema of period and fill to get sense of possible
             % angular distribution of these grating cell dimensions
             %
