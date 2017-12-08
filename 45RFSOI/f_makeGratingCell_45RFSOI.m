@@ -34,10 +34,10 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %
 % example:
 %   period          = 800;
-%   fill            = 0.8;
-%   ratio           = 1.0;
+%   fill_top        = 0.8;
+%   fill_bot        = 0.6;
 %   offset_ratio    = 0.0;
-%   GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill, ratio, offset_ratio );
+%   GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
 %       Then you can plot it and look at what the dielectric looks like:
 %   GC.plotIndex()
 

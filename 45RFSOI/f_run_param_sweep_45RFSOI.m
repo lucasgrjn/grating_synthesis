@@ -1,7 +1,8 @@
-function [] = f_run_param_sweep( n_workers, fill_top )
+function [] = f_run_param_sweep_45RFSOI( n_workers, fill_top )
 % authors: bohan
 % 
 % function for running the parameter sweep
+% FOR THE 45RFSOI dimensions
 %
 % inputs:
 % 	TEMPORARY: pick ONE fill to try
@@ -35,15 +36,6 @@ fill_bot_vec    = linspace(0.3, 1.0, 40);
 % ratio_vec   = linspace(0.3, 1.2, 40);
 fill_top_vec    = fill_top;                         % [ fill1, fill2 ];
 
-% for debugging
-% period_vec = 500:10:800;
-% offset_vec = 0.2;
-% ratio_vec  = 1.0;
-% fill_vec   = 0.6;
-% period_vec  = 500;
-% offset_vec  = 0.2;
-% ratio_vec   = 1.0;
-
 % waveguide index/thickness
 waveguide_index     = [ 3.47, 3.47 ];
 waveguide_thicks    = [ 100, 100 ];
@@ -72,7 +64,8 @@ Q = c_synthGrating( 'discretization',   disc,       ...
                     'data_filename',    data_filename, ...
                     'data_notes',       data_notes, ...
                     'data_mode',        'new', ...
-                    'num_par_workers',  n_workers ...
+                    'num_par_workers',  n_workers, ...
+                    'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
             );
 %                     'ratio_vec',        ratio_vec,  ...
 %                     'fill_vec',         fill_vec,   ...
