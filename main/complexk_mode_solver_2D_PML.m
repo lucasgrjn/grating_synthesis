@@ -77,9 +77,9 @@ yhalf(2:number_y) = y(1:number_y-1)+(y(2:number_y)-y(1:number_y-1))/2;
 yhalf(1) = yhalf(2)+(yhalf(2)-yhalf(3));
 yhalf(number_y+1) = yhalf(number_y)+(yhalf(number_y)-yhalf(number_y-1));
 
-% DEBUGGING
-fprintf('Time to set up A matrix:\n');
-tic;
+% % DEBUGGING
+% fprintf('Time to set up A matrix:\n');
+% tic;
 
 % Setup A matrix
 A = sparse(number_xy);
@@ -178,10 +178,10 @@ for k = 1:number_xy
     end
 end
 
-toc;
-% DEBUGGING
-fprintf('Time to set up B matrix:\n');
-tic;
+% toc;
+% % DEBUGGING
+% fprintf('Time to set up B matrix:\n');
+% tic;
 
 % Setup B matrix
 B = sparse(number_xy);
@@ -235,10 +235,10 @@ for k = 1:number_xy
     end
 end
 
-toc;
-% DEBUGGING
-fprintf('Time to solve eigs:\n');
-tic;
+% toc;
+% % DEBUGGING
+% fprintf('Time to solve eigs:\n');
+% tic;
 
 % Setup C matrix
 C = -1.*speye(number_x*number_y);
@@ -249,7 +249,7 @@ L2 = [sparse(number_x*number_y,number_x*number_y) -C; speye(number_x*number_y) s
 [Phi_out, k_out] = eigs(L1, L2, modes, guessk);
 k_unsorted = diag(k_out);
 
-toc;
+% toc;
 
 % Sort outputs for 0<k<pi/a
 jjj = 1;

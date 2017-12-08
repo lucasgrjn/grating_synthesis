@@ -150,8 +150,10 @@ classdef c_synthGrating
         domain_size;        % domain size, [ y size (height), x size (length) ]
         period_vec;         % periods to sweep
         offset_vec;         % offsets to sweep
-        ratio_vec;          % ratios of top to bottom teeth lengths to sweep
-        fill_vec;           % fill ratios of top teeth to sweep
+%         ratio_vec;          % ratios of top to bottom teeth lengths to sweep
+%         fill_vec;           % fill ratios of top teeth to sweep
+        fill_top_vec;       % top tooth fill ratio
+        fill_bot_vec;       % bot tooth fill ratio
         optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
         inputs;             % saves input settings for user reference
 
@@ -174,6 +176,8 @@ classdef c_synthGrating
         
         sweep_results;      % struct holding results of parameter sweep
                             % tensors have dimensions ( fill, ratio, period, offset )
+                            % AS OF 2017/12/08 CHANGED TO BE (fill top,
+                            % fill bot, period, offset)
                             % fields are: fill_tensor, ratio_tensor, offset_tensor, period_tensor, 
                             % scatter_strengths, directivities, angles
         
@@ -208,8 +212,8 @@ classdef c_synthGrating
                         'domain_size',      'none', ...
                         'period_vec',       'none', ...
                         'offset_vec',       'none', ...
-                        'ratio_vec',        'none', ...
-                        'fill_vec',         'none', ...
+                        'fill_top_vec',     'none', ...
+                        'fill_bot_vec',     'none', ...
                         'optimal_angle',    'none', ...
                         'waveguide_index',  'none', ...
                         'waveguide_thicks', 'none', ...
@@ -221,6 +225,8 @@ classdef c_synthGrating
                         'num_par_workers',  'none', ...
                         'h_makeGratingCell', [] ...
                      }; 
+%                         'ratio_vec',        'none', ...
+%                         'fill_vec',         'none', ...
             obj.inputs = inputs;
             
             % first check whether to run code from fresh data or to load
@@ -245,8 +251,10 @@ classdef c_synthGrating
                 obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd HH_MM_SS ' );
                 
                 % set properties
-                obj.fill_vec      = p.fill_vec;
-                obj.ratio_vec     = p.ratio_vec;
+%                 obj.fill_vec      = p.fill_vec;
+%                 obj.ratio_vec     = p.ratio_vec;
+                obj.fill_top_vec = p.fill_top_vec;
+                obj.fill_bot_vec = p.fill_bot_vec;
                 obj.period_vec    = p.period_vec;
                 obj.offset_vec    = p.offset_vec;
 
@@ -343,15 +351,19 @@ classdef c_synthGrating
             h_makeGratingCell = @obj.h_makeGratingCell;
          
             % extract some variables from the object
-            fill_vec    = obj.fill_vec;
-            ratio_vec   = obj.ratio_vec;
-            period_vec  = obj.period_vec;
-            offset_vec  = obj.offset_vec;
+%             fill_vec    = obj.fill_vec;
+%             ratio_vec   = obj.ratio_vec;
+            fill_top_vec    = obj.fill_top_vec;
+            fill_bot_vec    = obj.fill_bot_vec;
+            period_vec      = obj.period_vec;
+            offset_vec      = obj.offset_vec;
 
             % setup 4D tensors to save variable info
             % tensors have dimensions ( fill, ratio, period, offset )
-            [fill_tensor, ratio_tensor, period_tensor, offset_tensor] = ndgrid(fill_vec, ratio_vec, period_vec, offset_vec);
-            tensor_size         = size(fill_tensor);
+%             [fill_tensor, ratio_tensor, period_tensor, offset_tensor] = ndgrid(fill_vec, ratio_vec, period_vec, offset_vec);
+            [fill_top_tensor, fill_bot_tensor, period_tensor, offset_tensor] = ndgrid(fill_top_vec, fill_bot_vec, period_vec, offset_vec);
+%             tensor_size         = size(fill_tensor);
+            tensor_size         = size(fill_top_tensor);
             scatter_strengths   = zeros( tensor_size );
             directivities       = scatter_strengths;
             angles              = scatter_strengths;
@@ -362,8 +374,10 @@ classdef c_synthGrating
             
             % unwrap the tensors to make for easier looping, and thus
             % easier parallelization
-            fill_tensor         = fill_tensor(:);
-            ratio_tensor        = ratio_tensor(:);
+%             fill_tensor         = fill_tensor(:);
+%             ratio_tensor        = ratio_tensor(:);
+            fill_top_tensor     = fill_top_tensor(:);
+            fill_bot_tensor     = fill_bot_tensor(:);
             offset_tensor       = offset_tensor(:);
             period_tensor       = period_tensor(:);
             scatter_strengths   = scatter_strengths(:);
@@ -374,9 +388,9 @@ classdef c_synthGrating
             power_rad_down      = power_rad_down(:);
             
             % run loops
-            num_loops   = length(fill_vec)*length(ratio_vec)*length(period_vec)*length(offset_vec);
-%             h_waitbar   = waitbar(0, 'Loops running. God help us all.');
-%             loop_count  = 0;
+%             num_loops   = length(fill_vec)*length(ratio_vec)*length(period_vec)*length(offset_vec);
+            num_loops   = length(fill_top_vec)*length(fill_bot_vec)*length(period_vec)*length(offset_vec);
+            
             
             % grab modesolver options
             num_modes   = obj.modesolver_opts.num_modes;
@@ -417,12 +431,15 @@ classdef c_synthGrating
                 
                 % grab some parameters
                 period          = period_tensor(ii);
-                fill            = fill_tensor(ii);
-                ratio           = ratio_tensor(ii);
+%                 fill            = fill_tensor(ii);
+%                 ratio           = ratio_tensor(ii);
+                fill_top        = fill_top_tensor(ii);
+                fill_bot        = fill_bot_tensor(ii);
                 offset_ratio    = offset_tensor(ii);
                 
                 % make grating cell
-                Q = h_makeGratingCell( obj_copy, period, fill, ratio, offset_ratio );
+%                 Q = h_makeGratingCell( obj_copy, period, fill, ratio, offset_ratio );
+                Q = h_makeGratingCell( obj_copy, period, fill_top, fill_bot, offset_ratio );
                 
                 % run simulation
                 Q = Q.runSimulation( num_modes, BC, pml_options );
@@ -451,10 +468,12 @@ classdef c_synthGrating
             delete(gcp('nocreate'));
             
             % reshape the unwrapped tensors back into tensor form
-            fill_tensor         = reshape( fill_tensor, tensor_size );
-            ratio_tensor        = reshape( ratio_tensor, tensor_size );
+%             fill_tensor         = reshape( fill_tensor, tensor_size );
+%             ratio_tensor        = reshape( ratio_tensor, tensor_size );
             offset_tensor       = reshape( offset_tensor, tensor_size );
             period_tensor       = reshape( period_tensor, tensor_size );
+            fill_top_tensor     = reshape( fill_top_tensor, tensor_size );
+            fill_bot_tensor     = reshape( fill_bot_tensor, tensor_size );
             scatter_strengths   = reshape( scatter_strengths, tensor_size );
             directivities       = reshape( directivities, tensor_size );
             angles              = reshape( angles, tensor_size );
@@ -463,8 +482,20 @@ classdef c_synthGrating
             power_rad_down      = reshape( power_rad_down, tensor_size );
             
             % save all data to a mat file
-            sweep_results = struct( 'fill_tensor', fill_tensor, ...
-                                    'ratio_tensor', ratio_tensor, ...
+%             sweep_results = struct( ...  % 'fill_tensor', fill_tensor, ...
+% %                                     'ratio_tensor', ratio_tensor, ...
+%                                     'fill_top_tensor', fill_top_tensor, ...
+%                                     'fill_bot_tensor', fill_bot_tensor, ...
+%                                     'offset_tensor', offset_tensor, ...
+%                                     'period_tensor', period_tensor, ...
+%                                     'scatter_strengths', scatter_strengths, ...
+%                                     'directivities', directivities, ...
+%                                     'angles', angles, ...
+%                                     'power_in', power_in, ...
+%                                     'power_rad_up', power_rad_up, ...
+%                                     'power_rad_down', power_rad_down );                     
+            sweep_results = struct( 'fill_top_tensor', fill_top_tensor, ...
+                                    'fill_bot_tensor', fill_bot_tensor, ...
                                     'offset_tensor', offset_tensor, ...
                                     'period_tensor', period_tensor, ...
                                     'scatter_strengths', scatter_strengths, ...
@@ -473,6 +504,7 @@ classdef c_synthGrating
                                     'power_in', power_in, ...
                                     'power_rad_up', power_rad_up, ...
                                     'power_rad_down', power_rad_down );
+                                
             % store sweep results to synthgrating object
             obj.sweep_results = sweep_results;
             
@@ -542,7 +574,12 @@ classdef c_synthGrating
      
             obj_as_struct = struct();
             for p = 1:numel(props)
-                obj_as_struct.(props{p})=obj.(props{p});
+                if strcmp( props{p}, 'h_makeGratingCell' )
+                    % convert function handle to string
+                    obj_as_struct.(props{p}) = func2str( obj.(props{p}) );
+                else
+                    obj_as_struct.(props{p}) = obj.(props{p});
+                end
             end
             
         end
@@ -840,8 +877,10 @@ classdef c_synthGrating
 
             % DEBUG unwrap and see what variable ranges have been simulated
             % first unwrap all the variables
-            fills               = obj.sweep_results.fill_tensor(:);
-            ratios              = obj.sweep_results.ratio_tensor(:);
+%             fills               = obj.sweep_results.fill_tensor(:);
+%             ratios              = obj.sweep_results.ratio_tensor(:);
+            fill_tops           = obj.sweep_results.fill_top_tensor(:);
+            fill_bots           = obj.sweep_results.fill_bot_tensor(:);
             offsets             = obj.sweep_results.offset_tensor(:);
             periods             = obj.sweep_results.period_tensor(:); 
             angles              = obj.sweep_results.angles(:);
@@ -879,40 +918,61 @@ classdef c_synthGrating
             chosen_closest_angles   = zeros( size(chosen_angles) );     % DEBUG, what the angle would be without changing offset
             
             % Synthesis loop
-            for i_fill = 1:length(obj.fill_vec)
+            % OLD VERSION, using fill and ratio
+%             for i_fill = 1:length(obj.fill_vec)
+%                 % for each fill
+%                 for i_ratio = 1:length(obj.ratio_vec)
+%                     % for each ratio
+%                     
+%                     % pick period with angle closest to desired
+%                     % tensors have dimensions ( fill, ratio, period, offset )
+%                     angles_per_fill_ratio   = squeeze( obj.sweep_results.angles( i_fill, i_ratio, :, : ) );         % dimensiosn period x offset
+%                     dirs_per_fill_ratio     = squeeze( obj.sweep_results.directivities( i_fill, i_ratio, :, : ) );  % dimensiosn period x offset
+% 
+% %                     % index of angle and period closest to desired
+%                     [ ~, angle_indx ]                       = min( abs(angles_per_fill_ratio(:) - angle) );
+%                     [ i_period, i_offset_closest_angle ]    = ind2sub( size(angles_per_fill_ratio), angle_indx );
+% 
+% 
+%                     % instead let's try a multi objective optimization
+%                     % minimizing the angle and maximizing the directivity
+%                     % together
+%                     min_angle_merit         = abs( angles_per_fill_ratio - angle )/abs(angle);
+%                     max_dir_merit           = 1 - 10*log10(dirs_per_fill_ratio) / max( 10*log10(dirs_per_fill_ratio(:)) );
+%                     merit                   = 10*min_angle_merit + max_dir_merit;      % total merit function to minimize
+%                     [ ~, indx_best_merit ]  = min( merit(:) );
+%                     [ i_period, i_offset ]  = ind2sub( size(merit), indx_best_merit );
+%                     
+%                     % save the chosen variables
+% %                     chosen_angles( i_fill, i_ratio )        = angles_per_fill_ratio( i_period, i_offset );
+%                     chosen_angles( i_fill, i_ratio )        = obj.sweep_results.angles( i_fill, i_ratio, i_period, i_offset );
+% %                     chosen_directivities( i_fill, i_ratio ) = max_dir;
+%                     chosen_directivities( i_fill, i_ratio ) = obj.sweep_results.directivities( i_fill, i_ratio, i_period, i_offset );
+%                     chosen_periods( i_fill, i_ratio )       = obj.sweep_results.period_tensor( i_fill, i_ratio, i_period, i_offset );
+%                     chosen_offsets( i_fill, i_ratio )       = obj.sweep_results.offset_tensor( i_fill, i_ratio, i_period, i_offset );
+%                     chosen_scatter_str( i_fill, i_ratio )   = obj.sweep_results.scatter_strengths( i_fill, i_ratio, i_period, i_offset );
+%                     chosen_closest_angles( i_fill, i_ratio) = obj.sweep_results.angles( i_fill, i_ratio, i_period, i_offset_closest_angle );
+%                     
+%                     
+%                 end
+%             end
+            
+            % Synthesis loop, using fill top and fill bot
+            for i_fill_top = 1:length(obj.fill_top_vec)
                 % for each fill
-                for i_ratio = 1:length(obj.ratio_vec)
+                for i_fill_bot = 1:length(obj.fill_bot_vec)
                     % for each ratio
                     
                     % pick period with angle closest to desired
                     % tensors have dimensions ( fill, ratio, period, offset )
-                    angles_per_fill_ratio   = squeeze( obj.sweep_results.angles( i_fill, i_ratio, :, : ) );         % dimensiosn period x offset
-                    dirs_per_fill_ratio     = squeeze( obj.sweep_results.directivities( i_fill, i_ratio, :, : ) );  % dimensiosn period x offset
-                    
-%                     % DEBUG plot angles
-%                     figure;
-%                     imagesc( angles_per_fill_ratio );
+                    angles_per_fill_ratio   = squeeze( obj.sweep_results.angles( i_fill_top, i_fill_bot, :, : ) );         % dimensiosn period x offset
+                    dirs_per_fill_ratio     = squeeze( obj.sweep_results.directivities( i_fill_top, i_fill_bot, :, : ) );  % dimensiosn period x offset
 
-%                     % DEBUG set a pause point here
-%                     if i_fill == 20 && i_ratio == 20
-%                         fprintf('breakpoint here\n\n');
-%                     end
-
-%                     % DEBUG set a breakpoint here
-%                     % when fill = 0.56 and ratio = 0.4041
-%                     if ( abs( obj.fill_vec(i_fill) - 0.56 ) + abs( obj.ratio_vec(i_ratio) - 0.4041 ) ) < 1e-4
-%                         fprintf('breakpoint here\n\n');
-%                     end
-                    
 %                     % index of angle and period closest to desired
                     [ ~, angle_indx ]                       = min( abs(angles_per_fill_ratio(:) - angle) );
                     [ i_period, i_offset_closest_angle ]    = ind2sub( size(angles_per_fill_ratio), angle_indx );
-%                     
-%                     % pick offset with highest directivity
-%                     directivities_per_fill_ratio_period = obj.sweep_results.directivities( i_fill, i_ratio, i_period, : ); % vs. offset
-%                     [ max_dir, i_offset ]               = max(directivities_per_fill_ratio_period);
-                    
-                    
+
+
                     % instead let's try a multi objective optimization
                     % minimizing the angle and maximizing the directivity
                     % together
@@ -924,54 +984,56 @@ classdef c_synthGrating
                     
                     % save the chosen variables
 %                     chosen_angles( i_fill, i_ratio )        = angles_per_fill_ratio( i_period, i_offset );
-                    chosen_angles( i_fill, i_ratio )        = obj.sweep_results.angles( i_fill, i_ratio, i_period, i_offset );
+                    chosen_angles( i_fill_top, i_fill_bot )        = obj.sweep_results.angles( i_fill_top, i_fill_bot, i_period, i_offset );
 %                     chosen_directivities( i_fill, i_ratio ) = max_dir;
-                    chosen_directivities( i_fill, i_ratio ) = obj.sweep_results.directivities( i_fill, i_ratio, i_period, i_offset );
-                    chosen_periods( i_fill, i_ratio )       = obj.sweep_results.period_tensor( i_fill, i_ratio, i_period, i_offset );
-                    chosen_offsets( i_fill, i_ratio )       = obj.sweep_results.offset_tensor( i_fill, i_ratio, i_period, i_offset );
-                    chosen_scatter_str( i_fill, i_ratio )   = obj.sweep_results.scatter_strengths( i_fill, i_ratio, i_period, i_offset );
-                    chosen_closest_angles( i_fill, i_ratio) = obj.sweep_results.angles( i_fill, i_ratio, i_period, i_offset_closest_angle );
+                    chosen_directivities( i_fill_top, i_fill_bot ) = obj.sweep_results.directivities( i_fill_top, i_fill_bot, i_period, i_offset );
+                    chosen_periods( i_fill_top, i_fill_bot )       = obj.sweep_results.period_tensor( i_fill_top, i_fill_bot, i_period, i_offset );
+                    chosen_offsets( i_fill_top, i_fill_bot )       = obj.sweep_results.offset_tensor( i_fill_top, i_fill_bot, i_period, i_offset );
+                    chosen_scatter_str( i_fill_top, i_fill_bot )   = obj.sweep_results.scatter_strengths( i_fill_top, i_fill_bot, i_period, i_offset );
+                    chosen_closest_angles( i_fill_top, i_fill_bot) = obj.sweep_results.angles( i_fill_top, i_fill_bot, i_period, i_offset_closest_angle );
                     
                     
                 end
             end
             
-            % DEBUG plot the 2D design spaces
-            % chosen angles
-            figure;
-            imagesc( obj.ratio_vec, obj.fill_vec, chosen_angles );
-            xlabel('ratios'); ylabel('fill');
-            set(gca, 'ydir', 'normal');
-            title('DEBUG plot of chosen 2D design space for angles vs. fill and ratio');
-            colorbar;
-            % chosen directivities
-            figure;
-            imagesc( obj.ratio_vec, obj.fill_vec, 10*log10(chosen_directivities) );
-            xlabel('ratios'); ylabel('fill');
-            set(gca, 'ydir', 'normal');
-            title('DEBUG plot of chosen 2D design space for directivities (dB) vs. fill and ratio');
-            colorbar;
-            % chosen scatter strengths
-            figure;
-            imagesc( obj.ratio_vec, obj.fill_vec, chosen_scatter_str );
-            xlabel('ratios'); ylabel('fill');
-            set(gca, 'ydir', 'normal');
-            title('DEBUG plot of chosen 2D design space for scatter strengths vs. fill and ratio');
-            colorbar;
-            % chosen periods
-            figure;
-            imagesc( obj.ratio_vec, obj.fill_vec, chosen_periods );
-            xlabel('ratios'); ylabel('fill');
-            set(gca, 'ydir', 'normal');
-            title('DEBUG plot of chosen 2D design space for periods vs. fill and ratio');
-            colorbar;
-            % chosen offsets
-            figure;
-            imagesc( obj.ratio_vec, obj.fill_vec, chosen_offsets );
-            xlabel('ratios'); ylabel('fill');
-            set(gca, 'ydir', 'normal');
-            title('DEBUG plot of chosen 2D design space for offsets vs. fill and ratio');
-            colorbar;
+            % IF YOU WANT TO PLOT THESE AGAIN, replace obj.ratio_vec with
+            % obj.fill_bot_vec, and obj.fill_vec with obj.fill_top_vec
+%             % DEBUG plot the 2D design spaces
+%             % chosen angles
+%             figure;
+%             imagesc( obj.ratio_vec, obj.fill_vec, chosen_angles );
+%             xlabel('ratios'); ylabel('fill');
+%             set(gca, 'ydir', 'normal');
+%             title('DEBUG plot of chosen 2D design space for angles vs. fill and ratio');
+%             colorbar;
+%             % chosen directivities
+%             figure;
+%             imagesc( obj.ratio_vec, obj.fill_vec, 10*log10(chosen_directivities) );
+%             xlabel('ratios'); ylabel('fill');
+%             set(gca, 'ydir', 'normal');
+%             title('DEBUG plot of chosen 2D design space for directivities (dB) vs. fill and ratio');
+%             colorbar;
+%             % chosen scatter strengths
+%             figure;
+%             imagesc( obj.ratio_vec, obj.fill_vec, chosen_scatter_str );
+%             xlabel('ratios'); ylabel('fill');
+%             set(gca, 'ydir', 'normal');
+%             title('DEBUG plot of chosen 2D design space for scatter strengths vs. fill and ratio');
+%             colorbar;
+%             % chosen periods
+%             figure;
+%             imagesc( obj.ratio_vec, obj.fill_vec, chosen_periods );
+%             xlabel('ratios'); ylabel('fill');
+%             set(gca, 'ydir', 'normal');
+%             title('DEBUG plot of chosen 2D design space for periods vs. fill and ratio');
+%             colorbar;
+%             % chosen offsets
+%             figure;
+%             imagesc( obj.ratio_vec, obj.fill_vec, chosen_offsets );
+%             xlabel('ratios'); ylabel('fill');
+%             set(gca, 'ydir', 'normal');
+%             title('DEBUG plot of chosen 2D design space for offsets vs. fill and ratio');
+%             colorbar;
 %             % DEBUG chosen closest angles 
 %             figure;
 %             imagesc( obj.ratio_vec, obj.fill_vec, chosen_closest_angles );
@@ -1029,6 +1091,12 @@ classdef c_synthGrating
             % For each ratio value, pick the design with the highest
             % directivity.
             % plot the other resulting parameters
+            
+            
+            
+            % -!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!-
+            % STUFF BELOW HERE NEES TO BE REDONE
+            
             
             % init the data saving variables
             best_dir_v_ratio     = zeros( size(obj.ratio_vec) );
@@ -1272,8 +1340,8 @@ classdef c_synthGrating
             % using the trick that i can write and return the index from
             % the two level grating cell
             % first override the discretization
-            obj_as_struct = obj.convertObjToStruct();
-            obj_as_struct.discretization = [ dx, dz ] / ( um * obj.units.scale );
+            obj_as_struct                   = obj.convertObjToStruct();
+            obj_as_struct.discretization    = [ dx, dz ] / ( um * obj.units.scale );
             % now make the grating cell
             gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
                                                      z_in/(um*obj.units.scale), ...
@@ -1604,7 +1672,7 @@ end     % end class definition
 % Begin auxiliary non-class methods
 % -------------------------------------------------------------------------
 
-function GC = makeGratingCell( synth_obj, period, fill, ratio, offset_ratio )
+function GC = makeGratingCell( synth_obj, period, fill_top, fill_bot, offset_ratio )
             % makes and returns a c_twoLevelGratingCell object
             % 
             % inputs:
@@ -1614,12 +1682,18 @@ function GC = makeGratingCell( synth_obj, period, fill, ratio, offset_ratio )
             %   period
             %       type: double, scalar
             %       desc: period of the grating cell
-            %   fill
+            %   fill - OLD
             %       type: double, scalar
             %       desc: ratio of bottom layer to period
-            %   ratio
+            %   ratio - OLD
             %       type: double, scalar
             %       desc: ratio of top layer to bottom layer
+            %   fill_top - OLD
+            %       type: double, scalar
+            %       desc: ratio of top layer to period
+            %   fill_bot - OLD
+            %       type: double, scalar
+            %       desc: ratio of bottom layer to bottom layer
             %   offset_ratio
             %       type: double, scalar
             %       desc: ratio of bottom layer offset to period
@@ -1646,7 +1720,8 @@ function GC = makeGratingCell( synth_obj, period, fill, ratio, offset_ratio )
             % the inputs are organized [ top level, bottom level ]
             wg_thick        = synth_obj.waveguide_thicks;
             wg_min_y        = [ domain_size(1)/2, domain_size(1)/2-wg_thick(1) ];
-            wgs_duty_cycles = [ fill*ratio, fill ];
+%             wgs_duty_cycles = [ fill*ratio, fill ];
+            wgs_duty_cycles = [ fill_top, fill_bot ];
             wgs_offsets     = [ 0, offset_ratio*period ];
             GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, synth_obj.waveguide_index, ...
                                                     wgs_duty_cycles, wgs_offsets );
