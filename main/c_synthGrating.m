@@ -1688,10 +1688,10 @@ function GC = makeGratingCell( synth_obj, period, fill_top, fill_bot, offset_rat
             %   ratio - OLD
             %       type: double, scalar
             %       desc: ratio of top layer to bottom layer
-            %   fill_top - OLD
+            %   fill_top
             %       type: double, scalar
             %       desc: ratio of top layer to period
-            %   fill_bot - OLD
+            %   fill_bot
             %       type: double, scalar
             %       desc: ratio of bottom layer to bottom layer
             %   offset_ratio

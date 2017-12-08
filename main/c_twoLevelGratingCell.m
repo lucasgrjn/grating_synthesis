@@ -275,7 +275,7 @@ classdef c_twoLevelGratingCell
         end
         
         
-        function obj = runSimulation( obj, num_modes, BC, pml_options )
+        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk )
             % Runs mode solver
             %
             % Description:
@@ -297,7 +297,7 @@ classdef c_twoLevelGratingCell
             %               PML_options(2): length of PML layer in nm
             %               PML_options(3): strength of PML in the complex plane
             %               PML_options(4): PML polynomial order (1, 2, 3...)
-            
+
             % spatial variables, in units nm
             nm      = 1e9;
             a       = obj.domain_size(2) * obj.units.scale * nm;
@@ -307,10 +307,12 @@ classdef c_twoLevelGratingCell
             % store options
             obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
 
+            % set guessk if not entered
+            if nargin < 5
+                guessk = pi/(2*a);
+            end
+            
             % run solver
-            guessk      = pi/(2*a);
-%             % TEMP
-%             guessk      = (0.001993 + 0.000124j)* 1.01;
             k0          = 2*pi/lambda;
             [Phi_1D, k] = complexk_mode_solver_2D_PML( obj.N, ...
                                                        dx, ...
@@ -728,6 +730,7 @@ classdef c_twoLevelGratingCell
             % plot the field, real
             figure;
             imagesc( x_coords_all, obj.y_coords, real(E_z) );
+            clim( [ -max( abs( real(E_z(:)) ) ), max( abs( real(E_z(:)) ) ) ] );                % set color limits
             xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
             set( gca, 'YDir', 'normal' );
             title( sprintf('Real E_z, %i periods', numcells) );

@@ -1,4 +1,4 @@
-function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill, ratio, offset_ratio )
+function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, offset_ratio )
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
@@ -11,12 +11,18 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill, ratio, offset_
 %   period
 %       type: double, scalar
 %       desc: period of the grating cell
-%   fill
+%   fill - OLD
 %       type: double, scalar
 %       desc: ratio of bottom layer to period
-%   ratio
+%   ratio - OLD
 %       type: double, scalar
 %       desc: ratio of top layer to bottom layer
+%   fill_top
+%       type: double, scalar
+%       desc: ratio of top layer to period
+%   fill_bot
+%       type: double, scalar
+%       desc: ratio of bottom layer to bottom layer
 %   offset_ratio
 %       type: double, scalar
 %       desc: ratio of bottom layer offset to period
@@ -75,14 +81,15 @@ GC = GC.addLayer( t_air, domain_size(1)-t_SiO2_bot, n_SiO2 );     % add in SiO2
 % the inputs are organized [ top level, bottom level ]
 wg_thick        = [ t_pSi, t_cSi ];
 wg_min_y        = [ t_air+t_SiO2_bot+wg_thick(2), t_air+t_SiO2_bot ];
-wgs_duty_cycles = [ fill*ratio, fill ];
+% wgs_duty_cycles = [ fill*ratio, fill ];
+wgs_duty_cycles = [ fill_top, fill_bot ];
 wgs_offsets     = [ 0, offset_ratio*period ];
 GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, [ n_pSi, n_cSi ], ...
                                         wgs_duty_cycles, wgs_offsets );
 
 
 % draw SiN layer
-top_layer_length    = fill*ratio*period;
+top_layer_length    = fill_top*period;
 % top of Si
 GC = GC.addRect( 0, ...
                  t_air + t_SiO2_bot + wg_thick(2) + wg_thick(1), ...
