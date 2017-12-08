@@ -4,8 +4,10 @@
 
 clear; close all;
 
+addpath(['..' filesep 'main']);
+
 % initial settings
-disc        = 10;
+disc        = 5;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
@@ -41,7 +43,7 @@ GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
 GC.plotIndex();
 
 % run simulation
-num_modes   = 20;
+num_modes   = 1;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm

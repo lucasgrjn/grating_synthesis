@@ -309,6 +309,8 @@ classdef c_twoLevelGratingCell
 
             % run solver
             guessk      = pi/(2*a);
+%             % TEMP
+%             guessk      = (0.001993 + 0.000124j)* 1.01;
             k0          = 2*pi/lambda;
             [Phi_1D, k] = complexk_mode_solver_2D_PML( obj.N, ...
                                                        dx, ...
