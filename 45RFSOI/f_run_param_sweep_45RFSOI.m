@@ -32,7 +32,8 @@ mkdir( data_dir );
 % sweep parameters
 period_vec      = 600:20:1400;
 offset_vec      = linspace(0, 1.0, 40);
-fill_bot_vec    = linspace(0.3, 1.0, 40);
+% fill_bot_vec    = linspace(0.3, 1.0, 40);
+fill_bot_vec    = 0.3:0.02:1.0;
 % ratio_vec   = linspace(0.3, 1.2, 40);
 fill_top_vec    = fill_top;                         % [ fill1, fill2 ];
 
