@@ -43,8 +43,8 @@ function [Phi_1D, k] = complexk_mode_solver_2D_PML_v2( N, disc, k0, num_modes, g
 % k: vector of complex wavevector values calulated
 
 % total length of unwrapped vectors
-[ nx, ny ] = size(N);
-n_elem = nx*ny;
+[ nx, ny 
+n_elem = prod( size(N) );
 
 % generate forward Dy
 % first generate vectors corresponding to the diagonals
