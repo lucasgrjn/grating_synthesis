@@ -43,15 +43,54 @@ function [Phi_1D, k] = complexk_mode_solver_2D_PML_v2( N, disc, k0, num_modes, g
 % k: vector of complex wavevector values calulated
 
 % total length of unwrapped vectors
-[ nx, ny 
-n_elem = prod( size(N) );
+[ ny, nx ] = size(N)
+n_elem = nx*ny;
 
 % generate forward Dy
 % first generate vectors corresponding to the diagonals
 % where the suffix # of the diag = # of diagonals from the middle
-diag0 = -ones( n_elem, 1 );
-diag1 = 
-Dy_f = sparse( n_elem, n_elem );
+diag0               = -ones( n_elem, 1 );           % diag middle
+diag1               = ones( n_elem, 1 );            % diag plus 1
+diag1( ny:ny:end )  = 0;
+% diag1               = diag1(1:end-1);               % remove the last entry
+diagBC              = zeros(n_elem, 1);             % diag 0 - (ny-1)
+diagBC( 1:ny:end )  = 1;
+% diagBC              = diagBC( 1:(end-ny+1) );
+
+
+% this part is super annoying
+% the rule of spdiags is:
+% In this syntax, if a column of B is longer than the diagonal it is
+% replacing, and m >= n, (m = num of rows, n = num of cols in the SPARSE matrix)
+% spdiags takes elements of super-diagonals from the lower part of the column of B, and 
+% elements of sub-diagonals from the upper part of the column of B. 
+% However, if m < n , then super-diagonals are from the upper part of the column of B, 
+% and sub-diagonals from the lower part.
+% since m = n for us, always, then we are always replacing with the lower
+% part of the column
+
+% shift diag1
+diag1( 2:end ) = diag1( 1:end-1 );
+
+% stitch together the diags
+diag_all            = [ diagBC, diag0, diag1 ];
+diag_indexs         = [ -(ny-1), 0, 1 ];
+
+% make sparse matrix
+Dy_f    = spdiags( diag_all, diag_indexs, n_elem, n_elem );
+
+% DEBUG show Dy_f
+full(Dy_f)
+
+
+% generate backwards Dy
+diag0 = ones( n_elem, 1 );
+
+
+
+% TEMP dummy code
+Phi_1D = [];
+k = [];
 
 % -------------------------------------------------------------------------
 % OLD CODE

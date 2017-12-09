@@ -43,15 +43,107 @@ function [Phi_1D, k] = complexk_mode_solver_2D_PML_v2( N, disc, k0, num_modes, g
 % k: vector of complex wavevector values calulated
 
 % total length of unwrapped vectors
-[ nx, ny ] = size(N);
-n_elem = nx*ny;
+[ ny, nx ]  = size(N);
+n_elem      = nx*ny;
+
+% the rule of spdiags is:
+% In this syntax, if a column of B is longer than the diagonal it is
+% replacing, and m >= n, (m = num of rows, n = num of cols in the SPARSE matrix)
+% spdiags takes elements of super-diagonals from the lower part of the column of B, and 
+% elements of sub-diagonals from the upper part of the column of B. 
+% However, if m < n , then super-diagonals are from the upper part of the column of B, 
+% and sub-diagonals from the lower part.
+% since m = n for us, always, then we are always replacing with the lower
+% part of the column
 
 % generate forward Dy
 % first generate vectors corresponding to the diagonals
 % where the suffix # of the diag = # of diagonals from the middle
-diag0 = -ones( n_elem, 1 );
-diag1 = 
-Dy_f = sparse( n_elem, n_elem );
+diag0               = -ones( n_elem, 1 );           % diag middle
+diag1               = ones( n_elem, 1 );            % diag plus 1
+diag1( ny:ny:end )  = 0;
+
+% TEMP: this boundary condition will later be either PMC (val 1) or PEC
+% (val 0 )
+diagBC              = zeros(n_elem, 1);             % diag 0 - (ny-1)
+diagBC( 1:ny:end )  = 0;                            % force PEC for now
+
+% shift diag1
+diag1( 2:end ) = diag1( 1:end-1 );
+
+% stitch together the diags
+diag_all        = [ diagBC, diag0, diag1 ];
+diag_indexs     = [ -(ny-1), 0, 1 ];
+
+% make sparse matrix
+Dy_f    = spdiags( diag_all, diag_indexs, n_elem, n_elem );
+
+% DEBUG show Dy_f
+full(Dy_f)
+
+
+% generate backwards Dy
+diag0               = ones( n_elem, 1 );
+diagm1              = -ones( n_elem, 1 );
+diagm1( ny:ny:end ) = 0;                            % no need to shift due to being in lower triangle of Dy
+diagBC              = zeros(n_elem, 1);             % diag 0 + (ny-1)
+diagBC( 1:ny:end )  = 0;                            % again, force PEC for now
+
+% stitch together the diags
+diag_all        = [ diagm1, diag0, diagBC ];
+diag_indexs     = [ -1, 0, ny-1 ];
+
+% make sparse matrix
+Dy_b    = spdiags( diag_all, diag_indexs, n_elem, n_elem );
+
+% DEBUG show Dy_b
+full(Dy_b)
+
+% multiply Dy_f and Dy_b
+Dy2 = Dy_b*Dy_f;
+
+% DEBUG show Dy2
+full(Dy2)
+
+
+% generate Dx forward
+diag0   = -ones( n_elem, 1 );
+diagP   = ones( n_elem, 1 ); 
+diagBC  = ones( n_elem, 1 );                        % BLOCH boundary conditions
+diag_all        = [ diagBC, diag0, diagP ];
+diag_indexes    = [ -(n_elem-ny+1), 0, ny-1 ];
+
+% make sparse matrix
+Dx_f    = spdiags( diag_all, diag_indexes, n_elem, n_elem );
+
+% DEBUG show Dx_f
+full(Dx_f)
+
+
+% generate Dx backward
+diag0   = ones( n_elem, 1 );
+diagM   = -ones( n_elem, 1 ); 
+diagBC  = -ones( n_elem, 1 );                       % BLOCH boundary conditions
+diag_all        = [ diagM, diag0, diagBC ];
+diag_indexes    = [ -(ny-1), 0, (n_elem-ny+1) ];
+
+% make sparse matrix
+Dx_b    = spdiags( diag_all, diag_indexes, n_elem, n_elem );
+
+% DEBUG show Dx_b
+full(Dx_b)
+
+
+% generate Dx squared
+Dx2 = Dx_b*Dx_f;
+
+% DEBUG show Dx2
+full(Dx2)
+
+
+% TEMP dummy code
+Phi_1D = [];
+k = [];
 
 % -------------------------------------------------------------------------
 % OLD CODE
