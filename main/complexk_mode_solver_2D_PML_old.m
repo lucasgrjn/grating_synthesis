@@ -1,4 +1,4 @@
-function [Phi_1D, k] = complexk_mode_solver_2D_PML(n,d,k0,modes,guessk,BC,PML_options)
+function [Phi_1D, k, Phi_out, k_unsorted, A, B] = complexk_mode_solver_2D_PML_old(n,d,k0,modes,guessk,BC,PML_options)
 % Jelena's FDFD 2D complex-k mode solver
 % Version 3
 % May 15, 2014
