@@ -46,6 +46,48 @@ function [Phi_1D, k] = complexk_mode_solver_2D_PML_v2( N, disc, k0, num_modes, g
 [ ny, nx ]  = size(N);
 n_elem      = nx*ny;
 
+
+% draw in PMLs
+if PML_options(1) == 1
+   
+    % grab params
+    pml_len_nm  = PML_options(2);   % length of pml in nm
+    pml_str     = PML_options(3);   % strength of pml in complex plane
+    pml_order   = PML_options(4);   % pml polynomial order
+    
+    % setup discretizations
+    ny_pml = pml_len_nm/disc;                      % number of discretizations that pml spans
+    if abs(ny_pml - round(ny_pml)) >= 1e-5
+        % discretization was not integer value
+        error('Integer # of discretizations did not fit into the PML');
+    end
+    y_indx = 1:ny_pml;
+    
+    % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
+    % setup amplitude
+    ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
+    % setup conductivity
+    sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
+    % combine
+    eta0    = 376.73031346177;                              % ohms
+    pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
+    
+    % fill in pmls
+    N( 1:ny_pml, : )            = N( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
+    N( end-ny_pml+1:end, : )    = N( end-ny_pml+1:end, : ).*repmat( pml_y, 1, nx );
+    
+end
+
+% DEBUG plot new N
+figure;
+imagesc( imag(N) );
+colorbar;
+title('DEBUG imag(N)');
+figure;
+imagesc( real(N) );
+colorbar;
+title('DEBUG real(N)');
+
 % the rule of spdiags is:
 % In this syntax, if a column of B is longer than the diagonal it is
 % replacing, and m >= n, (m = num of rows, n = num of cols in the SPARSE matrix)
@@ -79,7 +121,7 @@ diag_indexs     = [ -(ny-1), 0, 1 ];
 Dy_f    = spdiags( diag_all, diag_indexs, n_elem, n_elem );
 
 % DEBUG show Dy_f
-full(Dy_f)
+% full(Dy_f)
 
 
 % generate backwards Dy
@@ -96,14 +138,14 @@ diag_indexs     = [ -1, 0, ny-1 ];
 % make sparse matrix
 Dy_b    = spdiags( diag_all, diag_indexs, n_elem, n_elem );
 
-% DEBUG show Dy_b
-full(Dy_b)
+% % DEBUG show Dy_b
+% full(Dy_b)
 
 % multiply Dy_f and Dy_b
 Dy2 = Dy_b*Dy_f;
 
-% DEBUG show Dy2
-full(Dy2)
+% % DEBUG show Dy2
+% full(Dy2)
 
 
 % generate Dx forward
@@ -116,8 +158,8 @@ diag_indexes    = [ -(n_elem-ny+1), 0, ny-1 ];
 % make sparse matrix
 Dx_f    = spdiags( diag_all, diag_indexes, n_elem, n_elem );
 
-% DEBUG show Dx_f
-full(Dx_f)
+% % DEBUG show Dx_f
+% full(Dx_f)
 
 
 % generate Dx backward
@@ -130,16 +172,36 @@ diag_indexes    = [ -(ny-1), 0, (n_elem-ny+1) ];
 % make sparse matrix
 Dx_b    = spdiags( diag_all, diag_indexes, n_elem, n_elem );
 
-% DEBUG show Dx_b
-full(Dx_b)
+% % DEBUG show Dx_b
+% full(Dx_b)
 
 
 % generate Dx squared
 Dx2 = Dx_b*Dx_f;
 
-% DEBUG show Dx2
-full(Dx2)
+% % DEBUG show Dx2
+% full(Dx2)
 
+% make eigenvalue eq
+n2      = spdiags( N(:).^2, 0, n_elem, n_elem );
+A       = Dx2 + Dy2 + (k0^2) * n2;
+B       = 1i * ( Dx_b + Dx_f );
+C       = -speye( n_elem, n_elem );
+Z       = speye( n_elem, n_elem );                                  % zeros
+LH      = [ A, B; Z, -C ];                                          % left hand side of eigeneq
+RH      = [ Z, -C; -C, Z ];                                         % right hand side of eigeneq
+
+% DEBUG show these
+n2_full = full(n2);
+A_full  = full(A);
+B_full  = full(B);
+C_full  = full(C);
+Z_full  = full(Z);
+LH_full = full(LH);
+
+% solve eigs
+[Phi_out, k_out]    = eigs(LH, RH, num_modes, guess_k);
+k_unsorted          = diag(k_out);
 
 % TEMP dummy code
 Phi_1D = [];
