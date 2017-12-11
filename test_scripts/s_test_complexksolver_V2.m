@@ -78,7 +78,7 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 0, 200, 5, 2 ];
+pml_options = [ 1, 200, 5, 2 ];
 
 
 % run solver
@@ -134,22 +134,30 @@ colorbar;
 set( gca, 'YDir', 'normal' );
 title( sprintf( 'Field (real) for mode 1, old ver' ) );
 
-% plot the sparse distributions
+% DEBUG plot secondmode
 figure;
-spy(A);
-title('A matrix, new');
+imagesc( x_coords, y_coords, real( Phi_secondmode ) );
+colorbar;
+set( gca, 'YDir', 'normal' );
+title( sprintf( 'Field (real) for mode 2, new ver' ) );
 
-figure;
-spy(A_old);
-title('A matrix, old');
 
-figure;
-spy(B);
-title('B matrix, new');
-
-figure;
-spy(B_old);
-title('B matrix, old');
+% % plot the sparse distributions
+% figure;
+% spy(A);
+% title('A matrix, new');
+% 
+% figure;
+% spy(A_old);
+% title('A matrix, old');
+% 
+% figure;
+% spy(B);
+% title('B matrix, new');
+% 
+% figure;
+% spy(B_old);
+% title('B matrix, old');
 
 % % re-scale k
 % k = k * nm * obj.units.scale;

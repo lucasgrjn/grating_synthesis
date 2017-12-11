@@ -275,8 +275,9 @@ classdef c_twoLevelGratingCell
         end
         
         
-        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk )
-            % Runs mode solver
+        function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )
+            % LEGACY VERSION
+            % Runs old mode solver (jelena/mark)
             %
             % Description:
             %   Runs complex-k mode solver. Stores the mode with the most
@@ -314,7 +315,7 @@ classdef c_twoLevelGratingCell
             
             % run solver
             k0          = 2*pi/lambda;
-            [Phi_1D, k] = complexk_mode_solver_2D_PML( obj.N, ...
+            [Phi_1D, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
                                                        dx, ...
                                                        k0, ...
                                                        num_modes, ...
@@ -426,7 +427,7 @@ classdef c_twoLevelGratingCell
             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
             
             
-        end     % end function runSimulation()
+        end     % end function runSimulation_old()
         
         
         function obj = calc_radiated_power(obj, y_up, y_down)
