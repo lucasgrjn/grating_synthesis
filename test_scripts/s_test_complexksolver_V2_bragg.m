@@ -1,33 +1,9 @@
 % authors: bohan zhang
 %
 % script for testing reworking of FDFD complex k bloch solver
+% debugging by comparing with analytical bragg stack result
 
 clear; close all;
-
-% % path to main code
-% addpath([ '..' filesep 'main']);
-% 
-% % set variables
-% N           = ones( 5, 5 );
-% disc        = 10;
-% k0          = 5;
-% num_modes   = 5;
-% guess_k     = 5;
-% BC          = 0;
-% 
-% % PML_options(1): PML in y direction (yes=1 or no=0)
-% % PML_options(2): length of PML layer in nm
-% % PML_options(3): strength of PML in the complex plane
-% % PML_options(4): PML polynomial order (1, 2, 3...)
-% PML_options = [ 0 200 500 5 ];
-% 
-% % run modesolver
-% [Phi_1D, k] = complexk_mode_solver_2D_PML_v2( N, disc, k0, num_modes, guess_k, BC, PML_options )
-
-
-% -------------------------------------------------------------------------
-% Debug using 2 level grating cell
-% -------------------------------------------------------------------------
 
 % Script for testing and debugging the new two level grating cell class
 
@@ -35,84 +11,43 @@ clear; close all;
 
 % import code
 addpath(['..' filesep 'main']);         % main
-addpath(['..' filesep '45RFSOI']);      % 45rfsoi
+% addpath(['..' filesep '45RFSOI']);      % 45rfsoi
 
 % initial settings
 disc        = 10;
 units       = 'nm';
-lambda      = 1550; %1500;
+lambda      = 1000; %1500;
 index_clad  = 1.0;
-domain      = [ 60, 50 ];
-% domain      = [ 2000, 700 ];
-numcells    = 10;
 
-% directory to save data to
-% unused for this script
-data_dir        = [ pwd, filesep, 'test_datasave' ];
-% data_dir        = [ filesep 'project' filesep 'siphot' filesep 'bz' filesep 'gratings' filesep 'grating_synth_data' ];
-data_filename   = 'test';
-data_notes      = 'test sweep new dedicated function for init. grating cell';
+% make index
+% let's have a quarter wave stack at 1000nm
+% indices
+n1      = 1.0;
+n2      = 1.25;
+d1      = lambda/(n1*4);
+d2      = lambda/(n2*4);
+period  = d1+d2;
+domain  = [ 100, period ];
 
-% make the directory to save data to, if not already in existence
-mkdir( data_dir );
+% draw indices
+% x = dir of propagation, y = transverse
+x_coords    = 0:disc:period-disc;
+y_coords    = 0:disc:domain(1)-disc;
+N           = zeros( length(y_coords), length(x_coords) );
+N( :, x_coords >= 0 & x_coords < d1 )   = n1;
+N( :, x_coords >= d1 )                  = n2;
 
-% sweep parameters
-% unused in this script
-period_vec = [700, 900];
-offset_vec = linspace(0, 0.3, 2);
-% ratio_vec  = linspace(0.7, 1.0, 1);
-% fill_vec   = linspace(0.5, 0.8, 1);
-fill_top_vec = 0.5;
-fill_bot_vec = 0.5;
-
-% number of parallel workers
-n_workers = 4;
-
-% waveguide index/thickness
-waveguide_index     = [ 3.47, 3.47 ];
-waveguide_thicks    = [ 100, 100 ];
-
-% desired angle
-optimal_angle = 15;
-
-% coupling up/down
-coupling_direction = 'down';
-
-% make object
-Q = c_synthGrating( 'discretization',   disc,       ...
-                    'units',            units,      ...
-                    'lambda',           lambda,     ...
-                    'background_index', index_clad, ...
-                    'domain_size',      domain,     ...
-                    'period_vec',       period_vec, ...
-                    'offset_vec',       offset_vec, ...
-                    'fill_top_vec',     fill_top_vec, ...
-                    'fill_bot_vec',     fill_bot_vec, ...
-                    'optimal_angle',    optimal_angle,      ...
-                    'waveguide_index',  waveguide_index,    ...
-                    'waveguide_thicks', waveguide_thicks,   ...
-                    'coupling_direction', coupling_direction, ...
-                    'data_directory',   data_dir, ...
-                    'data_filename',    data_filename, ...
-                    'data_notes',       data_notes, ...
-                    'data_mode',        'new', ...
-                    'num_par_workers',  n_workers, ...
-                    'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
-            );
-        
-% test the make 45RFSOI function
-period          = domain(2);
-fill_top        = 0.8;
-fill_bot        = 0.8;
-offset_ratio    = 0.0;
-GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
+% DEBUG plot N
+figure;
+imagesc( x_coords, y_coords, N );
+xlabel('x'); ylabel('y');
+set( gca, 'ydir', 'normal' );
+colorbar;
+title('DEBUG N');
                                  
-                                 
-% DEBUG plot the index
-GC.plotIndex();
 
 % run simulation
-num_modes   = 5;
+num_modes   = 20;
 BC          = 1;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
@@ -121,36 +56,55 @@ BC          = 1;     % 0 for PEC, 1 for PMC
 pml_options = [ 0, 200, 500, 2 ];
 
 
+% solve bandstructure
+lambda_min  = 200;
+lambda_max  = 5000;
+k0_all      = linspace( 2*pi/lambda_min, 2*pi/lambda_max, 10 );
+
 % run solver
-k0          = 2*pi/lambda;
-guessk      = pi/(2*period);
-% run new
-[Phi_1D, k, Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+guessk = pi/(2*period);
+for ii = 1:length(k0_all)
+    
+    fprintf('\nloop %i of %i\n\n', ii, length(k0_all));
+    
+    % run old
+    fprintf('running old solver\n');
+    tic;
+    [Phi_1D_old, k_old, Phi_all_old, k_all_old, A_old, B_old] = complexk_mode_solver_2D_PML_old( N, ...
+                                                                                   disc, ...
+                                                                                   k0_all(ii), ...
+                                                                                   num_modes, ...
+                                                                                   guessk, ...
+                                                                                   BC, ...
+                                                                                   pml_options );
+    toc;
+
+    % run new
+    fprintf('running new solver\n');
+    tic;
+    [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, ...
                                                            disc, ...
-                                                           k0, ...
+                                                           k0_all(ii), ...
                                                            num_modes, ...
                                                            guessk, ...
                                                            BC, ...
                                                            pml_options );
-% run old
-[Phi_1D_old, k_old, Phi_all_old, k_all_old, A_old, B_old] = complexk_mode_solver_2D_PML_old( GC.N, ...
-                                                                               disc, ...
-                                                                               k0, ...
-                                                                               num_modes, ...
-                                                                               guessk, ...
-                                                                               BC, ...
-                                                                               pml_options );
+    toc;
+    
+end
+
+
                                                                            
-% reshape and sort the Phis
-% when they come out raw from the modesolver, Phi_all's columns are the
-% eigenvectors
-% The eigenvectors are wrapped by column, then row
-ny = domain(1)/disc;
-nx = domain(2)/disc;
-Phi_all_half    = Phi_all( 1:end/2, : );                                        % first remove redundant bottom half
-Phi_all_reshape = reshape( Phi_all_half, ny, nx, size(Phi_all_half, 2) );       % hopefully this is dimensions y vs. x vs. mode#
-Phi_firstmode   = Phi_all_reshape( :, :, 1 );
-Phi_secondmode  = Phi_all_reshape( :, :, 2 );
+% % reshape and sort the Phis
+% % when they come out raw from the modesolver, Phi_all's columns are the
+% % eigenvectors
+% % The eigenvectors are wrapped by column, then row
+% ny = domain(1)/disc;
+% nx = domain(2)/disc;
+% Phi_all_half    = Phi_all( 1:end/2, : );                                        % first remove redundant bottom half
+% Phi_all_reshape = reshape( Phi_all_half, ny, nx, size(Phi_all_half, 2) );       % hopefully this is dimensions y vs. x vs. mode#
+% Phi_firstmode   = Phi_all_reshape( :, :, 1 );
+% Phi_secondmode  = Phi_all_reshape( :, :, 2 );
 
 % do the same but with the old phi for comparison
 Phi_all_half_old    = Phi_all_old( 1:end/2, : );

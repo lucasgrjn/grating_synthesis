@@ -349,6 +349,7 @@ classdef c_twoLevelGratingCell
             
             % sort on guided power
             guided_power  = zeros( size(k) );
+            total_power   = zeros( size(k) );
 
             % check to see if waveguide boundaries have been set yet
             if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
@@ -367,7 +368,8 @@ classdef c_twoLevelGratingCell
                 phi_guided = Phi_all( y >= y_bot & y <= y_top, :, ii );
 
                 % sum area of field
-                guided_power(ii) = sum( abs( phi_guided(:) ).^2 );
+                guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+                total_power(ii)     = sum( abs( Phi_all(:, :, ii) ).^2 );
 
             end
             
@@ -375,7 +377,7 @@ classdef c_twoLevelGratingCell
             obj.debug.guided_power = guided_power;
             
             % keep mode with LEAST unguided power OR MOST guided power
-            [~, indx_k] = max( guided_power );        % most guided
+            [~, indx_k] = max( abs(guided_power./total_power) );        % most guided
             k           = k(indx_k);
             Phi         = Phi_all(:,:,indx_k);
             

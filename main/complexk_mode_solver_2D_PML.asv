@@ -1,4 +1,4 @@
-function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_modes, guess_k, BC, PML_options )
+function [Phi_1D, k, Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_modes, guess_k, BC, PML_options )
 % FDFD 2D complex-k mode solver
 % 
 % authors: bohan zhang
@@ -39,12 +39,8 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %               PML_options(4): PML polynomial order (1, 2, 3...)
 %
 % OUTPUTS:
-%   Phi_all
-%       type: double, ny vs. nx vs. mode #
-%       desc: Output field, with dimensions ( y, x, mode # )
-%   k_all
-%       type: double, vector
-%       desc: vector of complex wavevector eigenvalues vs. mode #
+% Phi_1D: matrix of all Phi-field solutions (E = e^(jkx)*Phi) in 1D form for desired structure
+% k: vector of complex wavevector values calulated
 
 % total length of unwrapped vectors
 [ ny, nx ]  = size(N);
@@ -118,17 +114,17 @@ diag1               = ones( n_elem, 1 );            % diag plus 1
 diag1( ny:ny:end )  = 0;
 % TEMP: this boundary condition will later be either PMC (val 1) or PEC
 % (val 0 )
-if BC == 1
-    % PMC
-    diag0( ny:ny:end)  = 0;
-end
+if BC == 0
+    % PEC
+    diagBC              = zeros(n_elem, 1);             % diag 0 - (ny-1)
+elseif BC == 1
+    %
+%     diagBC( 1:ny:end )  = 0;                            % force PEC for now
 % shift diag1
 diag1( 2:end ) = diag1( 1:end-1 );
 % stitch together the diags
-% diag_all        = [ diagBC, diag0, diag1 ];
-diag_all        = [ diag0, diag1 ];
-% diag_indexs     = [ -(ny-1), 0, 1 ];
-diag_indexs     = [ 0, 1 ];
+diag_all        = [ diagBC, diag0, diag1 ];
+diag_indexs     = [ -(ny-1), 0, 1 ];
 % make sparse matrix
 Dy_f    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 
@@ -137,17 +133,11 @@ Dy_f    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 diag0               = ones( n_elem, 1 );
 diagm1              = -ones( n_elem, 1 );
 diagm1( ny:ny:end ) = 0;                            % no need to shift due to being in lower triangle of Dy
-if BC == 1
-    % PMC
-    diag0( 1:ny:end ) = 0;
-end
-% diagBC              = zeros(n_elem, 1);             % diag 0 + (ny-1)
-% diagBC( 1:ny:end )  = 0;                            % again, force PEC for now
+diagBC              = zeros(n_elem, 1);             % diag 0 + (ny-1)
+diagBC( 1:ny:end )  = 0;                            % again, force PEC for now
 % stitch together the diags
-% diag_all        = [ diagm1, diag0, diagBC ];
-diag_all        = [ diagm1, diag0 ]; 
-% diag_indexs     = [ -1, 0, ny-1 ];
-diag_indexs     = [ -1, 0 ];
+diag_all        = [ diagm1, diag0, diagBC ];
+diag_indexs     = [ -1, 0, ny-1 ];
 % make sparse matrix
 Dy_b    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 
@@ -220,13 +210,6 @@ RH      = [ Z, I; I, Z ];                                           % right hand
 k_all               = diag(k_all);
 
 % unwrap the field and stuff
-% reshape and sort the Phis
-% when they come out raw from the modesolver, Phi_all's columns are the
-% eigenvectors
-% The eigenvectors are wrapped by column, then row
-Phi_all_half    = Phi_all( 1:end/2, : );                                        % first remove redundant bottom half
-Phi_all_reshape = reshape( Phi_all_half, ny, nx, size(Phi_all_half, 2) );       % hopefully this is dimensions y vs. x vs. mode#
-
 
 % TEMP dummy code
 Phi_1D = [];
