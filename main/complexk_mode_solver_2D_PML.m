@@ -135,6 +135,15 @@ Dy_b    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 % generate Dy squared
 Dy2 = Dy_b*Dy_f;
 
+% DEBUG plot Dy f and Dy b 
+figure;
+spy( Dy_f );
+title('DEBUG d_y forward');
+figure;
+spy( Dy_b );
+title('DEBUG d_y backward');
+
+
 
 % generate Dx forward
 diag0           = -ones( n_elem, 1 );

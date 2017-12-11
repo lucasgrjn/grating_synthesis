@@ -40,8 +40,8 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-domain      = [ 60, 50 ];
-% domain      = [ 2000, 900 ];
+% domain      = [ 60, 50 ];
+domain      = [ 2000, 900 ];
 numcells    = 10;
 
 % Init a new object
