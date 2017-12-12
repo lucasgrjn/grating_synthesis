@@ -254,11 +254,13 @@ k_unsorted = diag(k_out);
 % Sort outputs for 0<k<pi/a
 jjj = 1;
 for jj = 1:length(k_unsorted)
-    if (real(k_unsorted(jj)) <= 1.03*pi/a) && (real(k_unsorted(jj))>=0)
+    
+    % TEMP removing this condition
+%     if (real(k_unsorted(jj)) <= 1.03*pi/a) && (real(k_unsorted(jj))>=0)
         k(jjj,1) = k_unsorted(jj);
         Phi_sorted(:,jjj) = Phi_out(:,jj);
         jjj = jjj+1;
-    end
+%     end
 end
 Phi_1D = Phi_sorted(1:length(Phi_sorted)/2,:);
 end

@@ -14,7 +14,7 @@ addpath(['..' filesep 'main']);         % main
 % addpath(['..' filesep '45RFSOI']);      % 45rfsoi
 
 % initial settings
-disc        = 10;
+disc        = 2;
 units       = 'nm';
 lambda      = 1000; %1500;
 index_clad  = 1.0;
@@ -23,7 +23,7 @@ index_clad  = 1.0;
 % let's have a quarter wave stack at 1000nm
 % indices
 n1      = 1.0;
-n2      = 1.25;
+n2      = 2.5;                  % 1.25;
 d1      = lambda/(n1*4);
 d2      = lambda/(n2*4);
 period  = d1+d2;
@@ -47,7 +47,7 @@ title('DEBUG N');
                                  
 
 % run simulation
-num_modes   = 20;
+num_modes   = 1;
 BC          = 1;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
@@ -57,12 +57,21 @@ pml_options = [ 0, 200, 500, 2 ];
 
 
 % solve bandstructure
-lambda_min  = 200;
+lambda_min  = 100;
 lambda_max  = 5000;
-k0_all      = linspace( 2*pi/lambda_min, 2*pi/lambda_max, 10 );
+k0_min      = 0.2*pi/period;
+k0_max      = 1.6*pi/period;
+k0_all      = linspace( k0_min, k0_max, 100 );
+
+% init saving variables
+all_k       = [];
+all_k0      = [];
+all_k_old   = [];
+all_k0_old  = [];
 
 % run solver
-guessk = pi/(2*period);
+% guessk = pi/(2*period);
+guessk = 0.000001;
 for ii = 1:length(k0_all)
     
     fprintf('\nloop %i of %i\n\n', ii, length(k0_all));
@@ -91,7 +100,48 @@ for ii = 1:length(k0_all)
                                                            pml_options );
     toc;
     
+    % save all k's
+    all_k       = [ all_k, k_all.' ];
+    all_k0      = [ all_k0, repmat( k0_all(ii), 1, length(k_all) ) ];
+    all_k_old   = [ all_k_old, k_all_old.' ];
+    all_k0_old  = [ all_k0_old, repmat( k0_all(ii), 1, length(k_all_old) ) ];
+    
+    % set new guessk
+    guessk = k_all(1);
+    
 end
+
+lambda_all  = 2*pi./all_k0;
+k0a_pi_bg   = (2*pi/lambda)*period/pi;    % this is where the bg should be
+
+% plot the bandstructure for ALL modes, new solver
+figure;
+plot( real(all_k)*period/pi, all_k0*period/pi, 'o' ); hold on;
+plot( imag(all_k)*period/pi, all_k0*period/pi, 'o' ); hold on;
+plot( xlim, [ k0a_pi_bg, k0a_pi_bg ], '--' );
+xlabel('ka/pi'); ylabel('k0*a/pi');
+legend('real', 'imag', 'center of bandgap');
+title('Bandstructure of all solved modes, new ver.');
+makeFigureNice();
+
+% % plot the bandstructure for ALL modes, new solver vs wl
+% figure;
+% plot( real(all_k)*period/pi, lambda_all, 'o' ); hold on;
+% plot( imag(all_k)*period/pi, lambda_all, 'o' ); hold on;
+% xlabel('ka/pi'); ylabel('\lambda');
+% legend('real', 'imag');
+% title('Bandstructure of all solved modes, new ver.');
+% makeFigureNice();
+
+% plot the bandstructure for ALL modes, old solver
+figure;
+plot( real(all_k_old)*period/pi, all_k0_old*period/pi, 'o' ); hold on;
+plot( imag(all_k_old)*period/pi, all_k0_old*period/pi, 'o' ); hold on;
+plot( xlim, [ k0a_pi_bg, k0a_pi_bg ], '--' );
+xlabel('ka/pi'); ylabel('k0*a/pi');
+legend('real', 'imag', 'center of bandgap');
+title('Bandstructure of all solved modes, old ver.');
+makeFigureNice();
 
 
                                                                            
@@ -106,37 +156,37 @@ end
 % Phi_firstmode   = Phi_all_reshape( :, :, 1 );
 % Phi_secondmode  = Phi_all_reshape( :, :, 2 );
 
-% do the same but with the old phi for comparison
-Phi_all_half_old    = Phi_all_old( 1:end/2, : );
-Phi_all_old_reshape = reshape( Phi_all_half_old, nx, ny, size(Phi_all_half_old, 2) );       % hopefully this is dimensions x vs. y vs. mode#
-Phi_firstmod_old    = Phi_all_old_reshape( :, :, 1 ).';                                     % gotta transpose
-
-% x and y coords
-x_coords = 0:disc:domain(2)-disc;
-y_coords = 0:disc:domain(1)-disc;
-
-% DEBUG plot firstmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_firstmode ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 1, new ver' ) );
-% DEBUG plot firstmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_firstmod_old ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 1, old ver' ) );
-
-% DEBUG plot secondmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_secondmode ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 2, new ver' ) );
-
-% debug display imag(k)
-imag(k_all)
+% % do the same but with the old phi for comparison
+% Phi_all_half_old    = Phi_all_old( 1:end/2, : );
+% Phi_all_old_reshape = reshape( Phi_all_half_old, nx, ny, size(Phi_all_half_old, 2) );       % hopefully this is dimensions x vs. y vs. mode#
+% Phi_firstmod_old    = Phi_all_old_reshape( :, :, 1 ).';                                     % gotta transpose
+% 
+% % x and y coords
+% x_coords = 0:disc:domain(2)-disc;
+% y_coords = 0:disc:domain(1)-disc;
+% 
+% % DEBUG plot firstmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_firstmode ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 1, new ver' ) );
+% % DEBUG plot firstmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_firstmod_old ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 1, old ver' ) );
+% 
+% % DEBUG plot secondmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_secondmode ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 2, new ver' ) );
+% 
+% % debug display imag(k)
+% imag(k_all)
 
 % % plot the sparse distributions
 % figure;
