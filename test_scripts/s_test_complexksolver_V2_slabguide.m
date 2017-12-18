@@ -9,9 +9,10 @@ clear; close all;
 % import code
 addpath(['..' filesep 'main']);         % main
 % addpath(['..' filesep '45RFSOI']);      % 45rfsoi
+addpath(['..' filesep 'slab_modesolver']);
 
 % initial settings
-disc        = 2;
+disc        = 10;
 units       = 'nm';
 lambda      = 1000; %1500;
 index_clad  = 1.0;
@@ -20,7 +21,7 @@ k0          = 2*pi/lambda;
 % make index
 % would like to make a single mode wg
 n1      = 1.0;
-n2      = 2.5;                  % 1.25;
+n2      = 4.0;                  % 1.25;
 t_wg    = 200;
 period  = 100;
 domain  = [ 1000, period ];
@@ -44,7 +45,7 @@ title('DEBUG N');
 
 % run simulation
 guessk      = k0*(n1+n2)/2;
-num_modes   = 1;
+num_modes   = 2;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
@@ -79,6 +80,13 @@ colorbar;
 xlabel('x'); ylabel('y');
 set( gca, 'ydir', 'normal' );
 title('first mode field, amp');
+
+% compute analytical solution (symmetric only) (?)
+core_d      = t_wg*1e-9;
+n_clad      = n1;
+n_core      = n2;
+lambda0     = lambda*1e-9;
+[ neff, k_analytical, kx_temp, alpha_temp, field_temp ] = solve_symm_slab( core_d, n_clad, n_core, lambda0, 'TE', true );
 
 
 % 
