@@ -3,6 +3,7 @@
 % script for testing reworking of FDFD complex k bloch solver
 % debuggiing PEC + periodic boundary conditions by solving for slab
 % waveguide
+% testing how solver changes with transverse domain size
 
 clear; close all;
 
@@ -12,10 +13,9 @@ addpath(['..' filesep 'main']);         % main
 addpath(['..' filesep 'slab_modesolver']);
 
 % initial settings
-disc        = 10;
+disc        = 5;
 units       = 'nm';
 lambda      = 1000; %1500;
-index_clad  = 1.0;
 k0          = 2*pi/lambda;
 
 % make index
@@ -24,64 +24,63 @@ n1      = 1.0;
 n2      = 2.0;                  % 1.25;
 t_wg    = 200;
 period  = 100;
-domain  = [ 1000, period ];
+% domain  = [ 1000, period ];
 
-% draw indices
-% x = dir of propagation, y = transverse
-x_coords    = 0:disc:domain(2)-disc;
-y_coords    = 0:disc:domain(1)-disc;
-N           = n1*ones( length(y_coords), length(x_coords) );
-y_indx_wg   = ( y_coords >= domain(1)/2 - t_wg/2 ) & (y_coords < domain(1)/2 + t_wg/2 );
-N( y_indx_wg, : )   = n2;
+% sweep transverse domain
+y_size  = 300:100:1000;
 
-% DEBUG plot N
-figure;
-imagesc( x_coords, y_coords, N );
-xlabel('x'); ylabel('y');
-set( gca, 'ydir', 'normal' );
-colorbar;
-title('DEBUG N');
-                                 
+% init saving variables
+k_all       = zeros(size(y_size));
+k_all_old   = zeros(size(y_size));
 
-% run simulation
-guessk      = k0*(n1+n2)/2;
-num_modes   = 1;
-BC          = 0;     % 0 for PEC, 1 for PMC
-% PML_options(1): PML in y direction (yes=1 or no=0)
-% PML_options(2): length of PML layer in nm
-% PML_options(3): strength of PML in the complex plane
-% PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 0, 200, 500, 2 ];
+for ii = 1:length(y_size)
+    % for each transverse size
+    
+    fprintf('loop %i of %i\n', ii, length(y_size) );
+    
+    domain = [ y_size(ii), period ] ;
+    
+    % draw indices
+    % x = dir of propagation, y = transverse
+    x_coords    = 0:disc:domain(2)-disc;
+    y_coords    = 0:disc:domain(1)-disc;
+    N           = n1*ones( length(y_coords), length(x_coords) );
+    y_indx_wg   = ( y_coords >= domain(1)/2 - t_wg/2 ) & (y_coords < domain(1)/2 + t_wg/2 );
+    N( y_indx_wg, : )   = n2;
+    
+    % run simulation
+    guessk      = k0*(n1+n2)/2;
+    num_modes   = 1;
+    BC          = 0;     % 0 for PEC, 1 for PMC
+    % PML_options(1): PML in y direction (yes=1 or no=0)
+    % PML_options(2): length of PML layer in nm
+    % PML_options(3): strength of PML in the complex plane
+    % PML_options(4): PML polynomial order (1, 2, 3...)
+    pml_options = [ 0, 200, 500, 2 ];
 
-% run solver
-fprintf('running new solver\n');
-tic;
-[Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, ...
-                                                       disc, ...
-                                                       k0, ...
-                                                       num_modes, ...
-                                                       guessk, ...
-                                                       BC, ...
-                                                       pml_options );
-toc;
+    % run solver
+    fprintf('running new solver\n');
+    tic;
+    [Phi, k, A, B] = complexk_mode_solver_2D_PML( N, ...
+                                                   disc, ...
+                                                   k0, ...
+                                                   num_modes, ...
+                                                   guessk, ...
+                                                   BC, ...
+                                                   pml_options );
+    toc;
+    
+    % old solver
+    [Phi_old, k_old, Phi_oldold, k_oldold, A, B] = complexk_mode_solver_2D_PML_old( N, disc, k0, num_modes, guessk, BC, pml_options);
+    
+    % save k
+    k_all(ii)       = k;
+    k_all_old(ii)   = k_old;
+    
+end
 
 
-% plot mode
-figure;
-imagesc( x_coords, y_coords, real(Phi_all(:,:,1)) );
-colorbar;
-xlabel('x'); ylabel('y');
-set( gca, 'ydir', 'normal' );
-title('first mode field, real');
-% plot mode
-figure;
-imagesc( x_coords, y_coords, abs(Phi_all(:,:,1)) );
-colorbar;
-xlabel('x'); ylabel('y');
-set( gca, 'ydir', 'normal' );
-title('first mode field, amp');
-
-% compute analytical solution (symmetric only) (?)
+% compute analytical solution
 core_d      = t_wg*1e-9;
 n_clad      = n1;
 n_core      = n2;
@@ -90,6 +89,58 @@ lambda0     = lambda*1e-9;
 
 % convert units to nm
 k_analytical = k_analytical*1e-9;
+
+% plot results
+figure;
+plot( y_size, k_all, '-o' ); hold on;
+plot( y_size, k_all_old, '-o' );
+plot( xlim, [ k_analytical, k_analytical ], '--' );
+legend('modesolver k', 'old modesolver k', 'analytical k');
+% legend('modesolver k', 'analytical k');
+xlabel('y domain size (nm)');
+title('Numerical error convergence vs. transverse size');
+makeFigureNice();
+
+% plot results
+figure;
+plot( y_size, 100*abs(k_all-k_analytical)./k_all, '-o' ); hold on;
+plot( y_size, 100*abs(k_all_old-k_analytical)./k_all_old, '-o' );
+% plot( xlim, [ k_analytical, k_analytical ], '--' );
+% legend('% error', 'analytical k');
+legend('new modesolver', 'old modesolver');
+xlabel('y domain size (nm)'); ylabel('% error');
+title('Numerical error convergence vs. transverse size');
+makeFigureNice();
+
+
+
+
+% % DEBUG plot N
+% figure;
+% imagesc( x_coords, y_coords, N );
+% xlabel('x'); ylabel('y');
+% set( gca, 'ydir', 'normal' );
+% colorbar;
+% title('DEBUG N');
+                                 
+
+
+
+
+% % plot mode
+% figure;
+% imagesc( x_coords, y_coords, real(Phi_all(:,:,1)) );
+% colorbar;
+% xlabel('x'); ylabel('y');
+% set( gca, 'ydir', 'normal' );
+% title('first mode field, real');
+% % plot mode
+% figure;
+% imagesc( x_coords, y_coords, abs(Phi_all(:,:,1)) );
+% colorbar;
+% xlabel('x'); ylabel('y');
+% set( gca, 'ydir', 'normal' );
+% title('first mode field, amp');
 
 % 
 % % solve bandstructure
