@@ -42,8 +42,8 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-domain      = [ 60, 50 ];
-% domain      = [ 2000, 700 ];
+% domain      = [ 60, 50 ];
+domain      = [ 2000, 700 ];
 numcells    = 10;
 
 % directory to save data to
@@ -113,19 +113,19 @@ GC.plotIndex();
 
 % run simulation
 num_modes   = 5;
-BC          = 1;     % 0 for PEC, 1 for PMC
+BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 0, 200, 500, 2 ];
+pml_options = [ 1, 200, 500, 2 ];
 
 
 % run solver
 k0          = 2*pi/lambda;
 guessk      = pi/(2*period);
 % run new
-[Phi_1D, k, Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+[Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
                                                            disc, ...
                                                            k0, ...
                                                            num_modes, ...
@@ -147,10 +147,10 @@ guessk      = pi/(2*period);
 % The eigenvectors are wrapped by column, then row
 ny = domain(1)/disc;
 nx = domain(2)/disc;
-Phi_all_half    = Phi_all( 1:end/2, : );                                        % first remove redundant bottom half
-Phi_all_reshape = reshape( Phi_all_half, ny, nx, size(Phi_all_half, 2) );       % hopefully this is dimensions y vs. x vs. mode#
-Phi_firstmode   = Phi_all_reshape( :, :, 1 );
-Phi_secondmode  = Phi_all_reshape( :, :, 2 );
+% Phi_all_half    = Phi_all( 1:end/2, : );                                        % first remove redundant bottom half
+% Phi_all_reshape = reshape( Phi_all_half, ny, nx, size(Phi_all_half, 2) );       % hopefully this is dimensions y vs. x vs. mode#
+% Phi_firstmode   = Phi_all_reshape( :, :, 1 );
+% Phi_secondmode  = Phi_all_reshape( :, :, 2 );
 
 % do the same but with the old phi for comparison
 Phi_all_half_old    = Phi_all_old( 1:end/2, : );
@@ -161,25 +161,25 @@ Phi_firstmod_old    = Phi_all_old_reshape( :, :, 1 ).';                         
 x_coords = 0:disc:domain(2)-disc;
 y_coords = 0:disc:domain(1)-disc;
 
-% DEBUG plot firstmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_firstmode ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 1, new ver' ) );
-% DEBUG plot firstmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_firstmod_old ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 1, old ver' ) );
-
-% DEBUG plot secondmode
-figure;
-imagesc( x_coords, y_coords, real( Phi_secondmode ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (real) for mode 2, new ver' ) );
+% % DEBUG plot firstmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_firstmode ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 1, new ver' ) );
+% % DEBUG plot firstmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_firstmod_old ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 1, old ver' ) );
+% 
+% % DEBUG plot secondmode
+% figure;
+% imagesc( x_coords, y_coords, real( Phi_secondmode ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (real) for mode 2, new ver' ) );
 
 % debug display imag(k)
 imag(k_all)

@@ -46,7 +46,7 @@ title('DEBUG N');
 % run simulation
 guessk      = k0*(n1+n2)/2;
 num_modes   = 1;
-BC          = 0;     % 0 for PEC, 1 for PMC
+BC          = 1;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane

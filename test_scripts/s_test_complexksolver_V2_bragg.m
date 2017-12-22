@@ -5,10 +5,6 @@
 
 clear; close all;
 
-% Script for testing and debugging the new two level grating cell class
-
-clear; close all;
-
 % import code
 addpath(['..' filesep 'main']);         % main
 % addpath(['..' filesep '45RFSOI']);      % 45rfsoi
@@ -111,8 +107,11 @@ for ii = 1:length(k0_all)
     
 end
 
+% calculate analytical bandgap properties
+c           = (3e8) * 1e9;  % nm/s?
 lambda_all  = 2*pi./all_k0;
-k0a_pi_bg   = (2*pi/lambda)*period/pi;    % this is where the bg should be
+k0a_pi_bg   = (2*pi/lambda)*period/pi;                            % this is where the bg should be
+gap_size_k  = k0a_pi_bg * (4/pi) * asin( abs(n2-n1)/(n2+n1) );    % size of bandgap, in k vector
 
 % plot the bandstructure for ALL modes, new solver
 figure;

@@ -1,15 +1,13 @@
-function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_modes, guess_k, BC, PML_options )
+function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_modes, guess_k, BC, PML_options, DEBUG )
 % FDFD 2D complex-k mode solver
 % 
 % authors: bohan zhang
 %
 % A reworking of Jelena's FDFD solver
-
-% Jelena's FDFD 2D complex-k mode solver
-% Version 3
-% May 15, 2014
-% Includes: Perfect Electric or Magnetic Boundary Conditions, Periodic
-% Boundary Conditions, Pefectly Matched Layers (PMLs)
+% Solves for modes of 2D (transverse into plane invariant) index profile
+% with 1D periodicity along propagation direction
+% Allows for PEC, PMC, PML boundary conditions
+% 
 %
 % INPUTS:
 %   N
@@ -37,6 +35,12 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %               PML_options(2): length of PML layer in nm
 %               PML_options(3): strength of PML in the complex plane
 %               PML_options(4): PML polynomial order (1, 2, 3...)
+%       TEMPORARY: adding a 5th option to the PML, which is to use type 1
+%       or 2
+%       
+%   DEBUG
+%       type: boolean
+%       desc: optional flag, turn on to enter debugging mode
 %
 % OUTPUTS:
 %   Phi_all
@@ -45,6 +49,11 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %   k_all
 %       type: double, vector
 %       desc: vector of complex wavevector eigenvalues vs. mode #
+
+% default DEBUG to off
+if nargin < 8
+    DEBUG = false;
+end
 
 % total length of unwrapped vectors
 [ ny, nx ]  = size(N);
@@ -55,7 +64,8 @@ er = N.^2;
 
 % draw in PMLs
 if PML_options(1) == 1
-   
+    % currently using uniaxial pml formulation
+    
     % grab params
     pml_len_nm  = PML_options(2);   % length of pml in nm
     pml_str     = PML_options(3);   % strength of pml in complex plane
@@ -69,24 +79,49 @@ if PML_options(1) == 1
     end
     y_indx = 1:ny_pml;
     
-%     % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
-%     % setup amplitude
-%     ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
-%     % setup conductivity
-%     sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
-%     % combine
-%     eta0    = 376.73031346177;                              % ohms
-%     pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
-    
-    % using coordinate stretching approach
-    c       = (3e8) * (1e9);                    % nm/s
-    eps0    = (8.854187817e-12) * (1e-9);       % F/nm
-    omega   = k0*c;                             % rad/s
-    pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
+    % TEMPORARY CHOOSE THE PML TYPE
+    if PML_options(5) == 1
+        % type 1
+        
+        % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
+        % setup amplitude
+        ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
+        % setup conductivity
+        sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
+        % combine
+        eta0    = 376.73031346177;                              % ohms
+        pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
+        
+    elseif PML_options(5) == 2
+        % type 2
+        
+        % using polynomial strength pml
+        c       = (3e8) * (1e9);                    % nm/s
+        eps0    = (8.854187817e-12) * (1e-9);       % F/nm
+        omega   = k0*c;                             % rad/s
+        pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
+        
+    end
     
     % fill in pmls, working with permittivity 
     er( 1:ny_pml, : )           = er( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
     er( end-ny_pml+1:end, : )   = er( end-ny_pml+1:end, : ).*repmat( pml_y, 1, nx );
+    
+    % DEBUG plot the pml profile
+    if DEBUG
+        % plot imag
+        figure;
+        plot( y_indx, imag(pml_y), '-o' );
+        xlabel('position'); ylabel('pml profile, imag component');
+        title('DEBUG imag component of pml profile');
+        makeFigureNice();
+        % plot real
+        figure;
+        plot( y_indx, real(pml_y), '-o' );
+        xlabel('position'); ylabel('pml profile, real component');
+        title('DEBUG real component of pml profile');
+        makeFigureNice();
+    end
     
 end
 
