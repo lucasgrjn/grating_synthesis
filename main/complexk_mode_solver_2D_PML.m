@@ -103,9 +103,17 @@ if PML_options(1) == 1
         
     end
     
-    % fill in pmls, working with permittivity 
-    er( 1:ny_pml, : )           = er( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
-    er( end-ny_pml+1:end, : )   = er( end-ny_pml+1:end, : ).*repmat( pml_y, 1, nx );
+    % draw stretched coordinate pml
+    pml_y_all                           = ones( size(N) );
+    pml_y_all( 1:ny_pml, : )            = repmat( flipud(pml_y), 1, nx );
+    pml_y_all( end-ny_pml+1:end, : )    = repmat( pml_y, 1, nx );
+    
+    % stretched coordinate operator
+    Sy = spdiags( pml_y_all(:), 0, n_elem, n_elem );
+    
+%     % fill in pmls, working with permittivity OLD
+%     er( 1:ny_pml, : )           = er( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
+%     er( end-ny_pml+1:end, : )   = er( end-ny_pml+1:end, : ).*repmat( pml_y, 1, nx );
     
     % DEBUG plot the pml profile
     if DEBUG
@@ -120,6 +128,12 @@ if PML_options(1) == 1
         plot( y_indx, real(pml_y), '-o' );
         xlabel('position'); ylabel('pml profile, real component');
         title('DEBUG real component of pml profile');
+        makeFigureNice();
+        % plot imag of Sy
+        figure;
+        plot( 1:n_elem, imag(diag(Sy)) );
+        xlabel('position'); ylabel('pml profile, imag component');
+        title('DEBUG imag component of diag(S_y), the stretching operator');
         makeFigureNice();
     end
     
@@ -164,6 +178,10 @@ diag_all        = [ diag0, diag1 ];
 diag_indexs     = [ 0, 1 ];
 % make sparse matrix
 Dy_f    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
+% stretched coordinate pml
+if PML_options(1) == 1
+    Dy_f = Sy * Dy_f;
+end
 
 
 % generate backwards Dy
@@ -183,7 +201,10 @@ diag_all        = [ diagm1, diag0 ];
 diag_indexs     = [ -1, 0 ];
 % make sparse matrix
 Dy_b    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
-
+% stretched coordinate pml
+if PML_options(1) == 1
+    Dy_b = Sy * Dy_b;
+end
 
 % generate Dy squared
 Dy2 = Dy_b*Dy_f;

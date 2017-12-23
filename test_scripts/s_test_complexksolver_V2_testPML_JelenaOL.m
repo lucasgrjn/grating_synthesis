@@ -58,7 +58,7 @@ GC.plotIndex();
 period      = domain(2);
 k0_max      = 10/period;
 k0_min      = 0.5/period;
-k0_all      = linspace( k0_min, k0_max, 100 );
+k0_all      = linspace( k0_min, k0_max, 1 );
 lambda      = 2*pi./k0_all;
 
 % init saving variables
@@ -77,13 +77,13 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(4): PML polynomial order (1, 2, 3...)
 pml_options         = [ 1, 200, 500, 2 ];
 pml_options_old     = [ 1, 200, 500, 2 ];
-DEBUG               = false;
+DEBUG               = true;
 
 % calc bandstructure
-guessk1 = 1e-5;
-guessk2 = 1e-5;
-guessk_old = 1e-5;
-guessk  = pi/(2*period);
+guessk1     = 1e-5;
+guessk2     = 1e-5;
+guessk_old  = 1e-5;
+guessk      = pi/(2*period);
 for ii = 1:length(k0_all)
     
     fprintf('\nloop %i of %i\n\n', ii, length(k0_all));
