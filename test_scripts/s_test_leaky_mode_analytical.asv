@@ -1,0 +1,18 @@
+% script for testing leaky mode solution function
+%
+% authors: bohan zhang
+
+clear; close all;
+
+% add path to solver
+addpath( ['..' filesep 'auxiliary_functions'] );
+
+% define inputs
+a       = 200;
+b       = 300;
+n0      = 1.45;
+n1      = 1.;
+lambda0 = 1500;
+
+% run solver
+f_solve_leaky_modes_analytical( a, b, n0, n1, lambda0 )
