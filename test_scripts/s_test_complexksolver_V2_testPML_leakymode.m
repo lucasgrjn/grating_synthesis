@@ -22,8 +22,8 @@ n0          = 1.45;
 n1          = 1.39;
 a           = 0.39*lambda;
 b           = 1.96*lambda;
-outer_clad  = 1000;                                     % width of outer cladding
-domain      = [ 2*outer_clad + a + 2*b, 200 ];
+outer_clad  = 2000;                                     % width of outer cladding
+domain      = [ 2*outer_clad + a + 2*b, 20 ];
 numcells    = 10;
 neff_analy  = 1.4185997 + 1i*1.577e-4;
 
@@ -62,13 +62,13 @@ GC.plotIndex();
 % -------------------------------------------------------------------------
 
 % set simulation options
-num_modes   = 10;
+num_modes   = 1;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options     = [ 1, 200, 5, 4 ];
+pml_options     = [ 1, 200, 1.5, 2 ];
 DEBUG           = true;
 
 % set guessk to analytical k

@@ -107,12 +107,12 @@ if PML_options(1) == 1
     pml_y_all                           = ones( 2*size(N,1), size(N,2) );
     pml_y_all( 1:ny_pml-1, : )          = repmat( flipud( pml_y(1:end-1) ), 1, nx );
     pml_y_all( end-ny_pml+1:end, : )    = repmat( pml_y, 1, nx );
-%     pml_y_all                           = pml_y_all.^(-1);
+    pml_y_all                           = pml_y_
     
     % stretched coordinate operator
     pml_y_all_vec   = pml_y_all(:);
-    Sy_f            = spdiags( 1./pml_y_all_vec(2:2:end), 0, n_elem, n_elem );                % half step for forward Sy
-    Sy_b            = spdiags( 1./pml_y_all_vec(1:2:end-1), 0, n_elem, n_elem );              % on grid for backwards Sy
+    Sy_f            = spdiags( pml_y_all_vec(2:2:end), 0, n_elem, n_elem );                % half step for forward Sy
+    Sy_b            = spdiags( pml_y_all_vec(1:2:end-1), 0, n_elem, n_elem );              % on grid for backwards Sy
 %     Sy_f = Sy_b;    % DEBUG
     
 %     % fill in pmls, working with permittivity OLD
@@ -136,18 +136,11 @@ if PML_options(1) == 1
         title('DEBUG real component of pml profile');
         makeFigureNice();
         
-%         % plot imag of Sy_f, dB
-%         figure;
-%         plot( 1:n_elem, 10*log10(imag(diag(Sy_f))+1) );
-%         xlabel('position'); ylabel('pml profile, imag component');
-%         title('DEBUG imag component of diag(Sy_f)+1, in dB, the forward stretching operator');
-%         makeFigureNice();
-        
         % plot imag of Sy_f
         figure;
-        plot( 1:n_elem, imag(diag(Sy_f)) );
+        plot( 1:n_elem, 10*log10(imag(diag(Sy_f))+1) );
         xlabel('position'); ylabel('pml profile, imag component');
-        title('DEBUG imag component of diag(Sy_f), the forward stretching operator');
+        title('DEBUG imag component of diag(Sy_f)+1, in dB, the forward stretching operator');
         makeFigureNice();
         
         % plot imag of Sy_b
