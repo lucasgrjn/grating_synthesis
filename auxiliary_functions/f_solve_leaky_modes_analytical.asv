@@ -1,4 +1,7 @@
-function [  ] = f_solve_leaky_modes_analytical( a, b, n0, n1, lambda0 )
+function [ beta ] = f_solve_leaky_modes_analytical( a, b, n0, n1, lambda0 )
+% CURRENTLY DEPRECATED... since matlab cannot minimize a complex valued
+% function (where the x axis is complex beta)
+%
 % Solves for TE analytical solutions to symmetric leaky mode waveguide
 %
 % Using formulation from paper:
@@ -32,10 +35,10 @@ function [  ] = f_solve_leaky_modes_analytical( a, b, n0, n1, lambda0 )
 %             of nm
 %   n0
 %       type: double, scalar
-%       desc: index of waveguide core/outer cladding
+%       desc: index of waveguide core/outer cladding. Should be > n1
 %   n1
 %       type: double, scalar
-%       desc: index of waveguide inter-cladding layer
+%       desc: index of waveguide inter-cladding layer. Should be < n0
 %   lambda0
 %       type: double, scalar
 %       desc: free space wavelength in nm
@@ -46,23 +49,47 @@ k0 = 2*pi/lambda0;  % units rad/nm
 % For first test, plot the dispersion relation
 
 % pick range of beta's to solve for
-neff_range  = linspace( n0, n1, 1000 );
+neff_range  = linspace( n1*1.0001, n0*0.9999, 1000 );
 beta_range  = (2*pi/lambda0).*neff_range;
-kx          = sqrt( (k0^2)*(n0^2) - beta_range.^2 );
-alpha       = sqrt( beta_range.^2 - (k0^2)*(n1^2) );
+% kx          = sqrt( (k0^2)*(n0^2) - beta_range.^2 );
+% alpha       = sqrt( beta_range.^2 - (k0^2)*(n1^2) );
 
 % dispersion equation
-lhs     = tan( kx*a );                                                          % left hand side
-rhs     = (alpha./kx) .* tanh( atanh( -1i * kx./alpha ) + alpha.*(b - a) );     % right hand side
+y_lhs   = lhs( beta_range, a, n0, k0 );               % left hand side
+y_rhs   = rhs( beta_range, a, b, n0, n1, k0 );        % right hand side
 
-% plot dispersion
+% DEBUG plot dispersion
 figure;
-plot( beta_range, lhs ); hold on;
-plot( beta_range, rhs );
+plot( beta_range, real(y_lhs) ); hold on;
+plot( beta_range, real(y_rhs) );
 legend('left hand side', 'right hand side');
 xlabel('\beta (rad/nm)'); ylabel('dispersion');
 title('DEBUG dispersion relation');
 makeFigureNice();
+
+% DEBUG plot dispersion, imag
+figure;
+plot( beta_range, imag(y_lhs) ); hold on;
+plot( beta_range, imag(y_rhs) );
+legend('left hand side', 'right hand side');
+xlabel('\beta (rad/nm)'); ylabel('dispersion');
+title('DEBUG dispersion relation, imaginary');
+makeFigureNice();
+
+% DEBUG plot abs(error)
+figure;
+plot( beta_range, abs(y_lhs - y_rhs) );
+xlabel('\beta (rad/nm)'); ylabel('dispersion');
+title('DEBUG dispersion relation, abs(error)');
+makeFigureNice();
+
+% solve for intersection of lhs and rhs
+xlims   = (2*pi/lambda0) .* [ n1, n0 ];
+% beta    = fzero( @(x) abs( lhs( x, a, n0, k0 ) - rhs( x, a, b, n0, n1, k0 ) ), xlims );
+beta    = fminbnd( @(x) abs( lhs( x, a, n0, k0 ) - rhs( x, a, b, n0, n1, k0 ) ), xlims(1), xlims(2) );
+
+% DEBUG calc err
+err = abs( lhs( beta, a, n0, k0 ) - rhs( beta, a, b, n0, n1, k0 ) )
 
 end
 
@@ -71,23 +98,30 @@ end
 % -------------------------------------------------------------------------
 
 % left hand side of dispersion equation
-function y = lhs( beta, a )
+function y = lhs( beta, a, n0, k0 )
     % inputs:
-    %   beta - vector of beta to solve for (rad/nm)
-    %   a    - width of core, nm
+    %   beta    - vector of beta to solve for (rad/nm)
+    %   a       - width of core, nm
+    %   n0      - index of core and outer cladding
+    %   k0      - 2*pi/lambda0, rad/nm
     
     kx  = sqrt( (k0^2)*(n0^2) - beta.^2 );
     y   = tan( kx*a );   
 end
 
 % right hand side of dispersion equation
-function y = rhs( beta, a )
+function y = rhs( beta, a, b, n0, n1, k0 )
     % inputs:
-    %   beta - vector of beta to solve for (rad/nm)
-    %   a    - width of core, nm
+    %   beta    - vector of beta to solve for (rad/nm)
+    %   a       - width of core, nm
+    %   b       - width of inter cladding, nm
+    %   n0      - index of core and outer cladding
+    %   n1      - index of inter cladding
+    %   k0      - 2*pi/lambda0, rad/nms
     
-    kx  = sqrt( (k0^2)*(n0^2) - beta.^2 );
-    y   = tan( kx*a );   
+    kx      = sqrt( (k0^2)*(n0^2) - beta.^2 );
+    alpha   = sqrt( beta.^2 - (k0^2)*(n1^2) );
+    y       = (alpha./kx) .* tanh( atanh( -1i * kx./alpha ) + alpha.*(b - a) );  
 end
 
 

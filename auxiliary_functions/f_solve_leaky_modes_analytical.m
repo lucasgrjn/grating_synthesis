@@ -1,4 +1,7 @@
 function [ beta ] = f_solve_leaky_modes_analytical( a, b, n0, n1, lambda0 )
+% CURRENTLY DEPRECATED... since matlab cannot minimize a complex valued
+% function (where the x axis is complex beta)
+%
 % Solves for TE analytical solutions to symmetric leaky mode waveguide
 %
 % Using formulation from paper:
@@ -84,6 +87,9 @@ makeFigureNice();
 xlims   = (2*pi/lambda0) .* [ n1, n0 ];
 % beta    = fzero( @(x) abs( lhs( x, a, n0, k0 ) - rhs( x, a, b, n0, n1, k0 ) ), xlims );
 beta    = fminbnd( @(x) abs( lhs( x, a, n0, k0 ) - rhs( x, a, b, n0, n1, k0 ) ), xlims(1), xlims(2) );
+
+% DEBUG calc err
+err = abs( lhs( beta, a, n0, k0 ) - rhs( beta, a, b, n0, n1, k0 ) )
 
 end
 
