@@ -9,8 +9,9 @@
 clear; close all;
 
 % import code
-addpath(['..' filesep 'main']);         % main
-addpath(['..' filesep '45RFSOI']);      % 45rfsoi
+addpath(['..' filesep 'main']);                 % main
+addpath(['..' filesep '45RFSOI']);              % 45rfsoi
+addpath(['..' filesep 'auxiliary_functions']);  % aux functions (gui)
 
 % initial settings
 disc        = 10;
@@ -67,17 +68,17 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options     = [ 1, 200, 500, 2 ];
+pml_options     = [ 1, 200, 5, 4 ];
 DEBUG           = true;
 
 % set guessk to analytical k
 guessk = k0 * neff_analy;
 
 % run new
-% Phi_all has dimensions ny vs. nx vs. mode #
+% Phi has dimensions ny vs. nx vs. mode #
 fprintf('running new solver, pml type 2\n');
 tic;
-[Phi_newver, k_newver, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+[Phi_new, k_new, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
                                                            disc, ...
                                                            k0, ...
                                                            num_modes, ...
@@ -99,10 +100,19 @@ tic;
                                                                                pml_options );
 toc;
 
+% -------------------------------------------------------------------------
+% Results
+% -------------------------------------------------------------------------
 
+% display results
+format shortEng                 % display in scientific notation
+neff_new = k_new/k0
+neff_old = k_all_old/k0
 
+% test out the gui
+f_plot_all_modes_gui( Phi_new )
 
-
+% lets look at the old modes too
 
 
 

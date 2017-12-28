@@ -72,12 +72,12 @@ if PML_options(1) == 1
     pml_order   = PML_options(4);   % pml polynomial order
     
     % setup discretizations
-    ny_pml = pml_len_nm/disc;                      % number of discretizations that pml spans
+    ny_pml = 2*pml_len_nm/disc;                                             % number of discretizations that pml spans, double sampled grid
     if abs(ny_pml - round(ny_pml)) >= 1e-5
         % discretization was not integer value
         error('Integer # of discretizations did not fit into the PML');
     end
-    y_indx = 1:ny_pml;
+    y_indx = 1:(ny_pml+1);
     
     % TEMPORARY CHOOSE THE PML TYPE
     if PML_options(5) == 1
@@ -104,12 +104,15 @@ if PML_options(1) == 1
     end
     
     % draw stretched coordinate pml
-    pml_y_all                           = ones( size(N) );
-    pml_y_all( 1:ny_pml, : )            = repmat( flipud(pml_y), 1, nx );
-    pml_y_all( end-ny_pml+1:end, : )    = repmat( pml_y, 1, nx );
+    pml_y_all                           = ones( 2*size(N,1)+1, size(N,2) );
+    pml_y_all( 1:ny_pml, : )            = repmat( flipud( pml_y(1:end-1) ), 1, nx );
+    pml_y_all( end-ny_pml:end, : )    = repmat( pml_y, 1, nx );
     
     % stretched coordinate operator
-    Sy = spdiags( pml_y_all(:), 0, n_elem, n_elem );
+    pml_y_all_vec = pml_y_all(:);
+    Sy_f = spdiags( pml_y_all_vec(2:2:end), 0, n_elem, n_elem );                % half step for forward Sy
+    Sy_b = spdiags( pml_y_all_vec(1:2:end-1), 0, n_elem, n_elem );              % on grid for backwards Sy
+%     Sy_f = Sy_b;    % DEBUG
     
 %     % fill in pmls, working with permittivity OLD
 %     er( 1:ny_pml, : )           = er( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
@@ -117,25 +120,52 @@ if PML_options(1) == 1
     
     % DEBUG plot the pml profile
     if DEBUG
+        
         % plot imag
         figure;
         plot( y_indx, imag(pml_y), '-o' );
         xlabel('position'); ylabel('pml profile, imag component');
         title('DEBUG imag component of pml profile');
         makeFigureNice();
+        
         % plot real
         figure;
         plot( y_indx, real(pml_y), '-o' );
         xlabel('position'); ylabel('pml profile, real component');
         title('DEBUG real component of pml profile');
         makeFigureNice();
-        % plot imag of Sy
+        
+        % plot imag of Sy_f
         figure;
-        plot( 1:n_elem, imag(diag(Sy)) );
+        plot( 1:n_elem, imag(diag(Sy_f)) );
         xlabel('position'); ylabel('pml profile, imag component');
-        title('DEBUG imag component of diag(S_y), the stretching operator');
+        title('DEBUG imag component of diag(Sy_f), the forward stretching operator');
         makeFigureNice();
-    end
+        
+        % plot imag of Sy_b
+        figure;
+        plot( 1:n_elem, imag(diag(Sy_b)) );
+        xlabel('position'); ylabel('pml profile, imag component');
+        title('DEBUG imag component of diag(Sy_b), the backward stretching operator');
+        makeFigureNice();
+        
+        % plot real pml_y in 2D
+        figure;
+        imagesc( real(pml_y_all) );
+        set( gca, 'ydir', 'normal' );
+        colorbar;
+        title('DEBUG real pml_y in 2D');
+        makeFigureNice();
+        
+        % plot imag pml_y in 2D
+        figure;
+        imagesc( 10*log10(imag(pml_y_all)) );
+        set( gca, 'ydir', 'normal' );
+        colorbar;
+        title('DEBUG imag pml_y in 2D (dB)');
+        makeFigureNice();
+        
+    end         % end debug code
     
 end
 
@@ -180,7 +210,7 @@ diag_indexs     = [ 0, 1 ];
 Dy_f    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 % stretched coordinate pml
 if PML_options(1) == 1
-    Dy_f = Sy * Dy_f;
+    Dy_f = Sy_f * Dy_f;
 end
 
 
@@ -203,7 +233,7 @@ diag_indexs     = [ -1, 0 ];
 Dy_b    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
 % stretched coordinate pml
 if PML_options(1) == 1
-    Dy_b = Sy * Dy_b;
+    Dy_b = Sy_b * Dy_b;
 end
 
 % generate Dy squared
