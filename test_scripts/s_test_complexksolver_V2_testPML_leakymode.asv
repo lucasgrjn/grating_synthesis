@@ -182,7 +182,7 @@ makeFigureNice();
 pml_str = linspace( 0.1, 5, 10 );
 
 % init saving vars
-k_new_all = zeros(size(pml_str));
+
 
 for ii = 1:length(pml_str)
     
@@ -215,19 +215,8 @@ for ii = 1:length(pml_str)
                                                                DEBUG );
     toc;
 
-    % save variables
-    k_new_all(ii) = k_new;
     
 end
-
-% plot effective index vs. pml strength
-figure;
-plot( pml_str, real(k_new_all)./k0, '-o' ); hold on;
-plot( xlims, [ real(neff_analy), real(neff_analy) ], '--' );
-legend('neff solver', 'analytical');
-xlabel('pml strength'); ylabel('neff, real');
-title('Real n_eff vs. pml_str');
-makeFigureNice();
 
 
 

@@ -36,7 +36,7 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %               PML_options(3): strength of PML in the complex plane
 %               PML_options(4): PML polynomial order (1, 2, 3...)
 %       TEMPORARY: adding a 5th option to the PML, which is to use type 1
-%       or 2
+%       or 2 (deprecated)
 %       
 %   DEBUG
 %       type: boolean
@@ -79,20 +79,20 @@ if PML_options(1) == 1
     end
     y_indx = 1:ny_pml;
     
-    % TEMPORARY CHOOSE THE PML TYPE
-    if PML_options(5) == 1
-        % type 1
-        
-        % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
-        % setup amplitude
-        ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
-        % setup conductivity
-        sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
-        % combine
-        eta0    = 376.73031346177;                              % ohms
-        pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
-        
-    elseif PML_options(5) == 2
+%     % TEMPORARY CHOOSE THE PML TYPE
+%     if PML_options(5) == 1
+%         % type 1
+%         
+%         % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
+%         % setup amplitude
+%         ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
+%         % setup conductivity
+%         sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
+%         % combine
+%         eta0    = 376.73031346177;                              % ohms
+%         pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
+%         
+%     elseif PML_options(5) == 2
         % type 2
         
         % using polynomial strength pml
@@ -101,7 +101,7 @@ if PML_options(1) == 1
         omega   = k0*c;                             % rad/s
         pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
         
-    end
+%     end
     
     % draw stretched coordinate pml
     pml_y_all                           = ones( 2*size(N,1), size(N,2) );
