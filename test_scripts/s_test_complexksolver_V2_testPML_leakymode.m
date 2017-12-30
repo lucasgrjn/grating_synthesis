@@ -22,7 +22,7 @@ n0          = 1.45;
 n1          = 1.39;
 a           = 0.39*lambda;                              % HALF of width of core wavevguide
 b           = 1.96*lambda;
-outer_clad  = 1000;                                     % width of outer cladding
+outer_clad  = 920;                                      % width of outer cladding
 domain      = [ 2*outer_clad + 2*b, 10 ];
 numcells    = 10;
 neff_analy  = 1.4185997 + 1i*1.577e-4;
@@ -178,66 +178,405 @@ makeFigureNice();
 % PML value sweeps
 % -------------------------------------------------------------------------
 
-% k vs. pml strength
-pml_str = linspace( 0.1, 5, 10 );
+% ------------------
+% % k vs. pml strength
+% pml_str = linspace( 0.0, 50, 100 );
+% 
+% % init saving vars
+% k_new_all = zeros(size(pml_str));
+% 
+% for ii = 1:length(pml_str)
+%     
+%     fprintf('loop %i of %i\n', ii, length(pml_str) );
+%     
+%     % set simulation options
+%     num_modes   = 1;
+%     BC          = 0;     % 0 for PEC, 1 for PMC
+%     % PML_options(1): PML in y direction (yes=1 or no=0)
+%     % PML_options(2): length of PML layer in nm
+%     % PML_options(3): strength of PML in the complex plane
+%     % PML_options(4): PML polynomial order (1, 2, 3...)
+%     pml_options     = [ 1, 200, pml_str(ii), 2 ];
+%     DEBUG           = false;
+% 
+%     % set guessk to analytical k
+%     guessk = k0 * neff_analy;
+%     
+%     % run new
+%     % Phi has dimensions ny vs. nx vs. mode #
+%     fprintf('running new solver\n');
+%     tic;
+%     [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                disc, ...
+%                                                                k0, ...
+%                                                                num_modes, ...
+%                                                                guessk, ...
+%                                                                BC, ...
+%                                                                pml_options, ...
+%                                                                DEBUG );
+%     toc;
+% 
+%     % save variables
+%     k_new_all(ii) = k_new;
+%     
+% end
+% 
+% % plot effective index vs. pml strength, real
+% figure;
+% plot( pml_str, real(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('pml strength'); ylabel('neff, real');
+% title('Real n_{eff} vs. pml strength');
+% makeFigureNice();
+% 
+% % plot effective index vs. pml strength, imag
+% figure;
+% plot( pml_str, imag(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('pml strength'); ylabel('neff, imag');
+% title('Imaginary n_{eff} vs. pml strength');
+% makeFigureNice();
+% ------------------
+
+% % % ------------------
+% % k vs. pml location
+% outer_clads  = 600:20:2000;                                     % width of outer cladding
+% 
+% % init saving vars
+% k_new_all = zeros(size(outer_clads));
+% 
+% for ii = 1:length(outer_clads)
+%     
+%     fprintf('loop %i of %i\n', ii, length(outer_clads) );
+%     
+%     % make new GC
+%     domain = [ 2*outer_clads(ii) + 2*b, 10 ];
+%     
+%     % make object
+%     GC = c_twoLevelGratingCell(  'discretization',   disc, ...
+%                                 'units',            units, ...
+%                                 'lambda',           lambda, ...
+%                                 'domain_size',      domain, ...
+%                                 'background_index', n1, ...
+%                                 'num_cells',        numcells );
+% 
+%     % Add wg core
+%     height_y    = 2*a;
+%     min_y       = domain(1)/2-a;
+%     index       = n0;
+%     GC          = GC.addLayer( min_y, height_y, index );
+% 
+%     % Add wg bottom outer cladding
+%     height_y    = outer_clad;
+%     min_y       = 0;
+%     index       = n0;
+%     GC          = GC.addLayer( min_y, height_y, index );
+% 
+%     % Add wg top outer cladding
+%     height_y    = outer_clad;
+%     min_y       = domain(1) - outer_clad;
+%     index       = n0;
+%     GC          = GC.addLayer( min_y, height_y, index );
+%     
+%     % set simulation options
+%     num_modes   = 1;
+%     BC          = 0;     % 0 for PEC, 1 for PMC
+%     % PML_options(1): PML in y direction (yes=1 or no=0)
+%     % PML_options(2): length of PML layer in nm
+%     % PML_options(3): strength of PML in the complex plane
+%     % PML_options(4): PML polynomial order (1, 2, 3...)
+%     pml_options     = [ 1, 200, 0.05, 2 ];
+%     DEBUG           = false;
+% 
+%     % set guessk to analytical k
+%     guessk = k0 * neff_analy;
+%     
+%     % run new
+%     % Phi has dimensions ny vs. nx vs. mode #
+%     fprintf('running new solver\n');
+%     tic;
+%     [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                disc, ...
+%                                                                k0, ...
+%                                                                num_modes, ...
+%                                                                guessk, ...
+%                                                                BC, ...
+%                                                                pml_options, ...
+%                                                                DEBUG );
+%     toc;
+% 
+%     % save variables
+%     k_new_all(ii) = k_new;
+%     
+% end
+% 
+% % plot effective index vs. pml location, real
+% figure;
+% plot( outer_clads, real(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('outer cladding size (nm)'); ylabel('neff, real');
+% title('Real n_{eff} vs. outer cladding size/pml location');
+% makeFigureNice();
+% 
+% % plot effective index vs. pml location, imag
+% figure;
+% plot( outer_clads, imag(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('outer cladding size (nm)'); ylabel('neff, imag');
+% title('Imaginary n_{eff} vs. outer cladding size/pml location');
+% makeFigureNice();
+% % ------------------
+
+% % ------------------
+% % k vs. pml size
+% pml_sizes = 50:10:500;
+% 
+% % init saving vars
+% k_new_all = zeros(size(pml_sizes));
+% 
+% for ii = 1:length(pml_sizes)
+%     
+%     fprintf('loop %i of %i\n', ii, length(pml_sizes) );
+%     
+%     
+%     % set simulation options
+%     num_modes   = 1;
+%     BC          = 0;     % 0 for PEC, 1 for PMC
+%     % PML_options(1): PML in y direction (yes=1 or no=0)
+%     % PML_options(2): length of PML layer in nm
+%     % PML_options(3): strength of PML in the complex plane
+%     % PML_options(4): PML polynomial order (1, 2, 3...)
+%     pml_options     = [ 1, pml_sizes(ii), 5, 2 ];
+%     DEBUG           = false;
+% 
+%     % set guessk to analytical k
+%     guessk = k0 * neff_analy;
+%     
+%     % run new
+%     % Phi has dimensions ny vs. nx vs. mode #
+%     fprintf('running new solver\n');
+%     tic;
+%     [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                disc, ...
+%                                                                k0, ...
+%                                                                num_modes, ...
+%                                                                guessk, ...
+%                                                                BC, ...
+%                                                                pml_options, ...
+%                                                                DEBUG );
+%     toc;
+% 
+%     % save variables
+%     k_new_all(ii) = k_new;
+%     
+% end
+% 
+% % plot effective index vs. pml location, real
+% figure;
+% plot( pml_sizes, real(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('pml size (nm)'); ylabel('neff, real');
+% title('Real n_{eff} vs. pml size');
+% makeFigureNice();
+% 
+% % plot effective index vs. pml location, imag
+% figure;
+% plot( pml_sizes, imag(k_new_all)./k0, '-o' ); hold on;
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% legend('solver', 'analytical');
+% xlabel('pml size (nm)'); ylabel('neff, imag');
+% title('Imaginary n_{eff} vs. opml size');
+% makeFigureNice();
+% % ------------------
+
+% ------------------
+% % k vs. pml strength AND ORDER
+% pml_str     = linspace( 0.0, 50, 100 );
+% pml_orders  = 1:6;
+% 
+% init saving vars
+% k_new_all = zeros( length(pml_str), length(pml_orders) );       % dimensions ( pml str, pml order )
+% 
+% for i_order = 1:length(pml_orders)
+%     for i_str = 1:length(pml_str)
+% 
+%         fprintf('loop %i of %i\n', i_str, length(pml_str) );
+% 
+%         set simulation options
+%         num_modes   = 1;
+%         BC          = 0;     % 0 for PEC, 1 for PMC
+%         PML_options(1): PML in y direction (yes=1 or no=0)
+%         PML_options(2): length of PML layer in nm
+%         PML_options(3): strength of PML in the complex plane
+%         PML_options(4): PML polynomial order (1, 2, 3...)
+%         pml_options     = [ 1, 200, pml_str(i_str), pml_orders(i_order) ];
+%         DEBUG           = false;
+% 
+%         set guessk to analytical k
+%         guessk = k0 * neff_analy;
+% 
+%         run new
+%         Phi has dimensions ny vs. nx vs. mode #
+%         fprintf('running new solver\n');
+%         tic;
+%         [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                    disc, ...
+%                                                                    k0, ...
+%                                                                    num_modes, ...
+%                                                                    guessk, ...
+%                                                                    BC, ...
+%                                                                    pml_options, ...
+%                                                                    DEBUG );
+%         toc;
+% 
+%         save variables
+%         k_new_all(i_str, i_order) = k_new;
+% 
+%     end
+% end
+% 
+% plot effective index vs. pml strength, real
+% legendstrs = {};
+% figure;
+% for ii = 1:length( pml_orders )
+%     
+%     plot( pml_str, real( k_new_all(:,ii) )./k0, '-' ); hold on;
+%     
+%     legendstrs{end+1} = [ 'order ' num2str(ii) ];
+%     
+% end
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legendstrs{end+1} = 'analytical';
+% legend(legendstrs);
+% xlabel('pml strength'); ylabel('neff, real');
+% title('Real n_{eff} vs. pml strength');
+% makeFigureNice();
+% 
+% plot effective index vs. pml strength, imag
+% figure;
+% for ii = 1:length( pml_orders )
+%     
+%     plot( pml_str, imag( k_new_all(:,ii) )./k0, '-' ); hold on;
+%     
+% end
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% legend(legendstrs);
+% xlabel('pml strength'); ylabel('neff, imag');
+% title('Imag n_{eff} vs. pml strength');
+% makeFigureNice();
+% ------------------
+
+
+% ------------------
+% k vs. pml location AND order
+outer_clads  = 600:20:4000;                                     % width of outer cladding
+pml_orders  = 1:6;
 
 % init saving vars
-k_new_all = zeros(size(pml_str));
+k_new_all = zeros( length(outer_clads), length(pml_orders) );       % dimensions ( outer cladding, pml order )
 
-for ii = 1:length(pml_str)
-    
-    fprintf('loop %i of %i\n', ii, length(pml_str) );
-    
-    % set simulation options
-    num_modes   = 1;
-    BC          = 0;     % 0 for PEC, 1 for PMC
-    % PML_options(1): PML in y direction (yes=1 or no=0)
-    % PML_options(2): length of PML layer in nm
-    % PML_options(3): strength of PML in the complex plane
-    % PML_options(4): PML polynomial order (1, 2, 3...)
-    pml_options     = [ 1, 200, pml_str(ii), 2 ];
-    DEBUG           = true;
+for i_order = 1:length(pml_orders)
+    for ii = 1:length(outer_clads)
 
-    % set guessk to analytical k
-    guessk = k0 * neff_analy;
-    
-    % run new
-    % Phi has dimensions ny vs. nx vs. mode #
-    fprintf('running new solver\n');
-    tic;
-    [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
-                                                               disc, ...
-                                                               k0, ...
-                                                               num_modes, ...
-                                                               guessk, ...
-                                                               BC, ...
-                                                               pml_options, ...
-                                                               DEBUG );
-    toc;
+        fprintf('loop %i of %i\n', ii, length(outer_clads) );
 
-    % save variables
-    k_new_all(ii) = k_new;
-    
+        % make new GC
+        domain = [ 2*outer_clads(ii) + 2*b, 10 ];
+
+        % make object
+        GC = c_twoLevelGratingCell(  'discretization',   disc, ...
+                                    'units',            units, ...
+                                    'lambda',           lambda, ...
+                                    'domain_size',      domain, ...
+                                    'background_index', n1, ...
+                                    'num_cells',        numcells );
+
+        % Add wg core
+        height_y    = 2*a;
+        min_y       = domain(1)/2-a;
+        index       = n0;
+        GC          = GC.addLayer( min_y, height_y, index );
+
+        % Add wg bottom outer cladding
+        height_y    = outer_clad;
+        min_y       = 0;
+        index       = n0;
+        GC          = GC.addLayer( min_y, height_y, index );
+
+        % Add wg top outer cladding
+        height_y    = outer_clad;
+        min_y       = domain(1) - outer_clad;
+        index       = n0;
+        GC          = GC.addLayer( min_y, height_y, index );
+
+        % set simulation options
+        num_modes   = 1;
+        BC          = 0;     % 0 for PEC, 1 for PMC
+        % PML_options(1): PML in y direction (yes=1 or no=0)
+        % PML_options(2): length of PML layer in nm
+        % PML_options(3): strength of PML in the complex plane
+        % PML_options(4): PML polynomial order (1, 2, 3...)
+        pml_options     = [ 1, 200, 10, pml_orders(i_order) ];
+        DEBUG           = false;
+
+        % set guessk to analytical k
+        guessk = k0 * neff_analy;
+
+        % run new
+        % Phi has dimensions ny vs. nx vs. mode #
+        fprintf('running new solver\n');
+        tic;
+        [Phi_new, k_new, ~, ~] = complexk_mode_solver_2D_PML( GC.N, ...
+                                                                   disc, ...
+                                                                   k0, ...
+                                                                   num_modes, ...
+                                                                   guessk, ...
+                                                                   BC, ...
+                                                                   pml_options, ...
+                                                                   DEBUG );
+        toc;
+
+        % save variables
+        k_new_all(ii, i_order) = k_new;
+
+    end
 end
 
-% plot effective index vs. pml strength
+% plot effective index vs. pml strength, real
+legendstrs = {};
 figure;
-plot( pml_str, real(k_new_all)./k0, '-o' ); hold on;
-plot( xlims, [ real(neff_analy), real(neff_analy) ], '--' );
-legend('neff solver', 'analytical');
-xlabel('pml strength'); ylabel('neff, real');
-title('Real n_eff vs. pml_str');
+for ii = 1:length( pml_orders )
+    
+    plot( outer_clads, real( k_new_all(:,ii) )./k0, '-' ); hold on;
+    
+    legendstrs{end+1} = [ 'order ' num2str(ii) ];
+    
+end
+plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+legendstrs{end+1} = 'analytical';
+legend(legendstrs);
+xlabel('outer cladding size (nm)'); ylabel('neff, real');
+title('Real n_{eff} vs. outer cladding size/pml location');
 makeFigureNice();
 
-
-
-
-
-
-
-
-
-
+% plot effective index vs. pml strength, imag
+figure;
+for ii = 1:length( pml_orders )
+    
+    plot( outer_clads, imag( k_new_all(:,ii) )./k0, '-' ); hold on;
+    
+end
+plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+legend(legendstrs);
+xlabel('outer cladding size (nm)'); ylabel('neff, imag');
+title('Imag n_{eff} vs. outer cladding size/pml location');
+makeFigureNice();
+% ------------------
 
 
 
