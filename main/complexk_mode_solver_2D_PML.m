@@ -99,7 +99,8 @@ if PML_options(1) == 1
         c       = (3e8) * (1e9);                    % nm/s
         eps0    = (8.854187817e-12) * (1e-9);       % F/nm
         omega   = k0*c;                             % rad/s
-        pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
+%         pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
+        pml_y   = (1 + 1i * pml_str * ( y_indx./ny_pml ).^( pml_order )).';
         
 %     end
     

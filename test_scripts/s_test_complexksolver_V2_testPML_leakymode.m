@@ -23,7 +23,7 @@ n1          = 1.39;
 a           = 0.39*lambda;                              % HALF of width of core wavevguide
 b           = 1.96*lambda;
 outer_clad  = 920;                                      % width of outer cladding
-domain      = [ 2*outer_clad + 2*b, 10 ];
+domain      = [ 2*outer_clad + 2*b, 100 ];
 numcells    = 10;
 neff_analy  = 1.4185997 + 1i*1.577e-4;
 
@@ -68,7 +68,7 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options     = [ 1, 200, 5, 2 ];
+pml_options     = [ 1, 200, 500, 2 ];
 DEBUG           = true;
 
 % set guessk to analytical k
@@ -474,8 +474,9 @@ makeFigureNice();
 
 % ------------------
 % k vs. pml location AND order
-outer_clads  = 600:20:4000;                                     % width of outer cladding
-pml_orders  = 1:6;
+outer_clads  = 600:20:2000;                                     % width of outer cladding
+% outer_clads = 4000;
+pml_orders  = 1:4;
 
 % init saving vars
 k_new_all = zeros( length(outer_clads), length(pml_orders) );       % dimensions ( outer cladding, pml order )
@@ -486,7 +487,7 @@ for i_order = 1:length(pml_orders)
         fprintf('loop %i of %i\n', ii, length(outer_clads) );
 
         % make new GC
-        domain = [ 2*outer_clads(ii) + 2*b, 10 ];
+        domain = [ 2*outer_clads(ii) + 2*b, 30 ];
 
         % make object
         GC = c_twoLevelGratingCell(  'discretization',   disc, ...
@@ -503,14 +504,14 @@ for i_order = 1:length(pml_orders)
         GC          = GC.addLayer( min_y, height_y, index );
 
         % Add wg bottom outer cladding
-        height_y    = outer_clad;
+        height_y    = outer_clads(ii);
         min_y       = 0;
         index       = n0;
         GC          = GC.addLayer( min_y, height_y, index );
 
         % Add wg top outer cladding
-        height_y    = outer_clad;
-        min_y       = domain(1) - outer_clad;
+        height_y    = outer_clads(ii);
+        min_y       = domain(1) - outer_clads(ii);
         index       = n0;
         GC          = GC.addLayer( min_y, height_y, index );
 
@@ -521,7 +522,7 @@ for i_order = 1:length(pml_orders)
         % PML_options(2): length of PML layer in nm
         % PML_options(3): strength of PML in the complex plane
         % PML_options(4): PML polynomial order (1, 2, 3...)
-        pml_options     = [ 1, 200, 10, pml_orders(i_order) ];
+        pml_options     = [ 1, 200, 1000, pml_orders(i_order) ];
         DEBUG           = false;
 
         % set guessk to analytical k
@@ -547,34 +548,69 @@ for i_order = 1:length(pml_orders)
     end
 end
 
-% plot effective index vs. pml strength, real
+% solved effective index
+neff_new            = k_new_all/k0;
+neff_new_err_real   = 100*abs( real( neff_new - neff_analy )./real( neff_analy ) );
+neff_new_err_imag   = 100*abs( imag( neff_new - neff_analy )./imag( neff_analy ) );
+
+% % plot effective index vs. pml strength, real
+% legendstrs = {};
+% figure;
+% for ii = 1:length( pml_orders )
+%     
+%     plot( outer_clads, real( k_new_all(:,ii) )./k0, '-' ); hold on;
+%     
+%     legendstrs{end+1} = [ 'order ' num2str(ii) ];
+%     
+% end
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legendstrs{end+1} = 'analytical';
+% legend(legendstrs);
+% xlabel('outer cladding size (nm)'); ylabel('neff, real');
+% title('Real n_{eff} vs. outer cladding size/pml location');
+% makeFigureNice();
+% 
+% % plot effective index vs. pml strength, imag
+% figure;
+% for ii = 1:length( pml_orders )
+%     
+%     plot( outer_clads, imag( k_new_all(:,ii) )./k0, '-' ); hold on;
+%     
+% end
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% legend(legendstrs);
+% xlabel('outer cladding size (nm)'); ylabel('neff, imag');
+% title('Imag n_{eff} vs. outer cladding size/pml location');
+% makeFigureNice();
+
+% plot effective index vs. pml strength, real, error
 legendstrs = {};
 figure;
 for ii = 1:length( pml_orders )
     
-    plot( outer_clads, real( k_new_all(:,ii) )./k0, '-' ); hold on;
+    plot( outer_clads, neff_new_err_real(:,ii), '-' ); hold on;
     
     legendstrs{end+1} = [ 'order ' num2str(ii) ];
     
 end
-plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
-legendstrs{end+1} = 'analytical';
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legendstrs{end+1} = 'analytical';
 legend(legendstrs);
-xlabel('outer cladding size (nm)'); ylabel('neff, real');
-title('Real n_{eff} vs. outer cladding size/pml location');
+xlabel('outer cladding size (nm)'); ylabel('% error');
+title('% error b/w real n_{eff} vs. outer cladding size/pml location');
 makeFigureNice();
 
 % plot effective index vs. pml strength, imag
 figure;
 for ii = 1:length( pml_orders )
     
-    plot( outer_clads, imag( k_new_all(:,ii) )./k0, '-' ); hold on;
+    plot( outer_clads, neff_new_err_imag(:,ii), '-' ); hold on;
     
 end
-plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
 legend(legendstrs);
-xlabel('outer cladding size (nm)'); ylabel('neff, imag');
-title('Imag n_{eff} vs. outer cladding size/pml location');
+xlabel('outer cladding size (nm)'); ylabel('% error');
+title('% error b/w imag n_{eff} vs. outer cladding size/pml location');
 makeFigureNice();
 % ------------------
 

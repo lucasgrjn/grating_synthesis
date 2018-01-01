@@ -314,7 +314,7 @@ classdef c_twoLevelGratingCell
             
             % run solver
             k0          = 2*pi/lambda;
-            [Phi_1D, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
+            [Phi_all, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
                                                        dx, ...
                                                        k0, ...
                                                        num_modes, ...
@@ -325,18 +325,18 @@ classdef c_twoLevelGratingCell
             % re-scale k
             k = k * nm * obj.units.scale;
             
-            % reshape field envelope ("Phi")
-            Phi_all = zeros( size(obj.N, 1), size(obj.N, 2), length(k) );  % stores all field envelope, dimensions y vs x vs k
-            for ii = 1:length(k)
-                
-                % reshape field
-                Phi_k = reshape( Phi_1D(:,ii), fliplr( size(obj.N) ) ); % dimensions (x, y) where x = direction of propagation
-                Phi_k = Phi_k.';
-                
-                % save in Phi_all
-                Phi_all(:, :, ii) = Phi_k;  % dimensions (y, x, k)
-                
-            end
+%             % reshape field envelope ("Phi")
+%             Phi_all = zeros( size(obj.N, 1), size(obj.N, 2), length(k) );  % stores all field envelope, dimensions y vs x vs k
+%             for ii = 1:length(k)
+%                 
+%                 % reshape field
+%                 Phi_k = reshape( Phi_1D(:,ii), fliplr( size(obj.N) ) ); % dimensions (x, y) where x = direction of propagation
+%                 Phi_k = Phi_k.';
+%                 
+%                 % save in Phi_all
+%                 Phi_all(:, :, ii) = Phi_k;  % dimensions (y, x, k)
+%                 
+%             end
             
             % DEBUG store temporary copies of k and phi_all b4 removing and
             % sorting
@@ -423,12 +423,12 @@ classdef c_twoLevelGratingCell
             obj = obj.calc_output_angle( y_up, y_down );
             
             % calculate power scattering strength
-            obj = obj.calc_scattering_strength();
+            obj                       = obj.calc_scattering_strength();
             obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
             
             
-        end     % end function runSimulation_old()
+        end     % end function runSimulation()
         
         
         function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )

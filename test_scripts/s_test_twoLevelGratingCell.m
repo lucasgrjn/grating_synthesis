@@ -45,6 +45,7 @@ GC.plotIndex();
 % run simulation
 num_modes   = 1;
 BC          = 0;     % 0 for PEC, 1 for PMC
+guessk      = 0;
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
@@ -52,7 +53,7 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 pml_options = [ 1, 200, 500, 2 ];
 
 % run simulation
-GC = GC.runSimulation( num_modes, BC, pml_options );
+GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
 
 % % DEBUG plot physical fields and all fields
 % k_all       = GC.debug.k_all;

@@ -16,7 +16,7 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
-domain      = [ 1600, 470 ];
+domain      = [ 2000, 470 ];
 numcells    = 10;
 
 
@@ -57,65 +57,82 @@ GC.plotIndex();
 % Pick wavelengths to sweep
 period      = domain(2);
 k0_max      = 10/period;
-k0_min      = 0.5/period;
-k0_all      = linspace( k0_min, k0_max, 1 );
+k0_min      = 2/period;
+k0_all      = linspace( k0_min, k0_max, 100 );
 lambda      = 2*pi./k0_all;
 
 % init saving variables
-all_k1      = [];   % returned k from pml type 1
-all_k2      = [];   % returned k from pml type 2
+% all_k1      = [];   % returned k from pml type 1
+% all_k2      = [];   % returned k from pml type 2
+all_k       = [];   % returned from new modesolver
 all_k0      = [];
 all_k_old   = [];
 all_k0_old  = [];
 
 % set simulation options
-num_modes   = 10;
+num_modes   = 1;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options         = [ 1, 200, 500, 2 ];
-pml_options_old     = [ 1, 200, 500, 2 ];
-DEBUG               = true;
+pml_options         = [ 1, 200, 500, 4 ];
+pml_options_old     = [ 1, 200, 500, 4 ];
+DEBUG               = false;
 
 % calc bandstructure
-guessk1     = 1e-5;
-guessk2     = 1e-5;
-guessk_old  = 1e-5;
+% guessk1     = 1e-5;
+% guessk2     = 1e-5;
+% guessk      = 1e-5;
+% guessk_old  = 1e-5;
 guessk      = pi/(2*period);
 for ii = 1:length(k0_all)
     
     fprintf('\nloop %i of %i\n\n', ii, length(k0_all));
     
-    % run simulation
-    % run new
-    % Phi_all has dimensions ny vs. nx vs. mode #
-    fprintf('running new solver, pml type 1\n');
-    tic;
-    [Phi_all1, k_all1, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
-                                                               disc, ...
-                                                               k0_all(ii), ...
-                                                               num_modes, ...
-                                                               guessk, ...
-                                                               BC, ...
-                                                               [pml_options, 1], ...
-                                                               DEBUG );
-    toc;
+%     % run simulation
+%     % run new
+%     % Phi_all has dimensions ny vs. nx vs. mode #
+%     fprintf('running new solver, pml type 1\n');
+%     tic;
+%     [Phi_all1, k_all1, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                disc, ...
+%                                                                k0_all(ii), ...
+%                                                                num_modes, ...
+%                                                                guessk, ...
+%                                                                BC, ...
+%                                                                [pml_options, 1], ...
+%                                                                DEBUG );
+%     toc;
     
+%     % run new
+%     % Phi_all has dimensions ny vs. nx vs. mode #
+%     fprintf('running new solver, pml type 2\n');
+%     tic;
+%     [Phi_all2, k_all2, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+%                                                                disc, ...
+%                                                                k0_all(ii), ...
+%                                                                num_modes, ...
+%                                                                guessk, ...
+%                                                                BC, ...
+%                                                                [pml_options, 2], ...
+%                                                                DEBUG );
+%     toc;
+
     % run new
     % Phi_all has dimensions ny vs. nx vs. mode #
-    fprintf('running new solver, pml type 2\n');
+    fprintf('running new solver\n');
     tic;
-    [Phi_all2, k_all2, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
+    [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
                                                                disc, ...
                                                                k0_all(ii), ...
                                                                num_modes, ...
                                                                guessk, ...
                                                                BC, ...
-                                                               [pml_options, 2], ...
+                                                               pml_options, ...
                                                                DEBUG );
     toc;
+
     
     % run old
     fprintf('running old solver\n');
@@ -129,8 +146,9 @@ for ii = 1:length(k0_all)
                                                                                    pml_options_old );
     toc;
                  
-    all_k1              = [ all_k1, k_all1.' ];           % returned k from pml type 1
-    all_k2              = [ all_k2, k_all2.' ];           % returned k from pml type 2
+%     all_k1              = [ all_k1, k_all1.' ];           % returned k from pml type 1
+%     all_k2              = [ all_k2, k_all2.' ];           % returned k from pml type 2
+    all_k               = [ all_k, k_all.' ];
     all_k_old           = [ all_k_old, k_all_old.' ];      % old k
     all_k0              = [ all_k0, repmat( k0_all(ii), 1, num_modes ) ];
     
@@ -138,22 +156,35 @@ for ii = 1:length(k0_all)
 %     guessk1         = all_k1(end);
 %     guessk2         = all_k2(end);
 %     guessk_old      = all_k_old(end);
+%     guessk          = all_k(end);
     
 end
 
 
+% % plot the bandstructure for ALL modes, new solver pml type 1 and 2
+% figure;
+% plot( real(all_k1)*period/pi, all_k0*period/pi, 'o' ); hold on;
+% plot( imag(all_k1)*period/pi, all_k0*period/pi, 'o' );
+% plot( real(all_k2)*period/pi, all_k0*period/pi, 'o' );
+% plot( imag(all_k2)*period/pi, all_k0*period/pi, 'o' );
+% plot( real(all_k_old)*period/pi, all_k0*period/pi, 'o' );
+% plot( imag(all_k_old)*period/pi, all_k0*period/pi, 'o' );
+% xlabel('ka/pi'); ylabel('k0*a/pi');
+% % legend('real', 'imag', 'center of bandgap');
+% legend('real, pm1', 'imag, pml1', 'real, pml2', 'imag, pml2', 'real, old', 'imag, old');
+% title('Bandstructure of all solved modes, new ver. pml 1 vs pml 2 vs. old version');
+% makeFigureNice();
+
 % plot the bandstructure for ALL modes, new solver pml type 1 and 2
 figure;
-plot( real(all_k1)*period/pi, all_k0*period/pi, 'o' ); hold on;
-plot( imag(all_k1)*period/pi, all_k0*period/pi, 'o' );
-plot( real(all_k2)*period/pi, all_k0*period/pi, 'o' );
-plot( imag(all_k2)*period/pi, all_k0*period/pi, 'o' );
+plot( real(all_k)*period/pi, all_k0*period/pi, 'o' ); hold on;
+plot( imag(all_k)*period/pi, all_k0*period/pi, 'o' );
 plot( real(all_k_old)*period/pi, all_k0*period/pi, 'o' );
 plot( imag(all_k_old)*period/pi, all_k0*period/pi, 'o' );
 xlabel('ka/pi'); ylabel('k0*a/pi');
 % legend('real', 'imag', 'center of bandgap');
-legend('real, pm1', 'imag, pml1', 'real, pml2', 'imag, pml2', 'real, old', 'imag, old');
-title('Bandstructure of all solved modes, new ver. pml 1 vs pml 2 vs. old version');
+legend('real, new', 'imag, new', 'real, old', 'imag, old');
+title('Bandstructure of all solved modes, new ver. vs. old version');
 makeFigureNice();
 
 % plot of just the old bandstructure
@@ -164,16 +195,16 @@ xlabel('ka/pi'); ylabel('k0*a/pi');
 title('Bandstructure of all solved modes,old version');
 makeFigureNice();
 
-% plot of just the new bandstructure
-figure;
-plot( real(all_k1)*period/pi, all_k0*period/pi, 'o' ); hold on;
-plot( imag(all_k1)*period/pi, all_k0*period/pi, 'o' );
-plot( real(all_k2)*period/pi, all_k0*period/pi, 'o' );
-plot( imag(all_k2)*period/pi, all_k0*period/pi, 'o' );
-xlabel('ka/pi'); ylabel('k0*a/pi');
-legend('real, pm1', 'imag, pml1', 'real, pml2', 'imag, pml2');
-title('Bandstructure of all solved modes, new ver. pml 1 vs pml 2');
-makeFigureNice();
+% % plot of just the new bandstructure
+% figure;
+% plot( real(all_k1)*period/pi, all_k0*period/pi, 'o' ); hold on;
+% plot( imag(all_k1)*period/pi, all_k0*period/pi, 'o' );
+% plot( real(all_k2)*period/pi, all_k0*period/pi, 'o' );
+% plot( imag(all_k2)*period/pi, all_k0*period/pi, 'o' );
+% xlabel('ka/pi'); ylabel('k0*a/pi');
+% legend('real, pm1', 'imag, pml1', 'real, pml2', 'imag, pml2');
+% title('Bandstructure of all solved modes, new ver. pml 1 vs pml 2');
+% makeFigureNice();
 
 
 
