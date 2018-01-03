@@ -314,7 +314,7 @@ classdef c_twoLevelGratingCell
             
             % run solver
             k0          = 2*pi/lambda;
-            [Phi_all, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
+            [Phi_all, k] = complexk_mode_solver_2D_PML( obj.N, ...
                                                        dx, ...
                                                        k0, ...
                                                        num_modes, ...
@@ -364,16 +364,18 @@ classdef c_twoLevelGratingCell
                 % for each mode
 
                 % grab guided portion of field
-                phi_guided = Phi_all( y >= y_bot & y <= y_top, :, ii );
+                phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
+                cur_phi     = Phi_all( :, :, ii );
 
                 % sum area of field
                 guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-                total_power(ii)     = sum( abs( Phi_all(:, :, ii) ).^2 );
+                total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
 
             end
             
             % DEBUG storing the guided power
-            obj.debug.guided_power = guided_power;
+            obj.debug.guided_power          = guided_power;
+            obj.debug.guided_power_ratio    = guided_power./total_power;
             
             % keep mode with LEAST unguided power OR MOST guided power
             [~, indx_k] = max( abs(guided_power./total_power) );        % most guided

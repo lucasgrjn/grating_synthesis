@@ -480,6 +480,7 @@ pml_orders  = 1:4;
 
 % init saving vars
 k_new_all = zeros( length(outer_clads), length(pml_orders) );       % dimensions ( outer cladding, pml order )
+k_old_all = k_new_all;
 
 for i_order = 1:length(pml_orders)
     for ii = 1:length(outer_clads)
@@ -541,9 +542,22 @@ for i_order = 1:length(pml_orders)
                                                                    pml_options, ...
                                                                    DEBUG );
         toc;
+        
+        % run old
+        fprintf('running old solver\n');
+        tic;
+        [~, ~, Phi_all_old, k_all_old, A_old, B_old] = complexk_mode_solver_2D_PML_old( GC.N, ...
+                                                                                       disc, ...
+                                                                                       k0, ...
+                                                                                       num_modes, ...
+                                                                                       guessk, ...
+                                                                                       BC, ...
+                                                                                       pml_options );
+        toc;
 
         % save variables
         k_new_all(ii, i_order) = k_new;
+        k_old_all(ii, i_order) = k_all_old;
 
     end
 end
@@ -552,6 +566,9 @@ end
 neff_new            = k_new_all/k0;
 neff_new_err_real   = 100*abs( real( neff_new - neff_analy )./real( neff_analy ) );
 neff_new_err_imag   = 100*abs( imag( neff_new - neff_analy )./imag( neff_analy ) );
+n_eff_old           = k_old_all/k0;
+neff_old_err_real   = 100*abs( real( n_eff_old - neff_analy )./real( neff_analy ) );
+neff_old_err_imag   = 100*abs( imag( n_eff_old - neff_analy )./imag( neff_analy ) );
 
 % % plot effective index vs. pml strength, real
 % legendstrs = {};
@@ -600,7 +617,7 @@ xlabel('outer cladding size (nm)'); ylabel('% error');
 title('% error b/w real n_{eff} vs. outer cladding size/pml location');
 makeFigureNice();
 
-% plot effective index vs. pml strength, imag
+% plot effective index vs. pml strength, imag, error
 figure;
 for ii = 1:length( pml_orders )
     
@@ -611,6 +628,38 @@ end
 legend(legendstrs);
 xlabel('outer cladding size (nm)'); ylabel('% error');
 title('% error b/w imag n_{eff} vs. outer cladding size/pml location');
+makeFigureNice();
+
+
+
+% plot effective index vs. pml strength, real, error, OLD
+legendstrs = {};
+figure;
+for ii = 1:length( pml_orders )
+    
+    plot( outer_clads, neff_old_err_real(:,ii), '-' ); hold on;
+    
+    legendstrs{end+1} = [ 'order ' num2str(ii) ];
+    
+end
+% plot( xlim, [ real(neff_analy), real(neff_analy) ], '--' );
+% legendstrs{end+1} = 'analytical';
+legend(legendstrs);
+xlabel('outer cladding size (nm)'); ylabel('% error');
+title('% error b/w real n_{eff} vs. outer cladding size/pml location, old ver.');
+makeFigureNice();
+
+% plot effective index vs. pml strength, imag, error, OLD
+figure;
+for ii = 1:length( pml_orders )
+    
+    plot( outer_clads, neff_old_err_imag(:,ii), '-' ); hold on;
+    
+end
+% plot( xlim, [ imag(neff_analy), imag(neff_analy) ], '--' );
+legend(legendstrs);
+xlabel('outer cladding size (nm)'); ylabel('% error');
+title('% error b/w imag n_{eff} vs. outer cladding size/pml location, old ver.');
 makeFigureNice();
 % ------------------
 

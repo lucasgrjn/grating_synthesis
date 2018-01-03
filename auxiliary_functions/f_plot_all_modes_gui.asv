@@ -9,28 +9,17 @@ function [] = f_plot_all_modes_gui( phi, x, y )
 %       type: double, tensor
 %       desc: Field (envelope), dimensions y vs x vs mode #, where y = in
 %             plane transverse dimension and x = direction of propagation
-%   x
-%       type: double, vector
-%       desc: x coordinates
-%   y 
-%       type: double, vector
-%       desc: y coordinates
-%   k
-%       type: double, vector
-%       desc: modesolver 
 
 % Create a figure and axes
 f   = figure('Visible','off');
 ax  = axes('Units','pixels');
 
-% default settings
-mode_num    = 1;
-mode_comp   = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
-
 % plot the first mode by default
-plot_field();
+modenum = 1;
+imagesc( real(phi(:,:,modenum)) );
 set( gca, 'ydir', 'normal' );
-
+colorbar;
+title('Mode 1, real');
 
 % move axes over
 ax.Position(1) = ax.Position(1) + 100;
@@ -65,48 +54,43 @@ f.Visible = 'on';
 function selectmode( source, event )
     % selects which mode to draw
     
-    mode_num     = source.Value;
+    modenum     = source.Value;
+    modename    = source.String;
 
-    plot_field();
+    imagesc( real(phi(:,:,modenum)) );
+    colorbar;
+    title( sprintf( 'Mode %i, real', modenum ));
+    
 end
 
 % function for selecting which component to draw
 function select_component( source, event )
     % selects which mode to draw
     
-    mode_comp    = source.String{ source.Value };
-    mode_comp    = mode_comp(2:end);                                        % remove whitespace prefix 
+    field_comp    = source.String{ source.Value };
 
-    plot_field();
-end
-
-function plot_field()
-    % depends on the variables:
-    %   mode_num
-    %   mode_comp
-    % which are automatically updated by the other ui functions
-
-    switch mode_comp
+    switch field_comp
        
-        case 'real'
-            imagesc( x, y, real(phi(:,:,mode_num)) );
-            title( sprintf( 'Mode %i, real', mode_num ));
+        case ' real'
+            imagesc( real(phi(:,:,modenum)) );
+            title( sprintf( 'Mode %i, real', modenum ));
             
-        case 'imag'
-            imagesc( x, y, imag(phi(:,:,mode_num)) );
-            title( sprintf( 'Mode %i, imag', mode_num ));
+        case ' imag'
+            imagesc( imag(phi(:,:,modenum)) );
+            title( sprintf( 'Mode %i, imag', modenum ));
             
-        case 'amplitude'
-            imagesc( x, y, abs(phi(:,:,mode_num)) );
-            title( sprintf( 'Mode %i, amplitude', mode_num ));
+        case ' amplitude'
+            imagesc( abs(phi(:,:,modenum)) );
+            title( sprintf( 'Mode %i, amplitude', modenum ));
             
-        case 'intensity'
-            imagesc( x, y, abs(phi(:,:,mode_num)).^2 );
-            title( sprintf( 'Mode %i, intensity', mode_num ));
+        case ' intensity'
+            imagesc( abs(phi(:,:,modenum)).^2 );
+            title( sprintf( 'Mode %i, intensity', modenum ));
         
     end
-    colorbar;
     
+    colorbar;
+      
 end
 
 
