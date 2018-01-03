@@ -524,10 +524,11 @@ classdef c_twoLevelGratingCell
 
                 % grab guided portion of field
                 phi_guided = Phi_all( y >= y_bot & y <= y_top, :, ii );
+                cur_phi    = Phi_all( :, :, ii );
 
                 % sum area of field
                 guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-                total_power(ii)     = sum( abs( Phi_all(:, :, ii) ).^2 );
+                total_power(ii)     = sum( abs( cur_phi(:) ).^2 );
 
             end
             

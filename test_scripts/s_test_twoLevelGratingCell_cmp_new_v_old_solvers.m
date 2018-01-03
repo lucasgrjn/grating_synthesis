@@ -57,7 +57,7 @@ guessk      = 2*pi*wg_index(1)*fill/lambda;
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 5, 2 ];
+pml_options = [ 1, 200, 5, 3 ];
 
 % run simulation
 GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
@@ -128,62 +128,66 @@ guessk      = 2*pi*wg_index(1)*fill/lambda;
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 5, 2 ];
+pml_options = [ 1, 200, 500, 2 ];
 
 % run simulation
-GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+GC_old = GC.runSimulation_old( num_modes, BC, pml_options, guessk );
 
 % DEBUG plot physical fields and all fields
-k_all       = GC.debug.k_all;
+k_all_old   = GC_old.debug.k_all;
 neff_all    = k_all/(2*pi/lambda);
 
-for ii = 1:length( k_all )
-    % Plotting physical fields
-    % plot field, abs
-    figure;
-    imagesc( GC.x_coords, GC.y_coords, abs( GC.debug.phi_all(:,:,ii) ) );
-    colorbar;
-    set( gca, 'YDir', 'normal' );
-    title( sprintf( 'Field (abs) for mode %i, k = %f + i%f', ii, real( k_all(ii) ), imag( k_all(ii) ) ) );
-end
+% for ii = 1:length( k_all )
+%     % Plotting physical fields
+%     % plot field, abs
+%     figure;
+%     imagesc( GC_old.x_coords, GC_old.y_coords, abs( GC_old.debug.phi_all(:,:,ii) ) );
+%     colorbar;
+%     set( gca, 'YDir', 'normal' );
+%     title( sprintf( 'Field (abs) for mode %i, k = %f + i%f, old solver', ii, real( k_all_old(ii) ), imag( k_all_old(ii) ) ) );
+% end
 
 % plot real and imag k
 k_labels = {};
-for ii = 1:length( k_all )
+for ii = 1:length( k_all_old )
     k_labels{end+1} = [ ' ', num2str(ii) ];
 end
 figure;
-plot( real( k_all ), imag( k_all ), 'o' ); 
-text( real( k_all ), imag( k_all ), k_labels );
+plot( real( k_all_old ), imag( k_all_old ), 'o' ); 
+text( real( k_all_old ), imag( k_all_old ), k_labels );
 xlabel('real k'); ylabel('imag k');
-title('real vs imag k');
+title('real vs imag k, old solver');
 makeFigureNice();
 
 % Plot the accepted mode
 figure;
-imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
+imagesc( GC_old.x_coords, GC_old.y_coords, abs( GC_old.Phi ) );
 colorbar;
 set( gca, 'YDir', 'normal' );
-title( ['Field (abs) for accepted mode, k= ', num2str( GC.k  ) ] );
+title( ['Field (abs) for accepted mode, old solver, k = ', num2str( GC_old.k  ) ] );
 
 % display calculated k
-fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
+fprintf('\nOld Complex k = %f + %fi\n', real(GC_old.k), imag(GC_old.k) );
 
 % display radiated power
-fprintf('\nRad power up = %e\n', GC.P_rad_up);
-fprintf('Rad power down = %e\n', GC.P_rad_down);
-fprintf('Up/down power directivity = %f\n', GC.directivity);
+fprintf('\nOld Rad power up = %e\n', GC_old.P_rad_up);
+fprintf('Old Rad power down = %e\n', GC_old.P_rad_down);
+fprintf('Old Up/down power directivity = %f\n', GC_old.directivity);
 
 % display angle of radiation
-fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
+fprintf('\nOld Angle of maximum radiation = %f deg\n', GC_old.max_angle_up);
 
 % plot full Ez with grating geometry overlaid
-GC.plotEz_w_edges();
+GC_old.plotEz_w_edges();
 axis equal;
 
+% plot all modes
+f_plot_all_modes_gui( GC_old.debug.phi_all, GC_old.x_coords, GC_old.y_coords, GC_old.debug.k_all );
 
 
-
+% -------------------------------------------------------------------------
+% Run fmm/eme
+% -------------------------------------------------------------------------
 
 
 
