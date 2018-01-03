@@ -1,4 +1,4 @@
-function [] = f_plot_all_modes_gui( phi, x, y )
+function [] = f_plot_all_modes_gui( phi, x, y, k )
 % authors: bohan zhang
 %
 % Function that plots all the modes from complex k modesolver, new ver, in
@@ -17,7 +17,7 @@ function [] = f_plot_all_modes_gui( phi, x, y )
 %       desc: y coordinates
 %   k
 %       type: double, vector
-%       desc: modesolver 
+%       desc: prop. eigenvalues vs. mode #
 
 % Create a figure and axes
 f   = figure('Visible','off');
@@ -26,11 +26,20 @@ ax  = axes('Units','pixels');
 % default settings
 mode_num    = 1;
 mode_comp   = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
+phase_on    = false;        % determines whether the propagation phase is included
+
+% two copies of field, one with and one without phase
+phi_nophase = phi;
+phi_phase   = phi;
+for ii = 1:length(k)
+    % for each mode, add in the phase
+    phase_only          = repmat( exp( 1i * k(ii) * x ), length(y), 1 );
+    phi_phase(:,:,ii)   = phi_phase(:,:,ii) .* phase_only;
+end
+
 
 % plot the first mode by default
 plot_field();
-set( gca, 'ydir', 'normal' );
-
 
 % move axes over
 ax.Position(1) = ax.Position(1) + 100;
@@ -57,6 +66,12 @@ popup_selectcomponent = uicontrol('Style', 'popup',...
                                    'String', {' real', ' imag', ' amplitude', ' intensity'},...
                                    'Position', [20, ax.Position(4) - 25, 100, 50],...
                                    'Callback', @select_component);   
+                               
+% Create checkbox for selecting/deselecting phase
+checkbox_phase = uicontrol('Style', 'checkbox',...
+                                   'String', {'Phase on'},...
+                                   'Position', [20, ax.Position(4) - 50, 100, 50],...
+                                   'Callback', @toggle_phase);   
 
 % Make figure visble after adding all components
 f.Visible = 'on';
@@ -78,6 +93,17 @@ function select_component( source, event )
     mode_comp    = mode_comp(2:end);                                        % remove whitespace prefix 
 
     plot_field();
+end
+
+% function for toggling phase on/off
+function toggle_phase( source, event )
+
+    if source.Value == true
+        phi = phi_phase;
+    else
+        phi = phi_nophase;
+    end 
+    plot_field()
 end
 
 function plot_field()
@@ -105,6 +131,8 @@ function plot_field()
             title( sprintf( 'Mode %i, intensity', mode_num ));
         
     end
+    set( gca, 'ydir', 'normal' );
+    xlabel('x'); ylabel('y');
     colorbar;
     
 end

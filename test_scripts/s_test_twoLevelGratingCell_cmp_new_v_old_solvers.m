@@ -57,7 +57,7 @@ guessk      = 2*pi*wg_index(1)*fill/lambda;
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 50, 2 ];
+pml_options = [ 1, 200, 5, 2 ];
 
 % run simulation
 GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
@@ -112,7 +112,7 @@ GC.plotEz_w_edges();
 axis equal;
 
 % plot all modes
-f_plot_all_modes_gui( GC.debug.phi_all, GC.x_coords, GC.y_coords );
+f_plot_all_modes_gui( GC.debug.phi_all, GC.x_coords, GC.y_coords, GC.debug.k_all );
 
 
 
