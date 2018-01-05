@@ -8,14 +8,13 @@ clear; close all;
 % dependencies
 addpath(['..' filesep 'main']);
 addpath(['..' filesep 'auxiliary_functions']);
-addpath(['..' filesep 'eme' ]);
 
 % initial settings
 disc        = 10;
 units       = 'nm';
 lambda      = 1550; %1500;
 index_clad  = 1.0;
-domain      = [ 3000, 800 ];
+domain      = [ 2000, 800 ];
 numcells    = 10;
 
 % Init a new object
@@ -29,7 +28,7 @@ GC = c_twoLevelGratingCell(  'discretization', disc, ...
 % draw cell
 % draw two levels using two level builder function
 % the inputs are organized [ top level, bottom level ]
-fill            = 0.8;
+fill            = 0.9;
 ratio           = 1.0;
 offset          = 0.0;
 period          = domain(2);
@@ -58,7 +57,7 @@ guessk      = 2*pi*wg_index(1)*fill/lambda;
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 20, 2 ];
+pml_options = [ 1, 200, 5, 3 ];
 
 % run simulation
 GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
@@ -199,7 +198,7 @@ n_cells     = 10;
 um          = 1e6;
 nm          = 1e9;
 dx          = disc*um/nm;                                               % in um
-dz          = dx;                                                       % in um
+dx          = dx;                                                       % in um
 pol         = 0;                                                        % 0 for TE, 1 for TM
 xf          = domain(1)*um/nm;                                          % in um
 zf          = n_cells * domain(2) * um/nm;                              % in um
@@ -207,7 +206,7 @@ lambda_um   = lambda * um/nm;                                           % wl in 
 eme_obj     = emeSim(   'discretization', [dx dz], ...
                     'pml', 0.2, ...
                     'domain', [xf zf], ...
-                    'backgroundIndex', 1, ...
+                    'backgroundIndex', obj.background_index, ...
                     'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
                     'debug', 'no',...                   
                     'polarization', pol );
@@ -216,8 +215,53 @@ diel        = eme_obj.diel;
 z_coords_eme    = eme_obj.domain.z;
 cur_z           = z_coords_eme(1);          % current z coordinate
 
-% draw grating
-eme_obj.diel = repmat( GC.N, 1, n_cells );
+% draw the input waveguide section
+% using the trick that i can write and return the index from
+% the two level grating cell
+% first override the discretization
+obj_as_struct                   = obj.convertObjToStruct();
+obj_as_struct.discretization    = [ dx, dz ] / ( um * obj.units.scale );
+% now make the grating cell
+gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
+                                         z_in/(um*obj.units.scale), ...
+                                         1.0, ...
+                                         0.0, ...
+                                         0.0 );
+
+% draw to diel
+diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + z_in ) = gratingcell_in.N;
+% update z
+cur_z               = cur_z + z_in;
+[~, cur_z_indx ]    = min( abs( z_coords_eme - cur_z ) );   % convert to array index
+            
+% draw each cell
+for ii = 1:n_cells
+
+    % TRICK - i can use the twoLeveLgratingcell to build the
+    % dielectric for the emeSim
+    gratingcell = obj.h_makeGratingCell(  obj_as_struct, ...
+                                         periods_synth(ii), ...
+                                         fills_synth(ii), ...
+                                         ratios_synth(ii), ...
+                                         offsets_synth(ii) );                                                
+
+    % draw to diel
+    try
+        diel( :, cur_z_indx:( cur_z_indx + size(gratingcell.N,2) - 1) ) = gratingcell.N;
+    catch ME
+        fprintf('ERROR dielectric sizes don''t match ya better debug this bud\n');
+        error(ME);
+    end
+    % update z
+    cur_z_indx = cur_z_indx + size(gratingcell.N,2);
+
+end
+            
+% replace the dielectric in the eme object
+eme_obj.diel = diel;
+
+%             % DEBUG plot the diel
+%             eme_obj.plotDiel();
 
 % run EME sim
 % Converts the dielectric distribution into layers for eigen mode expansion
@@ -225,11 +269,11 @@ eme_obj = eme_obj.convertDiel();
 % Runs simulation
 eme_obj = eme_obj.runSimulation('plotSource','yes');      
 % compute fiber overlap
-MFD = 10;
 eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
                                 'angleVec', -45:1:45,...
-                                'MFD',      MFD,...
-                                'overlapDir', 'down' );
+                                'MFD', MFD * obj.units.scale * um,...
+                                'overlapDir', obj.coupling_direction);
+
 % DEBUG show results
 gratingUI(eme_obj);
 

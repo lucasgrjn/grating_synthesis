@@ -132,6 +132,7 @@ function plot_field()
         
     end
     set( gca, 'ydir', 'normal' );
+    colormap('redbluehilight');
     xlabel('x'); ylabel('y');
     colorbar;
     

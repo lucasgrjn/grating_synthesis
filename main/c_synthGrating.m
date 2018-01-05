@@ -201,8 +201,13 @@ classdef c_synthGrating
             % Constructor
             % See top comments for input documentation
             
-            % adding path to emesim
-            addpath( [ '..' filesep 'eme' ] );
+            % Dependency imports
+            fname           = mfilename;                                            % name of class
+            fpath           = mfilename('fullpath');                                % full path, including fname
+            projectpath     = erase( fpath, [ 'main' filesep fname] );              % now only holds path to project's code
+            % path to emeSim
+            addpath([ projectpath 'eme' ]);
+            
 
             % inputs and defaults
             inputs = {  'discretization',   'none', ...
