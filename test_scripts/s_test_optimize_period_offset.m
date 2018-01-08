@@ -8,10 +8,10 @@
 
 clear; close all;
 
-% add path to the 45RFSOI functions
-addpath(['..' filesep '45RFSOI']);
-% add main code
-addpath([ '..' filesep 'main' ]);
+% dependencies
+addpath(['..' filesep '45RFSOI']);                  % 45RF
+addpath(['..' filesep 'main' ]);                    % main code
+addpath(['..' filesep 'auxiliary_functions']);      % merit function
 
 % initial settings
 disc        = 10;
@@ -73,29 +73,64 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
 
 % chosen fills
-fill_top = 0.8;
+fill_top = 0.6;
 fill_bot = 0.8;
 
 % period and offset ranges to sweep
-periods = 600:10:900;
+% periods = 650:10:770;                     % good range when fill top = fill bot = 80%
+periods = 730:10:830;                       % good range when fill top = 0.6, fill bot = 0.8
 offsets = 0:0.02:0.98;
 % % TEMP
 % periods = 00;
 % offsets = [0, 0.5];
 
 % simulation settings
-num_modes   = 5;
+num_modes   = 1;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 5, 2 ];
+pml_options = [ 1, 200, 20, 2 ];
+guessk      = 0.009448 + 0.000084i;                         % k when fill top = 0.6, fill bot = 0.8, period = 780, offset = 0.3
 
 % init saving variables
 directivities   = zeros( length(periods), length(offsets) );    % up/down directivity, dimensions period vs. offset
 angles_up       = zeros( length(periods), length(offsets) );    % up angle, dimensions period vs. offset
 angles_down     = zeros( length(periods), length(offsets) );    % down angle, dimensions period vs. offset
+
+
+% -------------------------------------------------------------------------
+% nonlinear optim
+% -------------------------------------------------------------------------
+
+% weights and fill factor
+weights         = [1, 1];
+fill_factors    = [ fill_top, fill_bot ];
+
+% starting point
+x0 = [ 0.700, 0.3 ];
+
+% options
+opts = optimset( 'Display', 'iter', ...
+                 'FunValCheck', 'off', ...
+                 'MaxFunEvals', 400, ...
+                 'MaxIter', 400, ...
+                 'PlotFcns', @optimplotfval );
+% 
+% % run fminsearch, simplex search
+% tic;
+% [x, fval, exitflag, output] = fminsearch( @(x) f_merit_period_offset( x, Q, optimal_angle, weights, fill_factors ), x0, opts );
+% toc;
+
+% % run fminunc, the gradient search
+% tic;
+% [x, fval, exitflag, output] = fminunc( @(x) f_merit_period_offset( x, Q, optimal_angle, weights, fill_factors ), x0, opts );
+% toc;
+
+% -------------------------------------------------------------------------
+% Brute force
+% -------------------------------------------------------------------------
 
 i_loop = 0;
 tic;
@@ -112,14 +147,14 @@ for i_period = 1:length(periods)
         % make grating coupler object
         GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, offsets(i_offset) );
         
-        % DEBUG plot index
-        GC.plotIndex();
+%         % DEBUG plot index
+%         GC.plotIndex();
         
         % run sim
-        GC = GC.runSimulation( num_modes, BC, pml_options );
+        GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
         
-        % DEBUG plot field
-        GC.plotEz_w_edges();
+%         % DEBUG plot field
+%         GC.plotEz_w_edges();
        
         % save results
         directivities( i_period, i_offset ) = GC.directivity;
@@ -131,54 +166,69 @@ for i_period = 1:length(periods)
     end
     
 end
+
+% % Loading old data
+% % data is stored in: C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data
+% data = load( 'C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data\s_test_opimize_period_offset_data.mat' );
+% % unpack data
+% v2struct(data.data);
         
-% % test the make 45RFSOI function
-% period          = 700;
-% fill_top        = 0.8;
-% fill_bot        = 0.8;
-% offset_ratio    = 0.3;
-% GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
-% 
-% % plot index
-% GC.plotIndex();
-%         
-% % simulate
-% % run simulation
-% num_modes   = 5;
-% BC          = 0;     % 0 for PEC, 1 for PMC
-% % PML_options(1): PML in y direction (yes=1 or no=0)
-% % PML_options(2): length of PML layer in nm
-% % PML_options(3): strength of PML in the complex plane
-% % PML_options(4): PML polynomial order (1, 2, 3...)
-% pml_options = [ 1, 200, 20, 2 ];
-% 
-% % run simulation
-% tic;
-% GC = GC.runSimulation( num_modes, BC, pml_options );
-% toc;
-% 
-% % Plot the accepted mode
-% figure;
-% imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
-% colorbar;
-% set( gca, 'YDir', 'normal' );
-% title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*domain(2)/(2*pi) ) ) );
-% 
-% % display calculated k
-% fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
-% 
-% % display radiated power
-% fprintf('\nRad power up = %e\n', GC.P_rad_up);
-% fprintf('Rad power down = %e\n', GC.P_rad_down);
-% fprintf('Up/down power directivity = %f\n', GC.directivity);
-% 
-% % display angle of radiation
-% fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
-% 
-% % plot full Ez with grating geometry overlaid
-% GC.plotEz_w_edges();
-% axis equal;
+% Plot stuff
+% directivity vs. period and offset
+figure;
+imagesc( offsets, periods, 10*log10(directivities) );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Up/down Directivity (dB) vs. period and offset');
+
+% angle up vs. period and offset
+figure;
+imagesc( offsets, periods, angles_up );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Up angle vs. period and offset');
+
+% angle down vs. period and offset
+figure;
+imagesc( offsets, periods, angles_down );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Down angle vs. period and offset');
+
+% plot FOM
+fom         = weights(1)*abs( optimal_angle - angles_down )/optimal_angle + weights(2)*log10(directivities);
+% plot merit function
+figure;
+imagesc( offsets, periods, fom );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('FOM vs. period and offset');
+
+% plot angle error
+angle_error = abs( optimal_angle - angles_down )/optimal_angle;
+figure;
+imagesc( offsets, periods, angle_error );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Angle error vs. period and offset');
+
+% plot directivity
+figure;
+imagesc( offsets, periods, log10(directivities) );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('log10(directivities) vs. period and offset');
+
         
+% -------------------------------------------------------------------------
+% Sweep offset and then sweep period
+% -------------------------------------------------------------------------
         
         
         

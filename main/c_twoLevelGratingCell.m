@@ -387,11 +387,17 @@ classdef c_twoLevelGratingCell
             if real(k) >=0 & imag(k) <= 0
                 
                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
-                          'Flipping the field and inverting the sign of k\n\n' ]);
-                
-                k   = -k;
-                Phi = rot90(Phi, 2);    % equivalent to fliplr(flipud(Phi))
-                
+                          'Re-running solver with flipped k\n\n' ]);
+
+                % re-run solver
+                [Phi, k] = complexk_mode_solver_2D_PML( obj.N, ...
+                                                           dx, ...
+                                                           k0, ...
+                                                           1, ...
+                                                           -k, ...
+                                                           BC, ...
+                                                           pml_options );
+
             end
 
             % save wavevectors and field
@@ -935,6 +941,7 @@ classdef c_twoLevelGratingCell
             % overplot the detected edges
             h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
             set( h, 'AlphaData', N_edges );
+            set( gca, 'YDir', 'normal' );
 
             % plot the field, abs
             figure;
@@ -949,6 +956,7 @@ classdef c_twoLevelGratingCell
             % overplot the detected edges
             h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
             set( h, 'AlphaData', N_edges );
+            set( gca, 'YDir', 'normal' );
             
         end     % end function plotEz()
         
