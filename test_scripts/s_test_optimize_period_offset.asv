@@ -14,7 +14,7 @@ addpath(['..' filesep 'main' ]);                    % main code
 addpath(['..' filesep 'auxiliary_functions']);      % merit function
 
 % initial settings
-disc        = 5;
+disc        = 10;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
@@ -132,98 +132,98 @@ opts = optimset( 'Display', 'iter', ...
 % Brute force
 % -------------------------------------------------------------------------
 
-% i_loop = 0;
-% tic;
-% 
-% % run loops
-% for i_period = 1:length(periods)
-%     
-%     for i_offset = 1:length(offsets)
-%         
-%         % print loop #
-%         i_loop = i_loop + 1;
-%         fprintf('Loop %i of %i\n', i_loop, length(periods)*length(offsets) );
-%         
-%         % make grating coupler object
-%         GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, offsets(i_offset) );
-%         
-% %         % DEBUG plot index
-% %         GC.plotIndex();
-%         
-%         % run sim
-%         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-%         
-% %         % DEBUG plot field
-% %         GC.plotEz_w_edges();
-%        
-%         % save results
-%         directivities( i_period, i_offset ) = GC.directivity;
-%         angles_up( i_period, i_offset )     = GC.max_angle_up;
-%         angles_down( i_period, i_offset )   = GC.max_angle_down;
-%         
-%         toc;
-%         
-%     end
-%     
-% end
-% 
-% % % Loading old data
-% % % data is stored in: C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data
-% % data = load( 'C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data\s_test_opimize_period_offset_data.mat' );
-% % % unpack data
-% % v2struct(data.data);
-%         
-% % Plot stuff
-% % directivity vs. period and offset
-% figure;
-% imagesc( offsets, periods, 10*log10(directivities) );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('Up/down Directivity (dB) vs. period and offset');
-% 
-% % angle up vs. period and offset
-% figure;
-% imagesc( offsets, periods, angles_up );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('Up angle vs. period and offset');
-% 
-% % angle down vs. period and offset
-% figure;
-% imagesc( offsets, periods, angles_down );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('Down angle vs. period and offset');
-% 
-% % plot FOM
-% fom         = weights(1)*abs( optimal_angle - angles_down )/optimal_angle + weights(2)*log10(directivities);
-% % plot merit function
-% figure;
-% imagesc( offsets, periods, fom );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('FOM vs. period and offset');
-% 
-% % plot angle error
-% angle_error = abs( optimal_angle - angles_down )/optimal_angle;
-% figure;
-% imagesc( offsets, periods, angle_error );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('Angle error vs. period and offset');
-% 
-% % plot directivity
-% figure;
-% imagesc( offsets, periods, log10(directivities) );
-% xlabel('offset'); ylabel('period');
-% colorbar;
-% set( gca, 'ydir', 'normal' );
-% title('log10(directivities) vs. period and offset');
+i_loop = 0;
+tic;
+
+% run loops
+for i_period = 1:length(periods)
+    
+    for i_offset = 1:length(offsets)
+        
+        % print loop #
+        i_loop = i_loop + 1;
+        fprintf('Loop %i of %i\n', i_loop, length(periods)*length(offsets) );
+        
+        % make grating coupler object
+        GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, offsets(i_offset) );
+        
+%         % DEBUG plot index
+%         GC.plotIndex();
+        
+        % run sim
+        GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+        
+%         % DEBUG plot field
+%         GC.plotEz_w_edges();
+       
+        % save results
+        directivities( i_period, i_offset ) = GC.directivity;
+        angles_up( i_period, i_offset )     = GC.max_angle_up;
+        angles_down( i_period, i_offset )   = GC.max_angle_down;
+        
+        toc;
+        
+    end
+    
+end
+
+% % Loading old data
+% % data is stored in: C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data
+% data = load( 'C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data\s_test_opimize_period_offset_data.mat' );
+% % unpack data
+% v2struct(data.data);
+        
+% Plot stuff
+% directivity vs. period and offset
+figure;
+imagesc( offsets, periods, 10*log10(directivities) );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Up/down Directivity (dB) vs. period and offset');
+
+% angle up vs. period and offset
+figure;
+imagesc( offsets, periods, angles_up );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Up angle vs. period and offset');
+
+% angle down vs. period and offset
+figure;
+imagesc( offsets, periods, angles_down );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Down angle vs. period and offset');
+
+% plot FOM
+fom         = weights(1)*abs( optimal_angle - angles_down )/optimal_angle + weights(2)*log10(directivities);
+% plot merit function
+figure;
+imagesc( offsets, periods, fom );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('FOM vs. period and offset');
+
+% plot angle error
+angle_error = abs( optimal_angle - angles_down )/optimal_angle;
+figure;
+imagesc( offsets, periods, angle_error );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('Angle error vs. period and offset');
+
+% plot directivity
+figure;
+imagesc( offsets, periods, log10(directivities) );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('log10(directivities) vs. period and offset');
 
         
 % -------------------------------------------------------------------------
@@ -232,15 +232,12 @@ opts = optimset( 'Display', 'iter', ...
         
         
 % starting period
-start_period = 740;
+start_period = 700;
 
 % init saving variables
-directivities   = zeros(size(offsets));
-angles_up       = zeros(size(periods));
-angles_down     = zeros(size(periods));
+directivities = zeros(size(offsets));
    
 % sweep offset, pick offset with best directivity
-tic;
 for i_offset = 1:length(offsets)
 
     % print loop #
@@ -255,38 +252,32 @@ for i_offset = 1:length(offsets)
     % save results
     directivities( i_offset ) = GC.directivity;
 
-    toc;
+%     toc;
 
 end
 
 % grab best directivity
-[ max_dir, indx_max_dir ]   = max(1./directivities(:));
-best_offset                 = offsets( indx_max_dir );
+[ max_dir, indx_max_dir ] = max(1./directivities(:));
         
 
-% sweep periods, pick period with closest angle to desired
-for i_period = 1:length(periods)
+% sweep periods, pick period wit
+for i_offset = 1:length(offsets)
 
     % print loop #
-    fprintf('Loop %i of %i\n', i_period, length(periods) );
+    fprintf('Loop %i of %i\n', i_offset, length(offsets) );
 
     % make grating coupler object
-    GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, best_offset );
+    GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), start_period, fill_top, fill_bot, offsets(i_offset) );
 
     % run sim
     GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
 
     % save results
-    angles_down( i_period ) = GC.max_angle_down;
+    directivities( i_offset ) = GC.directivity;
 
-    toc;
+%     toc;
 
 end
-
-
-% grab best period
-[ angle_err, indx_best_period ] = min( abs( optimal_angle - angles_down ) );
-best_period                     = periods( indx_best_period );
         
         
         

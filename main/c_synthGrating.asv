@@ -1506,9 +1506,8 @@ classdef c_synthGrating
                 
 
             % make grating cell
-            
 %                 Q = h_makeGratingCell( obj_copy, period, fill, ratio, offset_ratio );
-            GC = h_makeGratingCell( obj.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
+            Q = h_makeGratingCell( Q., period, fill_top, fill_bot, offset_ratio );
 
             % run simulation
             Q = Q.runSimulation( num_modes, BC, pml_options );
