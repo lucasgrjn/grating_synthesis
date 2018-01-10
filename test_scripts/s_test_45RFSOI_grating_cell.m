@@ -71,9 +71,9 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
         
 % test the make 45RFSOI function
-period          = 780;
-fill_top        = 0.6;
-fill_bot        = 0.8;
+period          = 1050;
+fill_top        = 0.3;
+fill_bot        = 0.3;
 offset_ratio    = 0.3;
 GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
 
@@ -82,7 +82,7 @@ GC.plotIndex();
         
 % simulate
 % run simulation
-num_modes   = 1;
+num_modes   = 5;
 BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(1): PML in y direction (yes=1 or no=0)
 % PML_options(2): length of PML layer in nm
@@ -91,8 +91,8 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 pml_options = [ 1, 200, 20, 2 ];
 
 % guessk
-% guessk = 2*2*pi/lambda;
-guessk  = 0.0094 + 0.0001i;
+guessk = 2*2*pi/lambda;
+% guessk  = 0.0094 + 0.0001i;
 % guessk = (0.002634 - 0.000038i);
 % guessk = -0.0019 + 0.0000i;
 
