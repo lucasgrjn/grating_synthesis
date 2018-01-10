@@ -11,12 +11,6 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %   period
 %       type: double, scalar
 %       desc: period of the grating cell
-%   fill - OLD
-%       type: double, scalar
-%       desc: ratio of bottom layer to period
-%   ratio - OLD
-%       type: double, scalar
-%       desc: ratio of top layer to bottom layer
 %   fill_top
 %       type: double, scalar
 %       desc: ratio of top layer to period

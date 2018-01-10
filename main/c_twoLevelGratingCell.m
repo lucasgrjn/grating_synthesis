@@ -384,7 +384,7 @@ classdef c_twoLevelGratingCell
             
             % check if k is backwards propagating
             % if it is, then the field must be flipped.
-            if real(k) >=0 & imag(k) <= 0
+            if real(k) > 0 && imag(k) < 0
                 
                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
                           'Re-running solver with flipped k\n\n' ]);
