@@ -6,6 +6,7 @@ clear; close all;
 
 % dependencies
 addpath(['..' filesep 'main']);                                             % main code
+addpath(['..' filesep '45RFSOI']);                                          % 45rf functions
 
 % initial settings
 disc        = 10;
