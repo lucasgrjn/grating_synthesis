@@ -192,6 +192,12 @@ classdef c_synthGrating
                             % as well as performance values
                             
         h_makeGratingCell;  % handle to the grating cell making function
+        
+        % probably temporary properties
+        directivities_vs_fills;
+        angles_vs_fills;
+        periods_vs_fills;
+        offsets_vs_fills;
                             
     end
     
@@ -1504,7 +1510,7 @@ classdef c_synthGrating
 %             pml_options = obj.modesolver_opts.pml_options;
                 
 
-            % make grating cell
+            % make waveguide cell
             waveguide = obj.h_makeGratingCell( obj.convertObjToStruct(), obj.discretization, 1.0, 1.0, 0.0 );
             
             % run simulation (I guess I'm assuming units are in nm)
@@ -1542,7 +1548,7 @@ classdef c_synthGrating
             fill_tops   = fliplr( 0.3:0.05:0.95 );
             fill_bots   = fliplr( 0.3:0.05:0.95 );
             % DEBUG
-            fill_bots   = [ 0.95, 0.9 ];
+%             fill_bots   = [ 0.95, 0.9 ];
             offsets     = 0:0.02:0.98;
             
             % initialize saving variables
@@ -1706,7 +1712,16 @@ classdef c_synthGrating
                 
             end     % end for i_ff_top = ...
                 
-
+            % save stuff for reference
+            obj.directivities_vs_fills  = directivities_vs_fills;
+            obj.angles_vs_fills         = angles_vs_fills;
+            obj.periods_vs_fills        = periods_vs_fills;
+            obj.offsets_vs_fills        = offsets_vs_fills;
+            
+            
+            
+            % DEBUG Plot stuff
+            
             
         end     % end synthesizeGaussianGrating()
         
