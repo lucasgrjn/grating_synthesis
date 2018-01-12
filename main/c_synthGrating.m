@@ -1527,6 +1527,9 @@ classdef c_synthGrating
             % run sim
             waveguide   = waveguide.runSimulation( num_modes, BC, pml_options, guessk );
             
+            % update guessk (units 1/nm)
+            guessk = waveguide.k;
+            
             % grab waveguide k
             waveguide_k = waveguide.k * obj.units.scale * 1e9;                              % in units 1/'units'                          
             
@@ -1626,8 +1629,8 @@ classdef c_synthGrating
                     best_offset_k               = k_vs_offset( indx_best_offset );
                     
                     % now sweep periods
-                    periods     = 0.9 * guess_period_nm : obj.discretization : 1.1 * guess_period_nm;
-                    periods     =    obj.discretization * round(periods/obj.discretization);
+                    periods     = fliplr( 0.95 * guess_period_nm : obj.discretization : 1.05 * guess_period_nm );
+                    periods     = obj.discretization * round(periods/obj.discretization);
                     periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
                     
                     % init saving variables
@@ -1748,10 +1751,10 @@ classdef c_synthGrating
             
             % scattering strength alpha vs. fill
             figure;
-            imagesc( fill_bots, fill_tops, scatter_str_vs_fills );
+            imagesc( fill_bots, fill_tops, real(scatter_str_vs_fills) );
             colorbar; set( gca, 'ydir', 'normal' );
             xlabel('bottom fill factor'); ylabel('top fill factor');
-            title('Scattering strength vs. fill factors');
+            title('Scattering strength (real) vs. fill factors');
             
             % period vs. fill
             figure;
@@ -1765,7 +1768,7 @@ classdef c_synthGrating
             imagesc( fill_bots, fill_tops, offsets_vs_fills );
             colorbar; set( gca, 'ydir', 'normal' );
             xlabel('bottom fill factor'); ylabel('top fill factor');
-            title(['Period (' obj.units.name ') vs. fill factors']);
+            title('Offset vs. fill factors');
             
             % k vs. fill
             figure;

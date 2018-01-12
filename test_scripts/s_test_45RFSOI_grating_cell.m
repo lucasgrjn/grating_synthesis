@@ -4,10 +4,10 @@
 
 clear; close all;
 
-% add path to the 45RFSOI functions
-addpath(['..' filesep '45RFSOI']);
-% add main code
-addpath([ '..' filesep 'main' ]);
+% dependencies
+addpath(['..' filesep '45RFSOI']);                                          % 45rf
+addpath([ '..' filesep 'main' ]);                                           % main
+addpath([ '..' filesep 'auxiliary_functions' ]);                            % gui
 
 % initial settings
 disc        = 10;
@@ -71,7 +71,7 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
         
 % test the make 45RFSOI function
-period          = 1050;
+period          = 700;
 fill_top        = 0.3;
 fill_bot        = 0.3;
 offset_ratio    = 0.3;
