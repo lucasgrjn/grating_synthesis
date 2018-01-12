@@ -669,8 +669,7 @@ classdef c_twoLevelGratingCell
             Sy_down = real( H_x_down(:)' .* E_z(y_down,:) );                % Sy = real( Ez Hx* )
 %             Sx_down = real( -H_y_down(:)' .* E_z(y_down, 2:end-1 ) );       % Sx = real( -Ez Hy* )
 %             P_rad_down_Hx_only  = sum( abs(Sy_down) );                      % only using Sy component
-            P_rad_down    = sum( abs(Sy_down) )*obj.dx;     % using both Sx and Sy compmonents
-
+            P_rad_down    = sum( abs(Sy_down) )*obj.dx;                     % Only using Sy component
             % DEBUG save p rad down
 %             obj.debug.P_rad_down_Hx_only  = P_rad_down_Hx_only;
 %             obj.debug.P_rad_down_Hx_Hy    = P_rad_down_Hx_Hy;

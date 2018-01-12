@@ -200,7 +200,6 @@ classdef c_synthGrating
         offsets_vs_fills        
         scatter_str_vs_fills
         k_vs_fills     
-        GC_vs_fills
                             
     end
     
@@ -1561,7 +1560,6 @@ classdef c_synthGrating
             offsets_vs_fills        = zeros( length( fill_tops ), length( fill_bots ) );     % dimensions top fill vs. bot fill
             scatter_str_vs_fills    = zeros( length( fill_tops ), length( fill_bots ) );     % dimensions top fill vs. bot fill
             k_vs_fills              = zeros( length( fill_tops ), length( fill_bots ) );     % dimensions top fill vs. bot fill
-            GC_vs_fills             = cell( length( fill_tops ), length( fill_bots ) );      % dimensions top fill vs. bot fill
             
             % set solver settings
             num_modes   = 1;
@@ -1701,7 +1699,6 @@ classdef c_synthGrating
                     periods_vs_fills( i_ff_top, i_ff_bot )  = best_period_nm * 1e-9 / obj.units.scale;
                     offsets_vs_fills( i_ff_top, i_ff_bot )  = best_offset;
                     k_vs_fills( i_ff_top, i_ff_bot )        = GC.k;
-                    GC_vs_fills{ i_ff_top, i_ff_bot }       = GC;
                     
                     % update the period and the guessk
                     if i_ff_bot == 1
@@ -1729,7 +1726,6 @@ classdef c_synthGrating
             obj.periods_vs_fills        = periods_vs_fills;
             obj.offsets_vs_fills        = offsets_vs_fills;
             obj.k_vs_fills              = k_vs_fills;
-            obj.GC_vs_fills             = GC_vs_fills;
             
             % DEBUG plot stuff
             % directivity vs. fill
