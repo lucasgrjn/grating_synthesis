@@ -325,24 +325,9 @@ classdef c_twoLevelGratingCell
             % re-scale k
             k = k_nm * nm * obj.units.scale;
             
-%             % reshape field envelope ("Phi")
-%             Phi_all = zeros( size(obj.N, 1), size(obj.N, 2), length(k) );  % stores all field envelope, dimensions y vs x vs k
-%             for ii = 1:length(k)
-%                 
-%                 % reshape field
-%                 Phi_k = reshape( Phi_1D(:,ii), fliplr( size(obj.N) ) ); % dimensions (x, y) where x = direction of propagation
-%                 Phi_k = Phi_k.';
-%                 
-%                 % save in Phi_all
-%                 Phi_all(:, :, ii) = Phi_k;  % dimensions (y, x, k)
-%                 
-%             end
-            
             % DEBUG store temporary copies of k and phi_all b4 removing and
             % sorting
-            temp_k_orig         = k;
-            temp_phi_all_orig   = Phi_all;
-            obj.debug.k_all     = temp_k_orig;
+            obj.debug.k_all     = k;
             obj.debug.phi_all   = Phi_all;
 
             
@@ -362,6 +347,40 @@ classdef c_twoLevelGratingCell
             
             for ii = 1:length(k)
                 % for each mode
+                
+                % check if k is backwards propagating
+                % if it is, then the mode must be resimulated with -k
+                if imag( k(ii) ) < 0
+
+                    fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+                              'Re-running solver with flipped k\n' ]);
+                    fprintf('Current k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+
+                    % re-run solver
+                    [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
+                                                               dx, ...
+                                                               k0, ...
+                                                               1, ...
+                                                               -( k(ii) * obj.units.scale * nm ), ...
+                                                               BC, ...
+                                                               pml_options );
+
+                    % re-scale k
+                    k(ii) = k_nm * nm * obj.units.scale;
+                    
+                    % now check, if imag(k) is still < 0, kill the mode
+                    % from consideration, meaning set the field = 0
+                    if imag( k(ii) ) < 0
+                        % set field = 0
+                        fprintf('Mode %i has imag(k) < 0, killing this mode\n', ii );
+                        Phi_all( :, :, ii ) = zeros(size(Phi));
+                    else
+                        % overwrite Phi
+                        fprintf('New k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+                        Phi_all( :, :, ii ) = Phi;
+                    end
+
+                end
 
                 % grab guided portion of field
                 phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
@@ -382,28 +401,28 @@ classdef c_twoLevelGratingCell
             k           = k(indx_k);
             Phi         = Phi_all(:,:,indx_k);
             
-            % check if k is backwards propagating
-            % if it is, then the field must be flipped.
-            if real(k) > 0 && imag(k) < 0
-                
-                fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
-                          'Re-running solver with flipped k\n' ]);
-                fprintf('Current k = %f + i * %f\n', real(k), imag(k));
-%                 fprintf('TEMP, running with conj(k)\n\n');
-
-                % re-run solver
-                [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
-                                                           dx, ...
-                                                           k0, ...
-                                                           1, ...
-                                                           -(k * obj.units.scale * nm), ...
-                                                           BC, ...
-                                                           pml_options );
-                                                       
-                % re-scale k
-                k = k_nm * nm * obj.units.scale;
-
-            end
+%             % check if k is backwards propagating
+%             % if it is, then the field must be flipped.
+%             if real(k) > 0 && imag(k) < 0
+%                 
+%                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+%                           'Re-running solver with flipped k\n' ]);
+%                 fprintf('Current k = %f + i * %f\n', real(k), imag(k));
+% %                 fprintf('TEMP, running with conj(k)\n\n');
+% 
+%                 % re-run solver
+%                 [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
+%                                                            dx, ...
+%                                                            k0, ...
+%                                                            1, ...
+%                                                            -(k * obj.units.scale * nm), ...
+%                                                            BC, ...
+%                                                            pml_options );
+%                                                        
+%                 % re-scale k
+%                 k = k_nm * nm * obj.units.scale;
+% 
+%             end
 
             % save wavevectors and field
             obj.k   = k;
