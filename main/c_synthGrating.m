@@ -1581,6 +1581,11 @@ classdef c_synthGrating
                 for i_ff_bot = 1:length( fill_bots )
                     % for each bottom fill factor
                     
+                    % DEBUG
+                    if i_ff_top == 7 && i_ff_bot == 14
+                        fprintf('debug here');
+                    end
+                    
                     % print iteration
                     ii = ii + 1;
                     fprintf('Fill factor iteration %i of %i\n', ii, length( fill_tops ) * length( fill_bots ) );
@@ -1632,7 +1637,7 @@ classdef c_synthGrating
                     % LET ME TRY THIS
                     % only sweep larger periods. Doubtful that the period
                     % will be smaller
-                    periods     = guess_period_nm : obj.discretization : 1.05 * guess_period_nm;
+                    periods     = guess_period_nm : obj.discretization : 1.5 * guess_period_nm;
                     periods     = obj.discretization * round(periods/obj.discretization);
                     periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
                     
@@ -1683,7 +1688,7 @@ classdef c_synthGrating
                     [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles ) );
                     best_period_nm                  = periods( indx_best_period );
                     best_period_k                   = k_vs_period( indx_best_period );
-                    best_GC                         = GC_vs_period{ indx_best_period );
+                    best_GC                         = GC_vs_period{ indx_best_period };
                     
 %                     % finally resimulate the GC with the chosen offset and
 %                     % period and save this data
