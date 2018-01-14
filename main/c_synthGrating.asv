@@ -1092,7 +1092,7 @@ classdef c_synthGrating
             % reset angles
             angles_sweep2       = zeros( 1, length(periods_nm_sweep2) );
             GC_vs_period_sweep2 = cell( 1, length(periods_nm_sweep2) );
-            
+
             
             % sweep periods
             fprintf('Sweeping periods again...\n');
@@ -1123,7 +1123,8 @@ classdef c_synthGrating
                 GC_vs_period_sweep2{i_period} = GC;
 
                 % update k
-                guessk = GC.k;
+                k_vs_period_sweep2(i_period)    = GC.k;
+                guessk                          = GC.k;
 
                 toc;
 
@@ -1133,6 +1134,7 @@ classdef c_synthGrating
             % pick best period
             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_sweep2 ) );
             best_period_nm                  = periods_nm_sweep2( indx_best_period );
+            best_period_k                   = k_vs_period_sweep2( indx_best_period );
             best_GC                         = GC_vs_period_sweep2{ indx_best_period };
             
 
