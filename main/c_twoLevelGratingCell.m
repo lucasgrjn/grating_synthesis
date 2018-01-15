@@ -159,21 +159,23 @@ classdef c_twoLevelGratingCell
             
             
             % check discretization fits in integer amt
-            if abs(obj.x_coords(end) - (obj.domain_size(2) - obj.dx)) >= 1e-4
+            if abs(obj.x_coords(end) - (obj.domain_size(2) - obj.dx)) >= 1e-10
                 % the discretization doesn't fit into x
                 warning('dx doesn''t fit integer times into the x domain size.');
                 
                 % override the domain size
                 fprintf('Overriding domain. Old domain x size was: %f. New domain x size is: %f\n\n',  obj.domain_size(2), obj.x_coords(end) + obj.dx);
                 obj.domain_size(2) = obj.x_coords(end) + obj.dx;
+                obj.domain_size(2) = obj.dx * round( obj.domain_size(2)/obj.dx );   % round
             end
-            if abs(obj.y_coords(end) - (obj.domain_size(1) - obj.dy)) >= 1e-4
+            if abs(obj.y_coords(end) - (obj.domain_size(1) - obj.dy)) >= 1e-10
                 % the discretization doesn't fit into x
                 warning('dy doesn''t fit integer times into the y domain size.');
                 
                 % override the domain size
                 fprintf('Overriding domain. Old domain y size was: %f. New domain y size is: %f\n\n', obj.domain_size(1), obj.y_coords(end) + obj.dy);
                 obj.domain_size(1) = obj.y_coords(end) + obj.dy;
+                obj.domain_size(1) = obj.dy * round( obj.domain_size(1)/obj.dy );   % round
             end
             
             % set number of cells
@@ -442,7 +444,9 @@ classdef c_twoLevelGratingCell
             numcells = obj.numcells;
 
             % stitch together e field, including the phase
-            x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
+            nx              = round( numcells*obj.domain_size(2)/obj.dx );
+%             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
+            x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
             phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
             E_z             = repmat( Phi, 1, numcells ).*phase_all;
             

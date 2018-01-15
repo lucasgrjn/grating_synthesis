@@ -1128,15 +1128,159 @@ classdef c_synthGrating
                 toc;
 
             end
-            fprintf('...done.\n');
+            fprintf('...done.\n\n');
             
             % pick best period
             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_sweep2 ) );
             best_period_nm                  = periods_nm_sweep2( indx_best_period );
-            best_GC                         = GC_vs_period_sweep2{ indx_best_period };
+            best_GC_sweep2                  = GC_vs_period_sweep2{ indx_best_period };
             
+            
+            % finally, fine tune with a local optimization
+            
+            
+            % inputs to merit function
+            weights         = [1, 1];
+            fill_factors    = [ fill_factor_top, fill_factor_bot ];
+            period          = best_period_nm * 1e-9 / obj.units.scale;
+            guessk_nm       = guessk;
+            guessk          = best_GC_sweep2.k * 1e9 * obj.units.scale;
+
+%             % DEBUG run FOM
+%             [ FOM ] = obj.merit_period_offset( [1, best_offset], weights, fill_factors, period, guessk );
+            
+            % starting point
+            x0 = [ 1, best_offset ];
+
+            % options
+            opts = optimset( 'Display', 'iter', ...
+                             'FunValCheck', 'off', ...
+                             'MaxFunEvals', 400, ...
+                             'MaxIter', 400, ...
+                             'PlotFcns', {@optimplotfval, @optimplotx} );
+            
+                         
+            % run fminsearch, simplex search
+            fprintf('Running local optimizer...\n');
+            [x, fval, exitflag, output] = fminsearch( @(x) obj.merit_period_offset( x, weights, fill_factors, period, guessk ), x0, opts );
+            toc;
+            fprintf('...done\n\n');
+
+%             % run fminsearch, simplex search
+%             fprintf('Running local optimizer...\n');
+%             tic;
+%             [x1, fval1, exitflag, output] = fminsearch( @(x) obj.merit_period_offset( x, weights, fill_factors, period, guessk ), x0, opts );
+%             toc;
+%             fprintf('...done\n\n');
+% 
+%             % run fminunc, gradient search
+%             fprintf('Running local optimizer...\n');
+%             tic;
+%             [x2, fval2, exitflag, output] = fminunc( @(x) obj.merit_period_offset( x, weights, fill_factors, period, guessk ), x0, opts );
+%             toc;
+%             fprintf('...done\n\n');
+%             
+%             
+%             % pick the better option
+%             if fval1 < fval2
+%                 % simplex wins
+%                 x = x1;
+%             else
+%                 % gradient wins
+%                 x = x2;
+%             end
+            
+            
+            % make final grating cell
+            best_period     = x(1) * period;
+            best_period_nm  = best_period * obj.units.scale * 1e9;
+            best_offset     = x(2);
+            GC_final = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                best_period_nm, ...
+                                                fill_factor_top, ...
+                                                fill_factor_bot, ...
+                                                best_offset );
+
+            % run sim
+            GC_final = GC_final.runSimulation( num_modes, BC, pml_options, guessk_nm );
+
 
         end         % end synthesizeUniformGrating()
+        
+        
+        function [ FOM ] = merit_period_offset( obj, inputs, weights, fill_factors, period, guessk )
+        % Merit function used to optimize grating cell's period and
+        % offset
+        % 
+        % Inputs:
+        %   inputs
+        %       type: 1x2 array
+        %       desc: inputs to merit function, aka the data point to get
+        %             FOM of
+        %             currently [ scaling of period, absolute value of
+        %             offset ]
+        %             such that the simulated GC has period of
+        %             period*scaling of period, and offset = offset
+        %   angle 
+        %       type: double, scalar
+        %       desc: desired angle in deg ( i think this input is
+        %               unnecessary
+        %   weights
+        %       type: double, vector
+        %       desc: 1x2 array to weigh the two objectives
+        %   fill_factors
+        %       type: double, vector
+        %       desc: [ fill factor top, fill factor bottom ]
+        %   period
+        %       type: double, scalar
+        %       desc: period to scale, in units 'units'
+        %   guessk
+        %       type: double, scalar
+        %       desc: guessk, in units rad/'units'
+
+            % parse inputs
+            period      = period * inputs(1);                               % units 'units'
+            period_nm   = period * obj.units.scale * 1e9;                   % units nm
+            offset      = inputs(2);
+            fill_top    = fill_factors(1);
+            fill_bot    = fill_factors(2);
+            guessk_nm   = guessk / ( obj.units.scale * 1e9 );               % units rad/nm 
+
+            % make grating coupler object
+            GC = obj.h_makeGratingCell( obj.convertObjToStruct(), period_nm, fill_top, fill_bot, offset );
+
+            % simulation settings
+            num_modes   = 1;
+            BC          = 0;     % 0 for PEC, 1 for PMC
+            % PML_options(1): PML in y direction (yes=1 or no=0)
+            % PML_options(2): length of PML layer in nm
+            % PML_options(3): strength of PML in the complex plane
+            % PML_options(4): PML polynomial order (1, 2, 3...)
+            pml_options = [ 1, 200, 20, 2 ];
+
+            % run simulation
+            GC = GC.runSimulation( num_modes, BC, pml_options, guessk_nm );
+
+            % grab angle, directivity depending on up/down coupling
+            if strcmp( obj.coupling_direction, 'up' )
+                % coupling direction is upwards
+                angle_sim   = GC.max_angle_up;
+                directivity = GC.directivity;
+            else
+                % coupling direction is downwards
+                angle_sim   = GC.max_angle_down;
+                directivity = 1/GC.directivity;
+            end
+            
+            
+            % minimize the FOM
+            % FOM = error in angle + directivity
+            FOM =   weights(1) * abs(( obj.optimal_angle - angle_sim )/obj.optimal_angle) - ...
+                    weights(2) * log10(directivity);
+
+        end
+
+
         
         
         function obj = synthesizeGaussianGrating_old(obj, angle, MFD)
