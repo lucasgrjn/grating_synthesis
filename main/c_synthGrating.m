@@ -71,35 +71,9 @@ classdef c_synthGrating
 %       type: 1x2 array, double
 %       desc: domain size, [ y height, x length ]
 %
-%   'period_vec'
-%       type: double, array
-%       desc: vector of periods to sweep, in units 'units'
-%
-%   'offset_vec'
-%       type: double, array
-%       desc: vector of offsets to sweep, as ratio of offset length/period
-%
-%   'ratio_vec'
-%       type: double, array
-%       desc: vector of ratio of bottom tooth to top tooth = bot tooth/top
-%             tooth
-%
-%   'fill_vec'
-%       type: double, array
-%       desc: vector of ratio of top tooth to period = top tooth/period
-%
 %   'optimal_angle'
 %       type: double, scalar
 %       desc: desired output angle, in deg
-%
-%   'waveguide_index'
-%       type: double, 1x2 array
-%       desc: waveguide indexes [ index of top tooth, index of bottom
-%             tooth ]
-%
-%   'waveguide_thicks'
-%       type: double, 1x2 array
-%       desc: waveguide thicknesses [ top thickness, bottom thickness ] 
 %
 %   'coupling_direction'
 %       type: string
@@ -128,19 +102,6 @@ classdef c_synthGrating
 %       desc: number of parallel workers to use when running sweep
 
     properties
-        % OLD properties
-%         fillVector
-%         ratioVector
-%         periodVector
-%         offsetVector
-%         periodMatrix %note: these are really 4 dimensional arrays. need to change naming from Matrix to Array but will break some things
-%         offsetMatrix
-%         scatteringStrengthMatrix
-%         directivityMatrix
-%         angleMatrix
-%         lambda0
-%         P
-%         inputs
 
         discretization;     % dx and dy
         units;              % units, verbose, 'm' or 'mm', or 'um', or 'nm'
@@ -148,12 +109,12 @@ classdef c_synthGrating
         lambda;             % center wavelength
         background_index;   % background index
         domain_size;        % domain size, [ y size (height), x size (length) ]
-        period_vec;         % periods to sweep
-        offset_vec;         % offsets to sweep
+%         period_vec;         % periods to sweep
+%         offset_vec;         % offsets to sweep
 %         ratio_vec;          % ratios of top to bottom teeth lengths to sweep
 %         fill_vec;           % fill ratios of top teeth to sweep
-        fill_top_vec;       % top tooth fill ratio
-        fill_bot_vec;       % bot tooth fill ratio
+%         fill_top_vec;       % top tooth fill ratio
+%         fill_bot_vec;       % bot tooth fill ratio
         optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
         inputs;             % saves input settings for user reference
 
@@ -162,8 +123,8 @@ classdef c_synthGrating
         % i'm thinking of getting rid of these two properties, since
         % they'll be defined by the end-user's custom grating cell function
         % anyways
-        waveguide_index;    % [ <index of top tooth>, <index of bottom tooth> ]
-        waveguide_thicks;   % [ <thickness of top tooth>, <thickness of bottom tooth> ]
+%         waveguide_index;    % [ <index of top tooth>, <index of bottom tooth> ]
+%         waveguide_thicks;   % [ <thickness of top tooth>, <thickness of bottom tooth> ]
         
         coupling_direction; % direction of coupling, either 'up', or 'down'
                             % defaults to 'down'
@@ -200,7 +161,7 @@ classdef c_synthGrating
         offsets_vs_fills        
         scatter_str_vs_fills
         k_vs_fills     
-        GC_vs_fills
+        GC_vs_fills     % this variable should be temporary, because it takes up a ton of memory
         fill_tops
         fill_bots;
         offsets;
@@ -224,24 +185,18 @@ classdef c_synthGrating
 
             % inputs and defaults
             inputs = {  'discretization',   'none', ...
-                        'units',            'um',   ...
+                        'units',            'nm',   ...
                         'lambda',           'none', ...
                         'background_index', 1.0,    ...
                         'domain_size',      'none', ...
-                        'period_vec',       'none', ...
-                        'offset_vec',       'none', ...
-                        'fill_top_vec',     'none', ...
-                        'fill_bot_vec',     'none', ...
                         'optimal_angle',    'none', ...
-                        'waveguide_index',  'none', ...
-                        'waveguide_thicks', 'none', ...
                         'coupling_direction', 'down', ...
                         'data_directory',   'none', ...
                         'data_filename',    '', ...
                         'data_notes',       '', ...
                         'data_mode',        'new', ...
                         'num_par_workers',  'none', ...
-                        'h_makeGratingCell', [] ...
+                        'h_makeGratingCell', @makeGratingCell ...
                      }; 
 %                         'ratio_vec',        'none', ...
 %                         'fill_vec',         'none', ...
@@ -271,10 +226,10 @@ classdef c_synthGrating
                 % set properties
 %                 obj.fill_vec      = p.fill_vec;
 %                 obj.ratio_vec     = p.ratio_vec;
-                obj.fill_top_vec = p.fill_top_vec;
-                obj.fill_bot_vec = p.fill_bot_vec;
-                obj.period_vec    = p.period_vec;
-                obj.offset_vec    = p.offset_vec;
+%                 obj.fill_top_vec = p.fill_top_vec;
+%                 obj.fill_bot_vec = p.fill_bot_vec;
+%                 obj.period_vec    = p.period_vec;
+%                 obj.offset_vec    = p.offset_vec;
 
                 % set units
                 obj.units.name  = p.units;
@@ -295,8 +250,8 @@ classdef c_synthGrating
                 obj.domain_size         = p.domain_size;
                 obj.optimal_angle       = p.optimal_angle;
 
-                obj.waveguide_index     = p.waveguide_index;
-                obj.waveguide_thicks    = p.waveguide_thicks;
+%                 obj.waveguide_index     = p.waveguide_index;
+%                 obj.waveguide_thicks    = p.waveguide_thicks;
 
                 if strcmp( p.coupling_direction, 'up') || strcmp( p.coupling_direction, 'down') 
                     % set coupling direction
@@ -319,12 +274,7 @@ classdef c_synthGrating
                 obj.modesolver_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
                 
                 % set handle to grating cell making function
-                if ~isempty( p.h_makeGratingCell )
-                    obj.h_makeGratingCell = p.h_makeGratingCell;
-                else
-                    % default to the test cell at bottom of this class
-                    obj.h_makeGratingCell = @makeGratingCell;
-                end
+                obj.h_makeGratingCell = p.h_makeGratingCell;
                 
                 
             else
@@ -2623,58 +2573,59 @@ end     % end class definition
 % -------------------------------------------------------------------------
 
 function GC = makeGratingCell( synth_obj, period, fill_top, fill_bot, offset_ratio )
-            % makes and returns a c_twoLevelGratingCell object
-            % 
-            % inputs:
-            %   synth_obj
-            %       type: c_synthGrating object AS STRUCT
-            %       desc: c_synthGrating object AS STRUCT
-            %   period
-            %       type: double, scalar
-            %       desc: period of the grating cell
-            %   fill - OLD
-            %       type: double, scalar
-            %       desc: ratio of bottom layer to period
-            %   ratio - OLD
-            %       type: double, scalar
-            %       desc: ratio of top layer to bottom layer
-            %   fill_top
-            %       type: double, scalar
-            %       desc: ratio of top layer to period
-            %   fill_bot
-            %       type: double, scalar
-            %       desc: ratio of bottom layer to bottom layer
-            %   offset_ratio
-            %       type: double, scalar
-            %       desc: ratio of bottom layer offset to period
-            %
-            % outputs:
-            %   GC
-            %       type: c_twoLevelGratingCell object
-            %       desc: two level grating cell object
-            
-            
-            % set domain 
-            domain_size     = synth_obj.domain_size;
-            domain_size(2)  = period;
-            
-            % make grating cell
-            GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
-                                        'units', synth_obj.units.name, ...
-                                        'lambda', synth_obj.lambda, ...
-                                        'domain_size', domain_size, ...
-                                        'background_index', synth_obj.background_index );
+% currently deprecated
+% makes and returns a c_twoLevelGratingCell object
+% 
+% inputs:
+%   synth_obj
+%       type: c_synthGrating object AS STRUCT
+%       desc: c_synthGrating object AS STRUCT
+%   period
+%       type: double, scalar
+%       desc: period of the grating cell
+%   fill - OLD
+%       type: double, scalar
+%       desc: ratio of bottom layer to period
+%   ratio - OLD
+%       type: double, scalar
+%       desc: ratio of top layer to bottom layer
+%   fill_top
+%       type: double, scalar
+%       desc: ratio of top layer to period
+%   fill_bot
+%       type: double, scalar
+%       desc: ratio of bottom layer to bottom layer
+%   offset_ratio
+%       type: double, scalar
+%       desc: ratio of bottom layer offset to period
+%
+% outputs:
+%   GC
+%       type: c_twoLevelGratingCell object
+%       desc: two level grating cell object
 
-            % draw cell
-            % draw two levels using two level builder function
-            % the inputs are organized [ top level, bottom level ]
-            wg_thick        = synth_obj.waveguide_thicks;
-            wg_min_y        = [ domain_size(1)/2, domain_size(1)/2-wg_thick(1) ];
+
+% set domain 
+domain_size     = synth_obj.domain_size;
+domain_size(2)  = period;
+
+% make grating cell
+GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
+                            'units', synth_obj.units.name, ...
+                            'lambda', synth_obj.lambda, ...
+                            'domain_size', domain_size, ...
+                            'background_index', synth_obj.background_index );
+
+% draw cell
+% draw two levels using two level builder function
+% the inputs are organized [ top level, bottom level ]
+wg_thick        = synth_obj.waveguide_thicks;
+wg_min_y        = [ domain_size(1)/2, domain_size(1)/2-wg_thick(1) ];
 %             wgs_duty_cycles = [ fill*ratio, fill ];
-            wgs_duty_cycles = [ fill_top, fill_bot ];
-            wgs_offsets     = [ 0, offset_ratio*period ];
-            GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, synth_obj.waveguide_index, ...
-                                                    wgs_duty_cycles, wgs_offsets );
+wgs_duty_cycles = [ fill_top, fill_bot ];
+wgs_offsets     = [ 0, offset_ratio*period ];
+GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, synth_obj.waveguide_index, ...
+                                        wgs_duty_cycles, wgs_offsets );
             
 end
 
