@@ -2,7 +2,7 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
-% units are in nm
+% units are in nm, specifically for this method
 % 
 % inputs:
 %   synth_obj
@@ -10,7 +10,7 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %       desc: c_synthGrating object AS STRUCT
 %   period
 %       type: double, scalar
-%       desc: period of the grating cell
+%       desc: period of the grating cell, in units defined by synth_obj.units
 %   fill_top
 %       type: double, scalar
 %       desc: ratio of top layer to period

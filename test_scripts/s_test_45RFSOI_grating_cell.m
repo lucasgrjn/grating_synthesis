@@ -71,7 +71,7 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
         
 % test the make 45RFSOI function
-period          = 700;
+period          = 1000;
 fill_top        = 0.3;
 fill_bot        = 0.3;
 offset_ratio    = 0.3;

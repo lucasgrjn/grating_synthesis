@@ -9,7 +9,7 @@ addpath(['..' filesep 'main']);                                             % ma
 addpath(['..' filesep '45RFSOI']);                                          % 45rf functions
 
 % initial settings
-disc        = 5;
+disc        = 10;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
@@ -56,8 +56,8 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % 
 angle   = 15; 
 MFD     = 10000;
-ff_top  = 0.7;
-ff_bot  = 0.9;
+ff_top  = 0.55;
+ff_bot  = 0.45;
 Q       = Q.synthesizeUniformGrating( angle, MFD, ff_top, ff_bot);
 
 

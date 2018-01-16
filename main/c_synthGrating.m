@@ -201,6 +201,10 @@ classdef c_synthGrating
         scatter_str_vs_fills
         k_vs_fills     
         GC_vs_fills
+        fill_tops
+        fill_bots;
+        offsets;
+
                             
     end
     
@@ -1193,6 +1197,7 @@ classdef c_synthGrating
             
             % make final grating cell
             best_period     = x(1) * period;
+            best_period     = obj.discretization * round( best_period/obj.discretization );     % snap to grid
             best_period_nm  = best_period * obj.units.scale * 1e9;
             best_offset     = x(2);
             GC_final = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
@@ -1203,7 +1208,111 @@ classdef c_synthGrating
 
             % run sim
             GC_final = GC_final.runSimulation( num_modes, BC, pml_options, guessk_nm );
+            
+            
+            % NOW to verify the design
+            % Run it in EME
+            fprintf('Verifying design in EME...\n');
+            
+            % Set Up Simulation
+            % note that emeSim uses 'z' as propagation direction and 'x'
+            % as transverse (synthGrating uses 'x' and 'y' respectively)
+            % and units are in um
+            n_cells     = 20;
+            um          = 1e6;
+            dx          = obj.discretization * obj.units.scale * um;                % in um
+            dz          = 5e-3;                                                     % in um
+            pol         = 0;                                                        % 0 for TE, 1 for TM
+            z_in        = 1.5;                                                      % length of input section of waveguide
+            xf          = obj.domain_size(1) * obj.units.scale * um;                % in um
+            zf          = n_cells * best_period * obj.units.scale * um + z_in;      % in um
+            lambda_um   = obj.lambda * obj.units.scale * um;                        % wl in um
+            eme_obj     = emeSim(   'discretization', [dx dz], ...
+                                    'pml', 0.2, ...
+                                    'domain', [xf zf], ...
+                                    'backgroundIndex', obj.background_index, ...
+                                    'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
+                                    'debug', 'no',...                   
+                                    'polarization', pol );
+            diel        = eme_obj.diel;
+            % grab emeSim coordinates
+            z_coords_eme    = eme_obj.domain.z;
+            cur_z           = z_coords_eme(1);          % current z coordinate
+            
+            % draw the input waveguide section
+            % using the trick that i can write and return the index from
+            % the two level grating cell
+            % first override the discretization
+            obj_as_struct                   = obj.convertObjToStruct();
+            obj_as_struct.discretization    = [ dx, dz ] / ( um * obj.units.scale );
+            % now make the grating cell
+            % pick between inverted and non-inverted designs
+            if fill_factor_top < 0.5
+                % going to assume if top fill factor < 1/2, then we want
+                % inverted design
+                gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
+                                                         z_in/(um*obj.units.scale), ...
+                                                         0.0, ...
+                                                         1.0, ...
+                                                         0.0 );
+            else
+                % non inverted design
+                gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
+                                                         z_in/(um*obj.units.scale), ...
+                                                         1.0, ...
+                                                         1.0, ...
+                                                         0.0 );
+            end
 
+            % draw to diel
+            diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + z_in ) = gratingcell_in.N;
+            % update z
+            cur_z               = cur_z + z_in;
+            [~, cur_z_indx ]    = min( abs( z_coords_eme - cur_z ) );   % convert to array index
+            
+            % draw each cell
+            gratingcell = obj.h_makeGratingCell(  obj_as_struct, ...
+                                                     best_period, ...
+                                                     fill_factor_top, ...
+                                                     fill_factor_bot, ...
+                                                     best_offset );
+            gratingcell_index_rep = repmat( gratingcell.N, 1, n_cells );
+            
+            % replace the dielectric in the eme object
+            diel( :, cur_z_indx:end )   = gratingcell_index_rep;
+            eme_obj.diel                = diel;
+            
+%             % DEBUG plot the diel
+%             eme_obj.plotDiel();
+            
+            % run EME sim
+            % Converts the dielectric distribution into layers for eigen mode expansion
+            eme_obj = eme_obj.convertDiel();   
+            % Runs simulation
+            eme_obj = eme_obj.runSimulation('plotSource','yes');      
+            % compute fiber overlap
+            eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
+                                            'angleVec', -45:1:45,...
+                                            'MFD', MFD * obj.units.scale * um,...
+                                            'overlapDir', obj.coupling_direction);
+                                        
+            % DEBUG show results
+            gratingUI(eme_obj);
+            
+            % store results
+            obj.final_design.GC_final               = GC_final;
+            obj.final_design.eme_obj                = eme_obj;
+            obj.final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
+            obj.final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset / ( um * obj.units.scale );    % in units 'units'
+            obj.final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
+            obj.final_design.reflection_coeff       = eme_obj.scatterProperties.PowerRefl(1,1);
+            obj.final_design.period                 = best_period;
+            obj.final_design.offset                 = best_offset;
+            obj.final_design.fill_factor_top        = fill_factor_top;
+            obj.final_design.fill_factor_bot        = fill_factor_bot;
+            obj.final_design.desired_angle          = angle;
+            obj.final_design.desired_MFD            = MFD;
+            
 
         end         % end synthesizeUniformGrating()
         
@@ -1278,7 +1387,7 @@ classdef c_synthGrating
             FOM =   weights(1) * abs(( obj.optimal_angle - angle_sim )/obj.optimal_angle) - ...
                     weights(2) * log10(directivity);
 
-        end
+        end         % end merit_period_offset()
 
 
         
@@ -1992,10 +2101,15 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_tops       = fliplr( 0.3:0.05:0.95 );
-            fill_bots       = fliplr( 0.3:0.05:0.95 );
+            fill_tops       = fliplr( 0.3:0.025:0.95 );
+            fill_bots       = fliplr( 0.3:0.025:0.95 );
             offsets_orig    = 0:0.02:0.98;                                  % unshifted offsets
             offsets         = offsets_orig;                                 % shifted offsets
+            
+            % save fills and offsets
+            obj.fill_tops   = fill_tops;
+            obj.fill_bots   = fill_bots;
+            obj.offsets     = offsets;
             
             % initialize saving variables
             directivities_vs_fills  = zeros( length( fill_tops ), length( fill_bots ) );     % dimensions top fill vs. bot fill
@@ -2088,7 +2202,7 @@ classdef c_synthGrating
                     % LET ME TRY THIS
                     % only sweep larger periods. Doubtful that the period
                     % will be smaller
-                    periods     = guess_period_nm : obj.discretization : 1.5 * guess_period_nm;
+                    periods     = guess_period_nm : obj.discretization : 1.1 * guess_period_nm;
                     periods     = obj.discretization * round(periods/obj.discretization);
                     periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
                     

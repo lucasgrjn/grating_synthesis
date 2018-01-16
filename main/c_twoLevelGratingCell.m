@@ -88,6 +88,7 @@ classdef c_twoLevelGratingCell
         % debugging
         %   Current fields: k_all, phi_all, unguided_power, guided_power,
         %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down, Sx_in
+        %                   P_rad_up_onecell, P_rad_down_onecell
         %   Some of the above fields may have been removed.
         debug;
         
@@ -657,69 +658,100 @@ classdef c_twoLevelGratingCell
             c       = c/obj.units.scale;        % units of (units)/s
             omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
             
-            % grab k and E_z
-            E_z = obj.E_z;
-            k   = obj.k; 
+           
+            % Stich field and phase together
+            phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
+            Ez_onecell      = obj.Phi .* phase_onecell;
             
             % Calculate power radiated up
             
             % calculate H_x
-            H_x_up  = 1/(1i*omega0*mu0) .* ( E_z(y_up-1,:) - E_z(y_up+1,:) )/(2*obj.dy);
-            
-            % calculate H_y
-            % calculate full H_y, see notes for derivation
-            H_y_up1 = (1i/(omega0*mu0)) * ( E_z(y_up, 3:2:end ) - E_z(y_up, 1:2:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
-            H_y_up2 = (1i/(omega0*mu0)) * ( E_z(y_up, 4:2:end ) - E_z(y_up, 2:2:end-2 ) )/(2*obj.dx);   % dx, term staggered 2
-            % interleave two arrays
-            H_y_up                                  = zeros( size( [H_y_up1, H_y_up2] ) );
-            H_y_up( ( 1:length(H_y_up1) )*2 - 1)    = H_y_up1;
-            H_y_up( ( 1:length(H_y_up2) )*2 )       = H_y_up2;
+            H_x_up_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_up-1,:) - Ez_onecell(y_up+1,:) )/(2*obj.dy);
 
             % power radiated up
-            Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                          % Sy = real( Ez Hx* )
-%             Sx_up = real( (-1) * H_y_up(:)' .* E_z( y_up, 2:end-1 ) );          % Sx = real( -Ez Hy* )
-%             P_rad_up_Hx_only    = sum( abs(Sy_up) )*obj.dx;                                    % only using Sy component
-%             P_rad_up      = sum( sqrt( Sy_up( 2:end-1 ).^2 + Sx_up.^2 ) )*obj.dx;        % using both Sx and Sy compmonents
-            P_rad_up      = sum( abs(Sy_up) )*obj.dx;        % using both Sx and Sy compmonents
-
-            % DEBUG save p rad up
-%             obj.debug.P_rad_up_Hx_only  = P_rad_up_Hx_only;
-%             obj.debug.P_rad_up_Hx_Hy    = P_rad_up_Hx_Hy;
+            Sy_up_onecell       = real( H_x_up_onecell(:)' .* Ez_onecell(y_up,:) );                          % Sy = real( Ez Hx* )
+            P_rad_up            = sum( abs(Sy_up_onecell) )*obj.dx;                                          % using Sy compmonent
             
             % calculate power radiated down
             
             % calculate H_x
-            H_x_down  = 1/(1i*omega0*mu0) .* ( E_z(y_down-1,:) - E_z(y_down+1,:) )/(2*obj.dy);
-            
-            % calculate H_y
-            % calculate full H_y, see notes for derivation
-            H_y_down1 = (1i/(omega0*mu0)) * ( E_z(y_down, 3:2:end ) - E_z(y_down, 1:2:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
-            H_y_down2 = (1i/(omega0*mu0)) * ( E_z(y_down, 4:2:end ) - E_z(y_down, 2:2:end-2 ) )/(2*obj.dx);   % dx, term staggered 2
-            % interleave two arrays
-            H_y_down                                    = zeros( size( [H_y_down1, H_y_down2] ) );
-            H_y_down( ( 1:length(H_y_down1) )*2 - 1)    = H_y_down1;
-            H_y_down( ( 1:length(H_y_down2) )*2 )       = H_y_down2;
+            H_x_down_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_down-1,:) - Ez_onecell(y_down+1,:) )/(2*obj.dy);
 
             % power radiated down
-            Sy_down = real( H_x_down(:)' .* E_z(y_down,:) );                % Sy = real( Ez Hx* )
-%             Sx_down = real( -H_y_down(:)' .* E_z(y_down, 2:end-1 ) );       % Sx = real( -Ez Hy* )
-%             P_rad_down_Hx_only  = sum( abs(Sy_down) );                      % only using Sy component
-            P_rad_down    = sum( abs(Sy_down) )*obj.dx;                     % Only using Sy component
-            % DEBUG save p rad down
-%             obj.debug.P_rad_down_Hx_only  = P_rad_down_Hx_only;
-%             obj.debug.P_rad_down_Hx_Hy    = P_rad_down_Hx_Hy;
-
-            % save power radiated up and down
-%             P_rad_up   = P_rad_up_Hx_Hy;
-%             P_rad_down = P_rad_down_Hx_Hy;
+            Sy_down_onecell     = real( H_x_down_onecell(:)' .* Ez_onecell(y_down,:) );             % Sy = real( Ez Hx* )
+            P_rad_down          = sum( abs(Sy_down_onecell) )*obj.dx;                               % Only using Sy component
+            
+            
+            % save to object
             obj.P_rad_down    = P_rad_down;
             obj.P_rad_up      = P_rad_up;
             
-            % DEBUG save Sx and Sy
-%             obj.debug.Sx_up     = Sx_up;
-%             obj.debug.Sx_down   = Sx_down;
-            obj.debug.Sy_up     = Sy_up;
-            obj.debug.Sy_down   = Sy_down;
+%             obj.debug.P_rad_up_onecell      = P_rad_up_onecell;
+%             obj.debug.P_rad_down_onecell    = P_rad_down_onecell;
+            
+            
+%             % OLD version that used multiiple cells
+%              % grab k and E_z
+%             E_z = obj.E_z;
+%             k   = obj.k; 
+%             
+%             % Calculate power radiated up
+%             
+%             % calculate H_x
+%             H_x_up  = 1/(1i*omega0*mu0) .* ( E_z(y_up-1,:) - E_z(y_up+1,:) )/(2*obj.dy);
+% 
+%             % power radiated up
+%             Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                          % Sy = real( Ez Hx* )
+%             P_rad_up      = sum( abs(Sy_up) )*obj.dx;                           % using Sy compmonent
+% 
+% 
+%             % calculate power radiated down
+%             
+%             % calculate H_x
+%             H_x_down  = 1/(1i*omega0*mu0) .* ( E_z(y_down-1,:) - E_z(y_down+1,:) )/(2*obj.dy);
+% 
+%             % power radiated down
+%             Sy_down = real( H_x_down(:)' .* E_z(y_down,:) );                % Sy = real( Ez Hx* )
+%             P_rad_down    = sum( abs(Sy_down) )*obj.dx;                     % Only using Sy component
+% 
+%             % save power radiated up and down
+%             obj.P_rad_down    = P_rad_down;
+%             obj.P_rad_up      = P_rad_up;
+%             
+%             % DEBUG save Sx and Sy
+%             obj.debug.Sy_up     = Sy_up;
+%             obj.debug.Sy_down   = Sy_down;
+%             
+%             
+%             % DEBUG
+%             % Comparing radiated power of ncells with 1 cell
+%             % stitch together e field, including the phase
+%             phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
+%             Ez_onecell      = obj.Phi .* phase_onecell;
+%             
+%             % Calculate power radiated up
+%             
+%             % calculate H_x
+%             H_x_up_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_up-1,:) - Ez_onecell(y_up+1,:) )/(2*obj.dy);
+% 
+%             % power radiated up
+%             Sy_up_onecell       = real( H_x_up_onecell(:)' .* Ez_onecell(y_up,:) );                          % Sy = real( Ez Hx* )
+%             P_rad_up_onecell    = sum( abs(Sy_up_onecell) )*obj.dx;                                          % using Sy compmonent
+%             
+%             % calculate power radiated down
+%             
+%             % calculate H_x
+%             H_x_down_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_down-1,:) - Ez_onecell(y_down+1,:) )/(2*obj.dy);
+% 
+%             % power radiated down
+%             Sy_down             = real( H_x_down_onecell(:)' .* Ez_onecell(y_down,:) );             % Sy = real( Ez Hx* )
+%             P_rad_down_onecell  = sum( abs(Sy_down) )*obj.dx;                                       % Only using Sy component
+%             
+%             
+%             % save to object
+%             obj.debug.P_rad_up_onecell      = P_rad_up_onecell;
+%             obj.debug.P_rad_down_onecell    = P_rad_down_onecell;
+%             
             
         end     % end function calc_radiated_power()
         
@@ -867,17 +899,15 @@ classdef c_twoLevelGratingCell
 
             % save input power
             obj.P_in = P_in;
-            % TEMP DEBUG
-%             obj.P_in = P_in_athalf;
             
             % calculate alpha efficiency (in 1/units)
             period          = obj.domain_size(2);
-            numcells        = obj.numcells;
-%             obj.alpha_up    = ( -1/( 2*numcells*period ) ) * log( obj.P_rad_up/P_in );
-%             obj.alpha_down  = ( -1/( 2*numcells*period ) ) * log( obj.P_rad_down/P_in );
-            obj.alpha_up    = ( -1/( 2*numcells*period ) ) * log( 1 - obj.P_rad_up/P_in );
-            obj.alpha_down  = ( -1/( 2*numcells*period ) ) * log( 1 - obj.P_rad_down/P_in );
-%             obj.alpha_tot   = obj.alpha_up + obj.alpha_down;
+            obj.alpha_up    = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/P_in );
+            obj.alpha_down  = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_down/P_in );
+
+
+            % DEBUG calculate efficiency from one cell
+            
                      
 %             % DEBUG let's calculate, numerically, the loss coefficient from
 %             % input to output and compare with imag(k)
