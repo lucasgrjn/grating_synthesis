@@ -135,7 +135,7 @@ classdef c_synthGrating
         data_mode;          % flag telling whether grating is run from scratch or run from previous data
                             % either 'new' or 'load'
         
-        sweep_results;      % struct holding results of parameter sweep
+%         sweep_results;      % struct holding results of parameter sweep
                             % tensors have dimensions ( fill, ratio, period, offset )
                             % AS OF 2017/12/08 CHANGED TO BE (fill top,
                             % fill bot, period, offset)
@@ -146,7 +146,7 @@ classdef c_synthGrating
         
         num_par_workers;    % number of parallel workers to use
         
-        modesolver_opts;    % STRUCT that stores the modesolver options
+%         modesolver_opts;    % STRUCT that stores the modesolver options
                             % CURRENTLY hardcoded.
                             
         final_design;       % STRUCT that stores the final design parameters
@@ -191,15 +191,13 @@ classdef c_synthGrating
                         'domain_size',      'none', ...
                         'optimal_angle',    'none', ...
                         'coupling_direction', 'down', ...
-                        'data_directory',   'none', ...
+                        'data_directory',   '', ...
                         'data_filename',    '', ...
                         'data_notes',       '', ...
                         'data_mode',        'new', ...
                         'num_par_workers',  'none', ...
                         'h_makeGratingCell', @makeGratingCell ...
                      }; 
-%                         'ratio_vec',        'none', ...
-%                         'fill_vec',         'none', ...
             obj.inputs = inputs;
             
             % first check whether to run code from fresh data or to load
@@ -222,14 +220,6 @@ classdef c_synthGrating
 
                 % save starting time
                 obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd HH_MM_SS ' );
-                
-                % set properties
-%                 obj.fill_vec      = p.fill_vec;
-%                 obj.ratio_vec     = p.ratio_vec;
-%                 obj.fill_top_vec = p.fill_top_vec;
-%                 obj.fill_bot_vec = p.fill_bot_vec;
-%                 obj.period_vec    = p.period_vec;
-%                 obj.offset_vec    = p.offset_vec;
 
                 % set units
                 obj.units.name  = p.units;
@@ -244,14 +234,12 @@ classdef c_synthGrating
                         obj.units.scale = 1e-9;
                 end
 
+                % set other properties
                 obj.discretization      = p.discretization;
                 obj.lambda              = p.lambda;
                 obj.background_index    = p.background_index;
                 obj.domain_size         = p.domain_size;
                 obj.optimal_angle       = p.optimal_angle;
-
-%                 obj.waveguide_index     = p.waveguide_index;
-%                 obj.waveguide_thicks    = p.waveguide_thicks;
 
                 if strcmp( p.coupling_direction, 'up') || strcmp( p.coupling_direction, 'down') 
                     % set coupling direction
@@ -260,18 +248,20 @@ classdef c_synthGrating
                     error('Error: input ''coupling_direction'' is not valid. Valid entries are ''up'' or ''down''. You entered ''%s''', p.coupling_direction);
                 end
 
+                % set file saving/loading properties
                 obj.data_directory  = p.data_directory;
                 obj.data_filename   = p.data_filename;
                 obj.data_notes      = p.data_notes;
                 obj.data_mode       = p.data_mode;
                 
+                % number of parallel workers
                 obj.num_par_workers = p.num_par_workers;
                 
-                % default modesolver options (currently hardcoded)
-                num_modes   = 20;
-                BC          = 0;                    % 0 for PEC, 1 for PMC
-                pml_options = [ 1, 200, 500, 2 ];   % [ yes/no, length in nm, strength, pml poly order ]
-                obj.modesolver_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
+%                 % default modesolver options (currently hardcoded)
+%                 num_modes   = 20;
+%                 BC          = 0;                    % 0 for PEC, 1 for PMC
+%                 pml_options = [ 1, 200, 500, 2 ];   % [ yes/no, length in nm, strength, pml poly order ]
+%                 obj.modesolver_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
                 
                 % set handle to grating cell making function
                 obj.h_makeGratingCell = p.h_makeGratingCell;

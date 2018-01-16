@@ -47,11 +47,9 @@ for ii = 1:2:( length(inputs)-1 )
     if ~isfield( p, inputs{ii} )
         % this input was not found
 
-        if ischar( inputs{ii+1} )
-            if strcmp( inputs{ii+1}, 'none' )
-                % this input has no default, throw error
-                error( 'Input ''%s'' was not set and requires a user-defined value. Try again.', inputs{ii} );
-            end
+        if ischar( inputs{ii+1} ) && strcmp( inputs{ii+1}, 'none' )
+            % this input has no default, throw error
+            error( 'Input ''%s'' was not set and requires a user-defined value. Try again.', inputs{ii} );
         else
             % this input has a default, set the default
             fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, num2str(inputs{ii+1}) );
