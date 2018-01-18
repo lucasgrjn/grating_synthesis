@@ -56,10 +56,10 @@ n_cSi   = index_Si_fits(lambda_um);
 n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
                         
 
-% grab pml parameters
-% [ yes/no, length in nm, strength, pml poly order ]
-pml_opts    = synth_obj.modesolver_opts.pml_options; 
-pml_length  = pml_opts(2);
+% % grab pml parameters
+% % [ yes/no, length in nm, strength, pml poly order ]
+% pml_opts    = synth_obj.modesolver_opts.pml_options; 
+% pml_length  = pml_opts(2);
 
 % define layer thicknesses
 t_air       = 500;

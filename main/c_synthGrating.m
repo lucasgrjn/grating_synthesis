@@ -787,7 +787,7 @@ classdef c_synthGrating
         end         % end synthesizeUniformGrating_old()
         
         
-        function obj = synthesizeUniformGrating(obj, angle, MFD, fill_factor_top, fill_factor_bot)
+        function obj = synthesizeUniformGrating(obj, angle, MFD, fill_factor_top, fill_factor_bot, DEBUG)
             % Synthesizes a uniform grating at the desired angle 
             %
             % inputs:
@@ -795,9 +795,15 @@ classdef c_synthGrating
             %   MFD in units 'units'
             %   fill_factor_top
             %   fill_factor_bot
+            %   DEBUG
+            %       type: boolean
+            %       desc: OPTIONAL flag - set to true to enable debug mode
             
-            % number of cells
-            n_cells = 20;
+            
+            % default debug mode to false
+            if nargin < 6
+                DEBUG = false;
+            end
            
             % get waveguide k
             fprintf('Simulating waveguide...\n');         
@@ -1097,11 +1103,16 @@ classdef c_synthGrating
             x0 = [ 1, best_offset ];
 
             % options
+            if DEBUG
+                plot_functions = {@optimplotfval, @optimplotx};
+            else
+                plot_functions = {};
+            end
             opts = optimset( 'Display', 'iter', ...
                              'FunValCheck', 'off', ...
                              'MaxFunEvals', 400, ...
                              'MaxIter', 400, ...
-                             'PlotFcns', {@optimplotfval, @optimplotx} );
+                             'PlotFcns', plot_functions );
             
                          
             % run fminsearch, simplex search
@@ -1163,7 +1174,7 @@ classdef c_synthGrating
             dx          = obj.discretization * obj.units.scale * um;                % in um
             dz          = 5e-3;                                                     % in um
             pol         = 0;                                                        % 0 for TE, 1 for TM
-            z_in        = 1.5;                                                      % length of input section of waveguide
+            z_in        = (MFD * obj.units.scale * um)/2;                           % length of input section of waveguide
             xf          = obj.domain_size(1) * obj.units.scale * um;                % in um
             zf          = n_cells * best_period * obj.units.scale * um + z_in;      % in um
             lambda_um   = obj.lambda * obj.units.scale * um;                        % wl in um
@@ -1186,26 +1197,28 @@ classdef c_synthGrating
             obj_as_struct                   = obj.convertObjToStruct();
             obj_as_struct.discretization    = [ dx, dz ] / ( um * obj.units.scale );
             % now make the grating cell
-            % pick between inverted and non-inverted designs
-            if fill_factor_top < 0.5
-                % going to assume if top fill factor < 1/2, then we want
-                % inverted design
-                gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
-                                                         z_in/(um*obj.units.scale), ...
-                                                         0.0, ...
-                                                         1.0, ...
-                                                         0.0 );
-            else
-                % non inverted design
-                gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
-                                                         z_in/(um*obj.units.scale), ...
-                                                         1.0, ...
-                                                         1.0, ...
-                                                         0.0 );
-            end
+            % run both inverted and non-inverted designs
+            eme_obj_invert = eme_obj;
+            eme_obj_normal = eme_obj;
+            % inverted design
+            gratingcell_in_invert  = obj.h_makeGratingCell( obj_as_struct, ...
+                                                     z_in/(um*obj.units.scale), ...
+                                                     0.0, ...
+                                                     1.0, ...
+                                                     0.0 );
+            % non-inverted design
+            gratingcell_in_normal  = obj.h_makeGratingCell( obj_as_struct, ...
+                                                     z_in/(um*obj.units.scale), ...
+                                                     1.0, ...
+                                                     1.0, ...
+                                                     0.0 );
+
 
             % draw to diel
-            diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + z_in ) = gratingcell_in.N;
+            diel_invert = diel;
+            diel_normal = diel;
+            diel_invert( :, z_coords_eme >= cur_z - dz/10 & z_coords_eme < cur_z + z_in - dz/10 ) = gratingcell_in_invert.N;
+            diel_normal( :, z_coords_eme >= cur_z - dz/10 & z_coords_eme < cur_z + z_in - dz/10 ) = gratingcell_in_normal.N;
             % update z
             cur_z               = cur_z + z_in;
             [~, cur_z_indx ]    = min( abs( z_coords_eme - cur_z ) );   % convert to array index
@@ -1219,33 +1232,52 @@ classdef c_synthGrating
             gratingcell_index_rep = repmat( gratingcell.N, 1, n_cells );
             
             % replace the dielectric in the eme object
-            diel( :, cur_z_indx:end )   = gratingcell_index_rep;
-            eme_obj.diel                = diel;
+            diel_invert( :, cur_z_indx:end )    = gratingcell_index_rep;
+            diel_normal( :, cur_z_indx:end )    = gratingcell_index_rep;
+            eme_obj_invert.diel                 = diel_invert;
+            eme_obj_normal.diel                 = diel_normal;
             
-%             % DEBUG plot the diel
-%             eme_obj.plotDiel();
+            % DEBUG plot the diel
+            if DEBUG
+                eme_obj_invert.plotDiel();
+                eme_obj_normal.plotDiel();
+            end
             
             % run EME sim
             % Converts the dielectric distribution into layers for eigen mode expansion
-            eme_obj = eme_obj.convertDiel();   
+            eme_obj_invert = eme_obj_invert.convertDiel();   
             % Runs simulation
-            eme_obj = eme_obj.runSimulation('plotSource','yes');      
+            eme_obj_invert = eme_obj_invert.runSimulation('plotSource','no');      
             % compute fiber overlap
-            eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
+            eme_obj_invert = eme_obj_invert.fiberOverlap( 'zOffset', 0:.1:12,...
+                                            'angleVec', -45:1:45,...
+                                            'MFD', MFD * obj.units.scale * um,...
+                                            'overlapDir', obj.coupling_direction);
+             % Converts the dielectric distribution into layers for eigen mode expansion
+            eme_obj_normal = eme_obj_normal.convertDiel();   
+            % Runs simulation
+            eme_obj_normal = eme_obj_normal.runSimulation('plotSource','no');      
+            % compute fiber overlap
+            eme_obj_normal = eme_obj_normal.fiberOverlap( 'zOffset', 0:.1:12,...
                                             'angleVec', -45:1:45,...
                                             'MFD', MFD * obj.units.scale * um,...
                                             'overlapDir', obj.coupling_direction);
                                         
-            % DEBUG show results
-            gratingUI(eme_obj);
+%             % DEBUG show results
+%             gratingUI(eme_obj);
             
             % store results
-            obj.final_design.GC_final               = GC_final;
-            obj.final_design.eme_obj                = eme_obj;
-            obj.final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
-            obj.final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset / ( um * obj.units.scale );    % in units 'units'
-            obj.final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
-            obj.final_design.reflection_coeff       = eme_obj.scatterProperties.PowerRefl(1,1);
+            obj.final_design.GC_final                   = GC_final;
+            obj.final_design.normal.eme_obj                = eme_obj_normal;
+            obj.final_design.normal.max_coupling_eff       = eme_obj_normal.fiberCoup.optCoup;
+            obj.final_design.normal.max_coupling_offset    = eme_obj_normal.fiberCoup.optZOffset / ( um * obj.units.scale );    % in units 'units'
+            obj.final_design.normal.max_coupling_angle     = eme_obj_normal.fiberCoup.optAngle;
+            obj.final_design.normal.reflection_coeff       = eme_obj_normal.scatterProperties.PowerRefl(1,1);
+            obj.final_design.invert.eme_obj                = eme_obj_invert;
+            obj.final_design.invert.max_coupling_eff       = eme_obj_invert.fiberCoup.optCoup;
+            obj.final_design.invert.max_coupling_offset    = eme_obj_invert.fiberCoup.optZOffset / ( um * obj.units.scale );    % in units 'units'
+            obj.final_design.invert.max_coupling_angle     = eme_obj_invert.fiberCoup.optAngle;
+            obj.final_design.invert.reflection_coeff       = eme_obj_invert.scatterProperties.PowerRefl(1,1);
             obj.final_design.period                 = best_period;
             obj.final_design.offset                 = best_offset;
             obj.final_design.fill_factor_top        = fill_factor_top;
