@@ -847,11 +847,10 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors...\n');
             
             % set fill factors
-            step_size   = 0.025;                                            % amount to decrease fill factor by each time (approx)
-            max_fill    = 0.95;                                             % max fill
-            n_fills     = round(max_fill/step_size);                        % number of fill factor combinations to try
-            fill_tops   = linspace( max_fill, fill_factor_top, n_fills );
-            fill_bots   = linspace( max_fill, fill_factor_bot, n_fills );
+            step_size   = 0.025;                                            % amount to decrease fill fact
+            n_fills     = 20;                                               % number of fill factor combinations to try
+            fill_tops   = linspace( 0.95, fill_factor_top, n_fills );
+            fill_bots   = linspace( 0.95, fill_factor_bot, n_fills );
             
             
             % initialize saving variables
@@ -1092,7 +1091,7 @@ classdef c_synthGrating
             
             
             % inputs to merit function
-            weights         = [10, 1];
+            weights         = [1, 1];
             fill_factors    = [ fill_factor_top, fill_factor_bot ];
             period          = best_period_nm * 1e-9 / obj.units.scale;
             guessk_nm       = guessk;
