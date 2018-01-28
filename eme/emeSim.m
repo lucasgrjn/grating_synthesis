@@ -1,5 +1,9 @@
 %%
 % Matlab class 'emeSim'
+%
+% Authors: Cale Gentry
+%
+% All spatial units in microns
 
 
 %%
@@ -1389,12 +1393,20 @@ classdef emeSim
             end
             
             centerLambdaIndex = round(length(obj.domain.k0)/2);
-            [tempmax, I1] = max(obj.fiberCoup.coup(:,:,centerLambdaIndex)); 
-            [obj.fiberCoup.optCoup, I2] = max(tempmax);
-            obj.fiberCoup.optZOffsetIndex = I1(I2);
-            obj.fiberCoup.optAngleIndex = I2;
-            obj.fiberCoup.optZOffset = obj.fiberCoup.zOffset(I1(I2));
-            obj.fiberCoup.optAngle = obj.fiberCoup.angleVec(I2);
+            % OLD CODE
+%             [tempmax, I1] = max(obj.fiberCoup.coup(:,:,centerLambdaIndex)); 
+%             [obj.fiberCoup.optCoup, I2] = max(tempmax);
+%             obj.fiberCoup.optZOffsetIndex = I1(I2);
+%             obj.fiberCoup.optAngleIndex = I2;
+%             obj.fiberCoup.optZOffset = obj.fiberCoup.zOffset(I1(I2));
+%             obj.fiberCoup.optAngle = obj.fiberCoup.angleVec(I2);
+            
+            % NEW CODE
+            coupling_center_lambda = obj.fiberCoup.coup(:,:,centerLambdaIndex); % dimensions zoffset vs. angle
+            [ obj.fiberCoup.optCoup, indx_opt ] = max(coupling_center_lambda(:)); 
+            [ indx_zoff, indx_angle ] = ind2sub( size(coupling_center_lambda), indx_opt );
+            obj.fiberCoup.optZOffset = obj.fiberCoup.zOffset( indx_zoff );
+            obj.fiberCoup.optAngle = obj.fiberCoup.angleVec( indx_angle );
  
         end                            %-------%%%
         

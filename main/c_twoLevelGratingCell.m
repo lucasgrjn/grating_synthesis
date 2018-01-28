@@ -143,11 +143,6 @@ classdef c_twoLevelGratingCell
             
             obj.lambda = p.lambda;
             
-%             % create background dielectric
-%             obj.domain_size = p.domain_size;
-%             obj.x_coords    = 0 : obj.dx : obj.domain_size(2) - obj.dx;
-%             obj.y_coords    = 0 : obj.dy : obj.domain_size(1) - obj.dy;
-%             obj.N           = p.background_index * ones( length( obj.y_coords ), length( obj.x_coords ) );  % dimensions of y vs. x
             
             % new version of creating backgrouund dielectric that rounds
             % the dimensions
