@@ -69,7 +69,7 @@ classdef c_twoLevelGratingCell
         sim_opts;
         
         % mode characteristics
-        k;              % complex k, units rad/'units'
+        k;              % complex k
         Phi;            % field envelope
         numcells;       % number of cells repeated in E_z
         E_z             % saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
@@ -157,7 +157,7 @@ classdef c_twoLevelGratingCell
             % check discretization fits in integer amt
             if abs(obj.x_coords(end) - (obj.domain_size(2) - obj.dx)) >= 1e-10
                 % the discretization doesn't fit into x
-                fprintf('Warning: dx doesn''t fit integer times into the x domain size.\n');
+                warning('dx doesn''t fit integer times into the x domain size.');
                 
                 % override the domain size
                 fprintf('Overriding domain. Old domain x size was: %f. New domain x size is: %f\n\n',  obj.domain_size(2), obj.x_coords(end) + obj.dx);
@@ -166,7 +166,7 @@ classdef c_twoLevelGratingCell
             end
             if abs(obj.y_coords(end) - (obj.domain_size(1) - obj.dy)) >= 1e-10
                 % the discretization doesn't fit into x
-                fprintf('Warning: dy doesn''t fit integer times into the y domain size.\n');
+                warning('dy doesn''t fit integer times into the y domain size.');
                 
                 % override the domain size
                 fprintf('Overriding domain. Old domain y size was: %f. New domain y size is: %f\n\n', obj.domain_size(1), obj.y_coords(end) + obj.dy);
@@ -309,33 +309,13 @@ classdef c_twoLevelGratingCell
             %       type: scalar, double (can be complex)
             %       desc: guess k value. Works best when closest to desired
             %             mode. In units rad/'units'
-            %
-            % Outputs:
-            %   Sets these object properties:
-            %   obj.debug.k_all
-            %   obj.debug.phi_all
-            %   obj.debug.guided_power
-            %   obj.debug.guided_power_ratio
-            %   obj.k
-            %       units rad/'units'
-            %   obj.Phi
-            %       dimensions y vs. x (x is dir. of propagation)
-            %   obj.E_z
-            %       field repeated, i can't remember why or if i use this
-            %   obj.directivity
-            %       up/down power ratio
-            %   calls obj.calc_output_angle()
-            %       this is a function, which probably figures out the
-            %       output angle
-            %   calls obj.calc_scattering_strength()
-            %
 
             % spatial variables, in units nm
             nm          = 1e9;
             a           = obj.domain_size(2) * obj.units.scale * nm;
             lambda      = obj.lambda * obj.units.scale * nm;
             dx          = obj.dx * obj.units.scale * nm;
-            guessk_nm   = guessk / ( obj.units.scale * nm );            % units rad/nm
+            guessk_nm   = guessk 
 
             % store options
             obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
@@ -351,7 +331,7 @@ classdef c_twoLevelGratingCell
                                                        dx, ...
                                                        k0, ...
                                                        num_modes, ...
-                                                       guessk_nm, ...
+                                                       guessk, ...
                                                        BC, ...
                                                        pml_options );
                                                    
@@ -434,6 +414,28 @@ classdef c_twoLevelGratingCell
             k           = k(indx_k);
             Phi         = Phi_all(:,:,indx_k);
             
+%             % check if k is backwards propagating
+%             % if it is, then the field must be flipped.
+%             if real(k) > 0 && imag(k) < 0
+%                 
+%                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+%                           'Re-running solver with flipped k\n' ]);
+%                 fprintf('Current k = %f + i * %f\n', real(k), imag(k));
+% %                 fprintf('TEMP, running with conj(k)\n\n');
+% 
+%                 % re-run solver
+%                 [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
+%                                                            dx, ...
+%                                                            k0, ...
+%                                                            1, ...
+%                                                            -(k * obj.units.scale * nm), ...
+%                                                            BC, ...
+%                                                            pml_options );
+%                                                        
+%                 % re-scale k
+%                 k = k_nm * nm * obj.units.scale;
+% 
+%             end
 
             % save wavevectors and field
             obj.k   = k;
@@ -466,8 +468,8 @@ classdef c_twoLevelGratingCell
             
             % calculate power scattering strength
             obj                       = obj.calc_scattering_strength();
-%             obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
-%             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
+            obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
+            obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
             
             
         end     % end function runSimulation()

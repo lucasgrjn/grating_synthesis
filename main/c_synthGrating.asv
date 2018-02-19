@@ -1897,8 +1897,8 @@ classdef c_synthGrating
 %             fill_tops       = fliplr( 0.3:0.025:0.95 );
 %             fill_bots       = fliplr( 0.3:0.025:0.95 );
             % DEBUG
-            fill_tops       = fliplr( 0.7:0.05:0.95 );
-            fill_bots       = fliplr( 0.7:0.05:0.95 );
+            fill_tops       = fliplr( 0.3:0.025:0.95 );
+            fill_bots       = fliplr( 0.3:0.025:0.95 );
             offsets         = 0:0.02:0.98;                                  % unshifted offsets
 %             offsets         = offsets_orig;                                 % shifted offsets
             
@@ -2013,7 +2013,7 @@ classdef c_synthGrating
                         % sweep periods
                         guessk = best_offset_k;
                         fprintf('Sweeping periods...\n');
-                        for i_period = 1:length(periods)
+                        for i_period = 1:length(periods_nm)
 
                             fprintf('Iteration %i of %i\n', i_period, length(periods) );
 
@@ -2065,11 +2065,11 @@ classdef c_synthGrating
                         x0 = [ 1, guess_offset ];
 
                         % options
-%                         if DEBUG
-%                             plot_functions = {@optimplotfval, @optimplotx};
-%                         else
+                        if DEBUG
+                            plot_functions = {@optimplotfval, @optimplotx};
+                        else
                             plot_functions = {};
-%                         end
+                        end
                         opts = optimset( 'Display', 'iter', ...
                                          'FunValCheck', 'off', ...
                                          'MaxFunEvals', 400, ...
