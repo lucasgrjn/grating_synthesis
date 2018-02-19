@@ -1897,8 +1897,8 @@ classdef c_synthGrating
 %             fill_tops       = fliplr( 0.3:0.025:0.95 );
 %             fill_bots       = fliplr( 0.3:0.025:0.95 );
             % DEBUG
-            fill_tops       = fliplr( 0.7:0.05:0.95 );
-            fill_bots       = fliplr( 0.7:0.05:0.95 );
+            fill_tops       = fliplr( 0.3:0.05:0.95 );
+            fill_bots       = fliplr( 0.3:0.05:0.95 );
             offsets         = 0:0.02:0.98;                                  % unshifted offsets
 %             offsets         = offsets_orig;                                 % shifted offsets
             
