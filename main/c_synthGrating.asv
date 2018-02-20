@@ -1184,12 +1184,12 @@ classdef c_synthGrating
         
         
         
-        function [ FOM ] = merit_offset_directivity( obj, input, fill_factors, period, guessk )
+        function [ FOM ] = merit_offset_directivity( obj, inputs, fill_factors, period, guessk )
         % Merit function used to optimize grating cell's directivity vs.
         % offset
         % 
         % Inputs:
-        %   input
+        %   inputs
         %       type: scalar, double
         %       desc: one input - the offset
         %   fill_factors
@@ -1203,7 +1203,8 @@ classdef c_synthGrating
         %       desc: guessk, in units rad/'units'
 
             % parse inputs
-            offset      = input;
+            period      = period * inputs(1);                               % units 'units'
+            offset      = inputs(2);
             fill_top    = fill_factors(1);
             fill_bot    = fill_factors(2);
 
@@ -1961,9 +1962,9 @@ classdef c_synthGrating
 %             fill_tops       = fliplr( 0.3:0.025:0.95 );
 %             fill_bots       = fliplr( 0.3:0.025:0.95 );
             % DEBUG
-            fill_tops       = fliplr( 0.3:0.05:0.95 );
-            fill_bots       = fliplr( 0.3:0.05:0.95 );
-            offsets         = 0:0.02:0.98;                                
+            fill_tops       = fliplr( 0.8:0.05:0.95 );
+            fill_bots       = fliplr( 0.8:0.05:0.95 );
+            offsets         = 0:0.01:0.98;                                
             
             % save fills and offsets
             obj.fill_tops   = fill_tops;
@@ -1994,6 +1995,11 @@ classdef c_synthGrating
                 for i_ff_bot = 1:length( fill_bots )
                     % for each bottom fill factor
                     
+                    % DEBUG
+                    if i_ff_top == 7 && i_ff_bot == 14
+                        fprintf('debug here');
+                    end
+                    
                     % print iteration
                     ii = ii + 1;
                     fprintf('Fill factor iteration %i of %i\n', ii, length( fill_tops ) * length( fill_bots ) );
@@ -2006,11 +2012,16 @@ classdef c_synthGrating
                         directivities = zeros( size(offsets) );
                         k_vs_offset   = zeros( size(offsets) );
 
-                        
-%                         % add a little bit to the guess period to avoid the
-%                         % bandgap
-%                         guess_period = guess_period * 1.05;
-%                         guess_period = obj.discretization * round(guess_period/obj.discretization);
+%                         % shift offsets, to best resemble previous mode
+%                         if i_ff_bot > 1
+% 
+%                             % grab previous offset index
+%                             [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills( i_ff_top, i_ff_bot-1 ) ) );
+% 
+%                             % shift offsets to start at previous offset
+%                             offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+% 
+%                         end
 
                         % Sweep offsets, pick offset with best directivity
                         fprintf('Sweeping offsets...\n');
@@ -2027,14 +2038,6 @@ classdef c_synthGrating
 
                             % run sim
                             GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-                            
-                            
-                            % DEBUG plot field at chosen iteration
-                            if DEBUG
-                                if i_offset == 20
-                                    GC.plotEz_w_edges();
-                                end
-                            end
 
                             % save directivity
                             if strcmp( obj.coupling_direction, 'up' )
@@ -2053,15 +2056,6 @@ classdef c_synthGrating
 
                         end     % end for i_offset = ...
                         fprintf('...done.\n');
-                        
-                        % DEBUG plot directivity vs. offset
-                        if DEBUG
-                            figure;
-                            plot( offsets, directivities, '-o' );
-                            xlabel('offsets'); ylabel('directivities');
-                            title('DEBUG directivities vs offsets for first run');
-                            makeFigureNice();
-                        end
 
                         % pick best offset
                         [ ~, indx_best_offset ]     = max( directivities );
@@ -2143,25 +2137,30 @@ classdef c_synthGrating
                         % run fminsearch, simplex search
                         % returns x = [ offset ]
                         fprintf('Optimizing offset for max directivity...\n');
-                        [guess_offset, fval, exitflag, output] = fminsearch( @(x) obj.merit_offset_directivity( x, fill_factors, guess_period, guessk ), x0, opts );
+                        [x, fval, exitflag, output] = fminsearch( @(x) obj.merit_offset_directivity( x, fill_factors, guess_period, guessk ), x0, opts );
                         toc;
                         fprintf('...done\n\n');
                         
                         % update guessk
                         % make grating coupler object
-                        GC = obj.h_makeGratingCell( obj.convertObjToStruct(), guess_period, fill_tops(i_ff_top), fill_bots(i_ff_bot), guess_offset );
+                        GC = obj.h_makeGratingCell( obj.convertObjToStruct(), period, fill_top, fill_bot, offset );
+
                         % simulation settings
                         num_modes   = 1;
                         BC          = 0;     % 0 for PEC, 1 for PMC
+                        % PML_options(1): PML in y direction (yes=1 or no=0)
+                        % PML_options(2): length of PML layer in nm
+                        % PML_options(3): strength of PML in the complex plane
+                        % PML_options(4): PML polynomial order (1, 2, 3...)
                         pml_options = [ 1, 200, 20, 2 ];
+
                         % run simulation
                         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-                        % update guessk
-                        guessk = GC.k;
                         
                         
                         % Now optimize both the offset and the period
                         % inputs to merit function
+                        guess_offset    = x;
                         weights         = [10, 1];                                                  % angle, offset                        
 
                         % starting point
@@ -2612,10 +2611,6 @@ GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
                             'domain_size', domain_size, ...
                             'background_index', synth_obj.background_index );
 
-                        
-% wrap offsets to range 0 to 1
-offset_ratio = mod( offset_ratio, 1 );
-                        
 % draw cell
 % draw two levels using two level builder function
 % the inputs are organized [ top level, bottom level ]

@@ -52,7 +52,19 @@ for ii = 1:2:( length(inputs)-1 )
             error( 'Input ''%s'' was not set and requires a user-defined value. Try again.', inputs{ii} );
         else
             % this input has a default, set the default
-            fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, num2str(inputs{ii+1}) );
+            
+            if isnumeric( inputs{ii+1} )
+                % input value is numerical, convert to string before
+                % printing
+                fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, num2str(inputs{ii+1}) );
+            elseif ischar( inputs{ii+1} )
+                % input value is string
+                fprintf( 'Input ''%s'' was not set, setting to default value ''%s''\n', inputs{ii}, inputs{ii+1} );
+            else
+                % input value is some other thing
+                fprintf( 'Input ''%s'' was not set, setting to default value\n', inputs{ii} );
+            end
+            
             p.(inputs{ii}) = inputs{ii+1};
         end
 
