@@ -1838,14 +1838,13 @@ classdef c_synthGrating
         end     % end synthesizeGaussianGrating_old()
         
         
-        function obj = synthesizeGaussianGrating(obj, angle, MFD, DEBUG)
+        function obj = synthesizeGaussianGrating(obj, MFD, DEBUG)
             % Synthesizes a grating that is mode-matched to fiber gaussian
             % mode
             %
+            % Coupling angle is determined by obj.optimal_angle
+            %
             % Inputs:
-            %   angle
-            %       type: double, scalar
-            %       desc: angle of fiber from normal
             %   MFD
             %       type: double, scalar
             %       desc: mode field diameter
@@ -1861,8 +1860,10 @@ classdef c_synthGrating
             %       type: boolean
             %       desc: OPTIONAL, set to true to enable debug mode
             %             which plots stuff and saves stuff, etc.
+            %
+            % WAIT WTF IM NOT EVEN USING ANGLE
             
-            if nargin < 4
+            if nargin < 3
                 DEBUG = false;
             end
             
@@ -1879,7 +1880,7 @@ classdef c_synthGrating
             zvec        = 0;                                                            % this is unused
             d0          = 0;                                                            % take slice at waist
             [obj, u]    = obj.fiberModeGaussian(    w0, zvec, xvec,...
-                                                    angle, d0, obj.background_index );
+                                                    obj.optimal_angle, d0, obj.background_index );
             
             % calculate desired scattering strength vs. x
             integral_u  = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
@@ -2005,12 +2006,13 @@ classdef c_synthGrating
                         % init saving variables
                         directivities = zeros( size(offsets) );
                         k_vs_offset   = zeros( size(offsets) );
+                        angles        = zeros( size(offsets) );     % for debugging
 
                         
-%                         % add a little bit to the guess period to avoid the
-%                         % bandgap
-%                         guess_period = guess_period * 1.05;
-%                         guess_period = obj.discretization * round(guess_period/obj.discretization);
+                        % add a little bit to the guess period to avoid the
+                        % bandgap
+                        guess_period = guess_period * 1.05;
+                        guess_period = obj.discretization * round(guess_period/obj.discretization);
 
                         % Sweep offsets, pick offset with best directivity
                         fprintf('Sweeping offsets...\n');
@@ -2039,10 +2041,12 @@ classdef c_synthGrating
                             % save directivity
                             if strcmp( obj.coupling_direction, 'up' )
                                 % coupling direction is upwards
-                                directivities( i_offset ) = GC.directivity;
+                                directivities( i_offset )   = GC.directivity;
+                                angles( i_offset )          = GC.max_angle_up;
                             else
                                 % coupling direction is downwards
-                                directivities( i_offset ) = 1./( GC.directivity );
+                                directivities( i_offset )   = 1./( GC.directivity );
+                                angles( i_offset )          = GC.max_angle_down;
                             end
 
                             % update the guessk (units rad/'units')
@@ -2061,6 +2065,13 @@ classdef c_synthGrating
                             xlabel('offsets'); ylabel('directivities');
                             title('DEBUG directivities vs offsets for first run');
                             makeFigureNice();
+                            
+                            figure;
+                            plot( offsets, angles, '-o' );
+                            xlabel('offsets'); ylabel('angles');
+                            title('DEBUG angles vs offsets for first run');
+                            makeFigureNice();
+                            
                         end
 
                         % pick best offset

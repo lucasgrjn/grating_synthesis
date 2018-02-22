@@ -18,7 +18,7 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
-domain      = [ 2000, 800 ];
+domain      = [ 1400, 800 ];
 
 % directory to save data to
 % unused for this script
@@ -30,19 +30,8 @@ data_notes      = 'test sweep new dedicated function for init. grating cell';
 % make the directory to save data to, if not already in existence
 mkdir( data_dir );
 
-% sweep parameters
-% unused in this script
-period_vec      = [700, 900];
-offset_vec      = linspace(0, 0.3, 2);
-fill_top_vec    = 0.5;
-fill_bot_vec    = 0.5;
-
 % number of parallel workers, unused
 n_workers = 4;
-
-% waveguide index/thickness, unused
-waveguide_index     = [ 3.47, 3.47 ];
-waveguide_thicks    = [ 100, 100 ];
 
 % desired angle
 optimal_angle = 15;
@@ -56,69 +45,34 @@ Q = c_synthGrating( 'discretization',   disc,       ...
                     'lambda',           lambda,     ...
                     'background_index', index_clad, ...
                     'domain_size',      domain,     ...
-                    'period_vec',       period_vec, ...
-                    'offset_vec',       offset_vec, ...
-                    'fill_top_vec',     fill_top_vec, ...
-                    'fill_bot_vec',     fill_bot_vec, ...
                     'optimal_angle',    optimal_angle,      ...
-                    'waveguide_index',  waveguide_index,    ...
-                    'waveguide_thicks', waveguide_thicks,   ...
                     'coupling_direction', coupling_direction, ...
                     'data_directory',   data_dir, ...
                     'data_filename',    data_filename, ...
                     'data_notes',       data_notes, ...
                     'data_mode',        'new', ...
-                    'num_par_workers',  n_workers, ...
-                    'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
-            );
-
-% chosen fills
-fill_top = 0.3;
-fill_bot = 0.3;
-
-% period and offset ranges to sweep
-% periods = 650:10:770;                     % good range when fill top = fill bot = 80%
-% periods = 730:10:830;                       % good range when fill top = 0.6, fill bot = 0.8
-periods = 980:10:1080;                       % good range when fill top = 0.3, fill bot = 0.3
-offsets = 0:0.02:0.98;
-% % TEMP
-% periods = 00;
-% offsets = [0, 0.5];
-
-% simulation settings
-num_modes   = 1;
-BC          = 0;     % 0 for PEC, 1 for PMC
-% PML_options(1): PML in y direction (yes=1 or no=0)
-% PML_options(2): length of PML layer in nm
-% PML_options(3): strength of PML in the complex plane
-% PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options = [ 1, 200, 20, 2 ];
-% guessk      = 0.009448 + 0.000084i;                         % k when fill top = 0.6, fill bot = 0.8, period = 780, offset = 0.3
-guessk      = 0.0073 + 0.0002i;                         % k when fill top = 0.3, fill bot = 0.3, period = 1050, offset = 0.3
-
-% init saving variables
-directivities   = zeros( length(periods), length(offsets) );    % up/down directivity, dimensions period vs. offset
-angles_up       = zeros( length(periods), length(offsets) );    % up angle, dimensions period vs. offset
-angles_down     = zeros( length(periods), length(offsets) );    % down angle, dimensions period vs. offset
-
+                    'num_par_workers',  n_workers ...
+                     );
+%                     'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
+          
 
 % -------------------------------------------------------------------------
 % nonlinear optim
 % -------------------------------------------------------------------------
 
-% weights and fill factor
-weights         = [1, 1];
-fill_factors    = [ fill_top, fill_bot ];
-
-% starting point
-x0 = [ 0.700, 0.3 ];
-
-% options
-opts = optimset( 'Display', 'iter', ...
-                 'FunValCheck', 'off', ...
-                 'MaxFunEvals', 400, ...
-                 'MaxIter', 400, ...
-                 'PlotFcns', @optimplotfval );
+% % weights and fill factor
+% weights         = [1, 1];
+% fill_factors    = [ fill_top, fill_bot ];
+% 
+% % starting point
+% x0 = [ 0.700, 0.3 ];
+% 
+% % options
+% opts = optimset( 'Display', 'iter', ...
+%                  'FunValCheck', 'off', ...
+%                  'MaxFunEvals', 400, ...
+%                  'MaxIter', 400, ...
+%                  'PlotFcns', @optimplotfval );
 % 
 % % run fminsearch, simplex search
 % tic;
@@ -134,6 +88,53 @@ opts = optimset( 'Display', 'iter', ...
 % Brute force
 % -------------------------------------------------------------------------
 
+% chosen fills
+fill_top = 0.3;
+fill_bot = 0.6;
+
+% period and offset ranges to sweep
+% periods = 650:10:770;                     % good range when fill top = fill bot = 80%
+% periods = 730:10:830;                       % good range when fill top = 0.6, fill bot = 0.8
+% periods = 980:10:1080;                       % good range when fill top = 0.3, fill bot = 0.3
+% periods     = 630:10:670;                       % good range when fills = 95%
+periods     = 1000:10:1020;                     % good range when fills = 0.65 top 0.3 bot
+offsets     = 0:0.02:0.98;
+periods     = 1020;
+offsets = [0.4, 0.5, 0.6, 0.7];
+
+% init saving variables
+directivities   = zeros( length(periods), length(offsets) );    % up/down directivity, dimensions period vs. offset
+angles_up       = zeros( length(periods), length(offsets) );    % up angle, dimensions period vs. offset
+angles_down     = zeros( length(periods), length(offsets) );    % down angle, dimensions period vs. offset
+k_all           = zeros( length(periods), length(offsets) );    % k, dimensions period vs. offset
+
+
+% % calculate waveguide k
+% waveguide = Q.h_makeGratingCell( Q.convertObjToStruct(), Q.discretization, 1.0, 1.0, 0.0 );
+% 
+% % run simulation
+% % sim settings
+% guess_n     = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
+% guessk      = guess_n * 2*pi/Q.lambda;                                          % units rad/'units'
+% num_modes   = 5;
+% BC          = 0;                                                                % 0 = PEC
+% pml_options = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
+% % run sim
+% waveguide   = waveguide.runSimulation( num_modes, BC, pml_options, guessk );
+% 
+% % update guessk (units rad/'units')
+% guessk = waveguide.k;
+
+% set guessk
+guessk = 7e-3 + 1i * 4e-4;
+
+
+% main loop simulation settings
+num_modes   = 5;
+BC          = 0;                                                % 0 = PEC
+pml_options = [1, 200, 20, 2]; 
+
+
 i_loop = 0;
 tic;
 
@@ -147,27 +148,35 @@ for i_period = 1:length(periods)
         fprintf('Loop %i of %i\n', i_loop, length(periods)*length(offsets) );
         
         % make grating coupler object
-        GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, offsets(i_offset) );
-        
-%         % DEBUG plot index
-%         GC.plotIndex();
+        GC = Q.h_makeGratingCell( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, offsets(i_offset) );
         
         % run sim
         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
         
 %         % DEBUG plot field
-%         GC.plotEz_w_edges();
+        GC.plotEz_w_edges();
        
         % save results
         directivities( i_period, i_offset ) = GC.directivity;
         angles_up( i_period, i_offset )     = GC.max_angle_up;
         angles_down( i_period, i_offset )   = GC.max_angle_down;
+        k_all( i_period, i_offset )         = GC.k;
+        
+        % update guessk
+        guessk  = GC.k;
+        if i_offset == 1
+            % first iteration, save this guessk for next outer iteration
+            next_period_loop_guessk = guessk;
+        end
         
         toc;
         
-    end
+    end     % end for i_offset
     
-end
+    % update guessk
+    guessk = next_period_loop_guessk;
+     
+end     % end for i_period
 
 % % Loading old data
 % % data is stored in: C:\Users\beezy\git\grating_synthesis\test_scripts\temporary_data
@@ -183,6 +192,15 @@ xlabel('offset'); ylabel('period');
 colorbar;
 set( gca, 'ydir', 'normal' );
 title('Up/down Directivity (dB) vs. period and offset');
+
+% down/up directivity vs. period and offset
+figure;
+imagesc( offsets, periods, 10*log10(1./directivities) );
+xlabel('offset'); ylabel('period');
+colorbar;
+set( gca, 'ydir', 'normal' );
+title('down/up Directivity (dB) vs. period and offset');
+
 
 % angle up vs. period and offset
 figure;
@@ -200,15 +218,15 @@ colorbar;
 set( gca, 'ydir', 'normal' );
 title('Down angle vs. period and offset');
 
-% plot FOM
-fom         = weights(1)*abs( optimal_angle - angles_down )/optimal_angle + weights(2)*log10(directivities);
-% plot merit function
-figure;
-imagesc( offsets, periods, fom );
-xlabel('offset'); ylabel('period');
-colorbar;
-set( gca, 'ydir', 'normal' );
-title('FOM vs. period and offset');
+% % plot FOM
+% fom         = weights(1)*abs( optimal_angle - angles_down )/optimal_angle + weights(2)*log10(directivities);
+% % plot merit function
+% figure;
+% imagesc( offsets, periods, fom );
+% xlabel('offset'); ylabel('period');
+% colorbar;
+% set( gca, 'ydir', 'normal' );
+% title('FOM vs. period and offset');
 
 % plot angle error
 angle_error = abs( optimal_angle - angles_down )/optimal_angle;
@@ -217,15 +235,15 @@ imagesc( offsets, periods, angle_error );
 xlabel('offset'); ylabel('period');
 colorbar;
 set( gca, 'ydir', 'normal' );
-title('Angle error vs. period and offset');
+title('Angle error (in %) vs. period and offset');
 
-% plot directivity
-figure;
-imagesc( offsets, periods, log10(directivities) );
-xlabel('offset'); ylabel('period');
-colorbar;
-set( gca, 'ydir', 'normal' );
-title('log10(directivities) vs. period and offset');
+% % plot directivity
+% figure;
+% imagesc( offsets, periods, log10(directivities) );
+% xlabel('offset'); ylabel('period');
+% colorbar;
+% set( gca, 'ydir', 'normal' );
+% title('log10(directivities) vs. period and offset');
 
         
 % -------------------------------------------------------------------------
@@ -233,62 +251,62 @@ title('log10(directivities) vs. period and offset');
 % -------------------------------------------------------------------------
         
         
-% starting period
-start_period = 1000;
-
-% init saving variables
-directivities   = zeros(size(offsets));
-angles_up       = zeros(size(periods));
-angles_down     = zeros(size(periods));
-   
-% sweep offset, pick offset with best directivity
-tic;
-for i_offset = 1:length(offsets)
-
-    % print loop #
-    fprintf('Loop %i of %i\n', i_offset, length(offsets) );
-
-    % make grating coupler object
-    GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), start_period, fill_top, fill_bot, offsets(i_offset) );
-
-    % run sim
-    GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-
-    % save results
-    directivities( i_offset ) = GC.directivity;
-
-    toc;
-
-end
-
-% grab best directivity
-[ max_dir, indx_max_dir ]   = max(1./directivities(:));
-best_offset                 = offsets( indx_max_dir );
-        
-
-% sweep periods, pick period with closest angle to desired
-for i_period = 1:length(periods)
-
-    % print loop #
-    fprintf('Loop %i of %i\n', i_period, length(periods) );
-
-    % make grating coupler object
-    GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, best_offset );
-
-    % run sim
-    GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-
-    % save results
-    angles_down( i_period ) = GC.max_angle_down;
-
-    toc;
-
-end
-
-
-% grab best period
-[ angle_err, indx_best_period ] = min( abs( optimal_angle - angles_down ) );
-best_period                     = periods( indx_best_period );
+% % starting period
+% start_period = 1000;
+% 
+% % init saving variables
+% directivities   = zeros(size(offsets));
+% angles_up       = zeros(size(periods));
+% angles_down     = zeros(size(periods));
+%    
+% % sweep offset, pick offset with best directivity
+% tic;
+% for i_offset = 1:length(offsets)
+% 
+%     % print loop #
+%     fprintf('Loop %i of %i\n', i_offset, length(offsets) );
+% 
+%     % make grating coupler object
+%     GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), start_period, fill_top, fill_bot, offsets(i_offset) );
+% 
+%     % run sim
+%     GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+% 
+%     % save results
+%     directivities( i_offset ) = GC.directivity;
+% 
+%     toc;
+% 
+% end
+% 
+% % grab best directivity
+% [ max_dir, indx_max_dir ]   = max(1./directivities(:));
+% best_offset                 = offsets( indx_max_dir );
+%         
+% 
+% % sweep periods, pick period with closest angle to desired
+% for i_period = 1:length(periods)
+% 
+%     % print loop #
+%     fprintf('Loop %i of %i\n', i_period, length(periods) );
+% 
+%     % make grating coupler object
+%     GC = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), periods(i_period), fill_top, fill_bot, best_offset );
+% 
+%     % run sim
+%     GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+% 
+%     % save results
+%     angles_down( i_period ) = GC.max_angle_down;
+% 
+%     toc;
+% 
+% end
+% 
+% 
+% % grab best period
+% [ angle_err, indx_best_period ] = min( abs( optimal_angle - angles_down ) );
+% best_period                     = periods( indx_best_period );
         
         
         

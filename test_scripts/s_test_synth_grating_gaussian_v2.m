@@ -42,10 +42,78 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % run synthesize gaussian grating
 % note units are in 'nm'
 % 
-angle   = 15; 
+% angle   = 20; 
 MFD     = 10000;
 DEBUG   = true;
-Q       = Q.synthesizeGaussianGrating(angle, MFD, DEBUG);
+Q       = Q.synthesizeGaussianGrating(MFD, DEBUG);
+
+
+
+
+
+
+
+% directivity vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, 10*log10(Q.directivities_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Directivity (dB) vs. fill factors');
+savefig('dir_v_ff.fig');
+saveas(gcf, 'dir_v_ff.png');
+
+% angles vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, Q.angles_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Angles (deg) vs. fill factors');
+savefig('angle_v_ff.fig');
+saveas(gcf, 'angle_v_ff.png');
+
+% scattering strength alpha vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, real(Q.scatter_str_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Scattering strength (real) vs. fill factors');
+savefig('scatter_str_v_ff.fig');
+saveas(gcf, 'scatter_str_v_ff.png');
+
+% period vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, Q.periods_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title(['Period (' Q.units.name ') vs. fill factors']);
+savefig('period_v_ff.fig');
+saveas(gcf, 'period_v_ff.png');
+
+% offset vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, Q.offsets_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Offset vs. fill factors');
+savefig('offsets_v_ff.fig');
+saveas(gcf, 'offsets_v_ff.png');
+
+% k vs. fill
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, real(Q.k_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Real k vs. fill factors');
+savefig('k_real_v_ff.fig');
+saveas(gcf, 'k_real_v_ff.png');
+
+figure;
+imagesc( Q.fill_bots, Q.fill_tops, imag(Q.k_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('bottom fill factor'); ylabel('top fill factor');
+title('Imag k vs. fill factors');
+savefig('k_imag_v_ff.fig');
+saveas(gcf, 'k_imag_v_ff.png');
 
 
 
