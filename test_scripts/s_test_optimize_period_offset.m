@@ -14,11 +14,11 @@ addpath(['..' filesep 'main' ]);                    % main code
 addpath(['..' filesep 'auxiliary_functions']);      % merit function
 
 % initial settings
-disc        = 10;
+disc        = 5;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
-domain      = [ 1400, 800 ];
+domain      = [ 2500, 800 ];
 
 % directory to save data to
 % unused for this script
@@ -89,48 +89,33 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % -------------------------------------------------------------------------
 
 % chosen fills
-fill_top = 0.3;
-fill_bot = 0.6;
+fill_top = 0.45;
+fill_bot = 0.8;
 
 % period and offset ranges to sweep
 % periods = 650:10:770;                     % good range when fill top = fill bot = 80%
 % periods = 730:10:830;                       % good range when fill top = 0.6, fill bot = 0.8
 % periods = 980:10:1080;                       % good range when fill top = 0.3, fill bot = 0.3
 % periods     = 630:10:670;                       % good range when fills = 95%
-periods     = 1000:10:1020;                     % good range when fills = 0.65 top 0.3 bot
-offsets     = 0:0.02:0.98;
-periods     = 1020;
-offsets = [0.4, 0.5, 0.6, 0.7];
+periods     = 840;                    
+offsets     = 0.04:0.02:1.04;
+% periods     = 1020;
+% offsets = [0.4, 0.5, 0.6, 0.7];
 
 % init saving variables
 directivities   = zeros( length(periods), length(offsets) );    % up/down directivity, dimensions period vs. offset
 angles_up       = zeros( length(periods), length(offsets) );    % up angle, dimensions period vs. offset
 angles_down     = zeros( length(periods), length(offsets) );    % down angle, dimensions period vs. offset
 k_all           = zeros( length(periods), length(offsets) );    % k, dimensions period vs. offset
+GC_all          = cell( length(periods), length(offsets) );     % GC objects, dimensions period vs. offset
 
-
-% % calculate waveguide k
-% waveguide = Q.h_makeGratingCell( Q.convertObjToStruct(), Q.discretization, 1.0, 1.0, 0.0 );
-% 
-% % run simulation
-% % sim settings
-% guess_n     = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
-% guessk      = guess_n * 2*pi/Q.lambda;                                          % units rad/'units'
-% num_modes   = 5;
-% BC          = 0;                                                                % 0 = PEC
-% pml_options = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
-% % run sim
-% waveguide   = waveguide.runSimulation( num_modes, BC, pml_options, guessk );
-% 
-% % update guessk (units rad/'units')
-% guessk = waveguide.k;
 
 % set guessk
-guessk = 7e-3 + 1i * 4e-4;
+guessk = 8.54e-3 + 1i * 1.6e-4;
 
 
 % main loop simulation settings
-num_modes   = 5;
+num_modes   = 1;
 BC          = 0;                                                % 0 = PEC
 pml_options = [1, 200, 20, 2]; 
 
@@ -154,13 +139,14 @@ for i_period = 1:length(periods)
         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
         
 %         % DEBUG plot field
-        GC.plotEz_w_edges();
+%         GC.plotEz_w_edges();
        
         % save results
         directivities( i_period, i_offset ) = GC.directivity;
         angles_up( i_period, i_offset )     = GC.max_angle_up;
         angles_down( i_period, i_offset )   = GC.max_angle_down;
         k_all( i_period, i_offset )         = GC.k;
+        GC_all{ i_period, i_offset }        = GC;
         
         % update guessk
         guessk  = GC.k;
@@ -244,6 +230,17 @@ title('Angle error (in %) vs. period and offset');
 % colorbar;
 % set( gca, 'ydir', 'normal' );
 % title('log10(directivities) vs. period and offset');
+
+% DEBUG plot each mode one by one
+OPTS.plots = 'real';
+for ii = 1:length(GC_all)
+   
+    GC_all{ii}.plotEz_w_edges( OPTS );
+    pause;
+    close(gcf);
+    close(gcf);
+    
+end
 
         
 % -------------------------------------------------------------------------

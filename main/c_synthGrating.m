@@ -1926,9 +1926,9 @@ classdef c_synthGrating
             
             % run simulation
             % sim settings
-%             lambda_nm   = obj.lambda * obj.units.scale * 1e9;                               % units nm
+%             lambda_nm   = obj.lambda * obj.units.scale * 1e9;                             % units nm
             guess_n     = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
-            guessk      = guess_n * 2*pi/obj.lambda;                                         % units rad/'units'
+            guessk      = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
             num_modes   = 5;
             BC          = 0;                                                                % 0 = PEC
             pml_options = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
@@ -1962,9 +1962,10 @@ classdef c_synthGrating
 %             fill_tops       = fliplr( 0.3:0.025:0.95 );
 %             fill_bots       = fliplr( 0.3:0.025:0.95 );
             % DEBUG
-            fill_tops       = fliplr( 0.3:0.05:0.95 );
-            fill_bots       = fliplr( 0.3:0.05:0.95 );
-            offsets         = 0:0.02:0.98;                                
+            fill_tops       = fliplr( 0.0:0.025:1 );
+            fill_bots       = fliplr( 0.0:0.025:1 );
+            offsets         = 0:0.04:0.98;
+            offsets_orig    = offsets;
             
             % save fills and offsets
             obj.fill_tops   = fill_tops;
@@ -2000,7 +2001,7 @@ classdef c_synthGrating
                     fprintf('Fill factor iteration %i of %i\n', ii, length( fill_tops ) * length( fill_bots ) );
                     
                     
-                    if ii == 1
+%                     if ii == 1
                         % First go-around, sweep offset and period
                     
                         % init saving variables
@@ -2009,10 +2010,10 @@ classdef c_synthGrating
                         angles        = zeros( size(offsets) );     % for debugging
 
                         
-                        % add a little bit to the guess period to avoid the
-                        % bandgap
-                        guess_period = guess_period * 1.05;
-                        guess_period = obj.discretization * round(guess_period/obj.discretization);
+%                         % add a little bit to the guess period to avoid the
+%                         % bandgap
+%                         guess_period = guess_period * 1.025;
+%                         guess_period = obj.discretization * round(guess_period/obj.discretization);
 
                         % Sweep offsets, pick offset with best directivity
                         fprintf('Sweeping offsets...\n');
@@ -2031,12 +2032,12 @@ classdef c_synthGrating
                             GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
                             
                             
-                            % DEBUG plot field at chosen iteration
-                            if DEBUG
-                                if i_offset == 20
-                                    GC.plotEz_w_edges();
-                                end
-                            end
+%                             % DEBUG plot field at chosen iteration
+%                             if DEBUG
+%                                 if i_offset == 20
+%                                     GC.plotEz_w_edges();
+%                                 end
+%                             end
 
                             % save directivity
                             if strcmp( obj.coupling_direction, 'up' )
@@ -2058,31 +2059,50 @@ classdef c_synthGrating
                         end     % end for i_offset = ...
                         fprintf('...done.\n');
                         
-                        % DEBUG plot directivity vs. offset
+%                         % DEBUG plot directivity vs. offset
                         if DEBUG
                             figure;
                             plot( offsets, directivities, '-o' );
                             xlabel('offsets'); ylabel('directivities');
-                            title('DEBUG directivities vs offsets for first run');
+                            title('DEBUG directivities vs offsets');
                             makeFigureNice();
-                            
-                            figure;
-                            plot( offsets, angles, '-o' );
-                            xlabel('offsets'); ylabel('angles');
-                            title('DEBUG angles vs offsets for first run');
-                            makeFigureNice();
-                            
+%                             
+%                             figure;
+%                             plot( offsets, angles, '-o' );
+%                             xlabel('offsets'); ylabel('angles');
+%                             title('DEBUG angles vs offsets for first run');
+%                             makeFigureNice();
+%                             
                         end
 
                         % pick best offset
                         [ ~, indx_best_offset ]     = max( directivities );
                         best_offset                 = offsets( indx_best_offset );
                         best_offset_k               = k_vs_offset( indx_best_offset );
+                        
+                        % DEBUG plot grating with best directivity
+                        if DEBUG
+                           
+                            % make grating cell
+                            GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                        guess_period, ...
+                                                        fill_tops(i_ff_top), ...
+                                                        fill_bots(i_ff_bot), ...
+                                                        best_offset );
 
+                            % run sim
+                            GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
+                            
+                            % plot field
+                            GC.plotEz_w_edges();
+                            
+                        end
+
+                        
                         % now sweep periods
                         % only sweep larger periods. Doubtful that the period
                         % will be smaller
-                        periods     = guess_period : obj.discretization : 1.1 * guess_period;
+                        periods     = guess_period : obj.discretization : 1.05 * guess_period;
                         periods     = obj.discretization * round(periods/obj.discretization);
 %                         periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
 
@@ -2135,77 +2155,77 @@ classdef c_synthGrating
                         best_period_k                   = k_vs_period( indx_best_period );
                         best_GC                         = GC_vs_period{ indx_best_period };
                         
-                    else
-                        % Run local optimizer
-
-                        % grab fill factors
-                        fill_factors    = [ fill_tops(i_ff_top), fill_bots(i_ff_bot) ];
-                        
-                        % First optimize the offset
-                        % starting point
-                        x0 = guess_offset;
-                        
-                        % options
-                        opts = optimset( 'Display', 'iter', ...
-                                         'FunValCheck', 'off', ...
-                                         'MaxFunEvals', 400, ...
-                                         'MaxIter', 400 );
-
-                        % run fminsearch, simplex search
-                        % returns x = [ offset ]
-                        fprintf('Optimizing offset for max directivity...\n');
-                        [guess_offset, fval, exitflag, output] = fminsearch( @(x) obj.merit_offset_directivity( x, fill_factors, guess_period, guessk ), x0, opts );
-                        toc;
-                        fprintf('...done\n\n');
-                        
-                        % update guessk
-                        % make grating coupler object
-                        GC = obj.h_makeGratingCell( obj.convertObjToStruct(), guess_period, fill_tops(i_ff_top), fill_bots(i_ff_bot), guess_offset );
-                        % simulation settings
-                        num_modes   = 1;
-                        BC          = 0;     % 0 for PEC, 1 for PMC
-                        pml_options = [ 1, 200, 20, 2 ];
-                        % run simulation
-                        GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
-                        % update guessk
-                        guessk = GC.k;
-                        
-                        
-                        % Now optimize both the offset and the period
-                        % inputs to merit function
-                        weights         = [10, 1];                                                  % angle, offset                        
-
-                        % starting point
-                        x0 = [ 1, guess_offset ];
-
-                        % run fminsearch, simplex search
-                        % returns x = [ period ratio, offset ]
-                        fprintf('Running local optimizer...\n');
-                        [x, fval, exitflag, output] = fminsearch( @(x) obj.merit_period_offset( x, weights, fill_factors, guess_period, guessk ), x0, opts );
-                        toc;
-                        fprintf('...done\n\n');
-                        
-                        
-                        % parse results
-                        best_period = x(1) * guess_period;
-                        best_period = obj.discretization * round( best_period/obj.discretization );     % snap to grid
-                        best_offset = x(2);
-                        
-                        
-                        % finally resimulate the GC with the chosen offset and
-                        % period and save this data
-                        % make grating cell
-                        best_GC = obj.h_makeGratingCell(    obj.convertObjToStruct(), ...
-                                                            best_period, ...
-                                                            fill_tops(i_ff_top), ...
-                                                            fill_bots(i_ff_bot), ...
-                                                            best_offset );
-
-                        % run sim
-                        best_GC = best_GC.runSimulation( 1, BC, pml_options, guessk );
-                        
-                    
-                    end     % end if ii == 0
+%                     else
+%                         % Run local optimizer
+% 
+%                         % grab fill factors
+%                         fill_factors    = [ fill_tops(i_ff_top), fill_bots(i_ff_bot) ];
+%                         
+%                         % First optimize the offset
+%                         % starting point
+%                         x0 = guess_offset;
+%                         
+%                         % options
+%                         opts = optimset( 'Display', 'iter', ...
+%                                          'FunValCheck', 'off', ...
+%                                          'MaxFunEvals', 400, ...
+%                                          'MaxIter', 400 );
+% 
+%                         % run fminsearch, simplex search
+%                         % returns x = [ offset ]
+%                         fprintf('Optimizing offset for max directivity...\n');
+%                         [guess_offset, fval, exitflag, output] = fminsearch( @(x) obj.merit_offset_directivity( x, fill_factors, guess_period, guessk ), x0, opts );
+%                         toc;
+%                         fprintf('...done\n\n');
+%                         
+%                         % update guessk
+%                         % make grating coupler object
+%                         GC = obj.h_makeGratingCell( obj.convertObjToStruct(), guess_period, fill_tops(i_ff_top), fill_bots(i_ff_bot), guess_offset );
+%                         % simulation settings
+%                         num_modes   = 1;
+%                         BC          = 0;     % 0 for PEC, 1 for PMC
+%                         pml_options = [ 1, 200, 20, 2 ];
+%                         % run simulation
+%                         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+%                         % update guessk
+%                         guessk = GC.k;
+%                         
+%                         
+%                         % Now optimize both the offset and the period
+%                         % inputs to merit function
+%                         weights         = [10, 1];                                                  % angle, offset                        
+% 
+%                         % starting point
+%                         x0 = [ 1, guess_offset ];
+% 
+%                         % run fminsearch, simplex search
+%                         % returns x = [ period ratio, offset ]
+%                         fprintf('Running local optimizer...\n');
+%                         [x, fval, exitflag, output] = fminsearch( @(x) obj.merit_period_offset( x, weights, fill_factors, guess_period, guessk ), x0, opts );
+%                         toc;
+%                         fprintf('...done\n\n');
+%                         
+%                         
+%                         % parse results
+%                         best_period = x(1) * guess_period;
+%                         best_period = obj.discretization * round( best_period/obj.discretization );     % snap to grid
+%                         best_offset = x(2);
+%                         
+%                         
+%                         % finally resimulate the GC with the chosen offset and
+%                         % period and save this data
+%                         % make grating cell
+%                         best_GC = obj.h_makeGratingCell(    obj.convertObjToStruct(), ...
+%                                                             best_period, ...
+%                                                             fill_tops(i_ff_top), ...
+%                                                             fill_bots(i_ff_bot), ...
+%                                                             best_offset );
+% 
+%                         % run sim
+%                         best_GC = best_GC.runSimulation( 1, BC, pml_options, guessk );
+%                         
+%                     
+%                     end     % end if ii == 0
                     
                     
                     % save data
@@ -2238,6 +2258,12 @@ classdef c_synthGrating
                     guess_period        = best_period;
                     guess_offset        = best_offset;
                     
+                    % update the offsets
+                    % grab previous offset index
+                    [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+                    % shift offsets to start at previous offset
+                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                    
                     
                 end     % end for i_ff_bot = ...
                 
@@ -2245,12 +2271,12 @@ classdef c_synthGrating
                 guess_period    = next_top_loop_period;
                 guessk          = next_top_loop_k;
                 guess_offset    = next_top_loop_offset;
-%                 
-%                 % update the offsets
-%                 % grab previous offset index
-%                 [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills( i_ff_top, 1 ) ) );
-%                 % shift offsets to start at previous offset
-%                 offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                
+                % update the offsets
+                % grab previous offset index
+                [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills( i_ff_top, 1 ) ) );
+                % shift offsets to start at previous offset
+                offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
                 
             end     % end for i_ff_top = ...
             

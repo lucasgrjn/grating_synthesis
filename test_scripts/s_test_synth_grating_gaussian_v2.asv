@@ -110,26 +110,15 @@ title('Directivity (dB) (only datapoints that jelena sweeps) vs. fill factors');
 % saveas(gcf, [ 'dir_v_ff_sat_' num2str(sat_thresh) '.png']);
 
 
-% plot but only show the "normal" curve regime
+% plot but only show the "inverted" curve regime
 dir_v_fill_jelena                       = 10*log10(Q.directivities_vs_fills);
-dir_v_fill_jelena( layer_ratio < 0.95 | layer_ratio > 1.4 ) = -100;
+dir_v_fill_jelena( layer_ratio > 0.8 )  = -100;
 
 figure;
 imagesc( Q.fill_bots, Q.fill_tops, dir_v_fill_jelena );
 colorbar; set( gca, 'ydir', 'normal' );
 xlabel('bottom fill factor'); ylabel('top fill factor');
 title('Directivity (dB) (only datapoints on normal curve) vs. fill factors');
-
-
-% plot but only show the "inverted" curve regime
-dir_v_fill_jelena                       = 10*log10(Q.directivities_vs_fills);
-dir_v_fill_jelena( layer_ratio > 1.05 | (layer_ratio + FILL_BOT) < 0.9 | (layer_ratio + FILL_BOT) > 1.1 )  = -100;
-
-figure;
-imagesc( Q.fill_bots, Q.fill_tops, dir_v_fill_jelena );
-colorbar; set( gca, 'ydir', 'normal' );
-xlabel('bottom fill factor'); ylabel('top fill factor');
-title('Directivity (dB) (only datapoints on inverted curve) vs. fill factors');
 
 
 % angles vs. fill

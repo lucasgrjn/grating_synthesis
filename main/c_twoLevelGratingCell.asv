@@ -995,14 +995,7 @@ classdef c_twoLevelGratingCell
             %   OPTS
             %       type: struct
             %       desc: struct with these fields:
-            %           plots
-            %               type: string
-            %               desc: either 'real', 'amp', or 'both'
-            
-            % default to both
-            if nargin < 2
-                OPTS = struct( 'plots', 'both' );
-            end
+            %           
             
             numcells = obj.numcells;
             E_z      = obj.E_z;
@@ -1013,39 +1006,35 @@ classdef c_twoLevelGratingCell
             % define x coordinates
             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
             
-            % plot the field, real
-            if strcmp( OPTS.plots, 'real' ) || strcmp( OPTS.plots, 'both' ) 
-                figure;
-                imagesc( x_coords_all, obj.y_coords, real(E_z) ); hold on;
-                xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
-                set( gca, 'YDir', 'normal' );
-                title( sprintf('Real E_z, %i periods', numcells) );
-                % overplot the index with transparency
-                % first things first, edge detection:
-                filt    = 'roberts';            % filter
-                N_edges = edge( N, filt );
-                % overplot the detected edges
-                h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
-                set( h, 'AlphaData', N_edges );
-                set( gca, 'YDir', 'normal' );
-            end
+                        % plot the field, real
+            figure;
+            imagesc( x_coords_all, obj.y_coords, real(E_z) ); hold on;
+            xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
+            set( gca, 'YDir', 'normal' );
+            title( sprintf('Real E_z, %i periods', numcells) );
+            % overplot the index with transparency
+            % first things first, edge detection:
+            filt    = 'roberts';            % filter
+            N_edges = edge( N, filt );
+            % overplot the detected edges
+            h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
+            set( h, 'AlphaData', N_edges );
+            set( gca, 'YDir', 'normal' );
 
             % plot the field, abs
-            if strcmp( OPTS.plots, 'amp' ) || strcmp( OPTS.plots, 'both' ) 
-                figure;
-                imagesc( x_coords_all, obj.y_coords, abs(E_z) ); hold on;
-                xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
-                set( gca, 'YDir', 'normal' );
-                title( sprintf('Amplitude E_z, %i periods', numcells) );
-                % overplot the index with transparency
-                % first things first, edge detection:
-                filt    = 'roberts';            % filter
-                N_edges = edge( N, filt );
-                % overplot the detected edges
-                h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
-                set( h, 'AlphaData', N_edges );
-                set( gca, 'YDir', 'normal' );
-            end
+            figure;
+            imagesc( x_coords_all, obj.y_coords, abs(E_z) ); hold on;
+            xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
+            set( gca, 'YDir', 'normal' );
+            title( sprintf('Amplitude E_z, %i periods', numcells) );
+            % overplot the index with transparency
+            % first things first, edge detection:
+            filt    = 'roberts';            % filter
+            N_edges = edge( N, filt );
+            % overplot the detected edges
+            h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
+            set( h, 'AlphaData', N_edges );
+            set( gca, 'YDir', 'normal' );
             
         end     % end function plotEz()
         

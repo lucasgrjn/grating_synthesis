@@ -17,12 +17,13 @@ k0          = 2*pi/lambda0;
 
 % define material layers
 n_clad      = 1.44;
-n_core      = 3.477;
+% n_core      = 3.477;
+n_core      = 1.44;
 n           = [ n_clad, n_core, n_clad ];
 
 % discretization
-dx          = [ 0.1*lambda0, 0.05*lambda0, 0.01*lambda0 ];
-% dx          = 0.05*1e-6;
+% dx          = [ 0.1*lambda0, 0.05*lambda0, 0.01*lambda0 ];
+dx          = 0.05*1e-6;
 
 % define layer thicknesses
 clad_d    = 5*1e-6;  % layer depths
@@ -57,18 +58,19 @@ end
 % xlabel('x (m)'); ylabel('Index');
 % makeFigureNice();
 
-% % plot the modes
-% for i_mode = 1:size(field,2)
-% 
-%     figure;
-%     plotyy( x, (field(:,i_mode)), x, n_array ); hold on;
-%     makeFigureNice();
-%     title(sprintf('mode: %i of %i', i_mode, size(field,2)));
-%     xlabel('x');
-%     legend('Field', 'index');
-%     makeFigureNice();
-%     
-% end
+% plot the modes
+for i_mode = 1:size(field,2)
+
+    figure;
+    plotyy( x, (field(:,i_mode)), x, n_array ); hold on;
+    makeFigureNice();
+    title(sprintf('mode: %i of %i', i_mode, size(field,2)));
+    xlabel('x');
+    legend('Field', 'index');
+    makeFigureNice();
+    
+end
+
 
 % plot analytical beta versus FDFD beta
 figure;
