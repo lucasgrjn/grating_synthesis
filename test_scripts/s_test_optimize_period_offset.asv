@@ -112,7 +112,6 @@ alpha_down      = zeros( length(periods), length(offsets) );    % scattering str
 k_all           = zeros( length(periods), length(offsets) );    % k, dimensions period vs. offset
 p_rad_up        = zeros( length(periods), length(offsets) );    % power radiated upwards, dimensions period vs. offset
 p_rad_down      = zeros( length(periods), length(offsets) );    % power radiated upwards, dimensions period vs. offset
-p_in            = zeros( length(periods), length(offsets) );    % power in, dimensions period vs. offset
 GC_all          = cell( length(periods), length(offsets) );     % GC objects, dimensions period vs. offset
 
 
@@ -259,19 +258,11 @@ title('Down radiated power vs. period and offset');
 
 % power in vs. period and offset
 figure;
-imagesc( offsets, periods, p_in );
+imagesc( offsets, periods, p_rad_down );
 xlabel('offset'); ylabel('period');
 colorbar;
 set( gca, 'ydir', 'normal' );
-title('Input power vs. period and offset');
-
-% power in minus power up minus power down vs. period and offset
-figure;
-imagesc( offsets, periods, p_in - p_rad_up - p_rad_down );
-xlabel('offset'); ylabel('period');
-colorbar;
-set( gca, 'ydir', 'normal' );
-title('Input power - rad up - rad down vs. period and offset');
+title('Down radiated power vs. period and offset');
 
 
 % % plot FOM

@@ -887,12 +887,12 @@ classdef c_twoLevelGratingCell
             % H y in (on the same grid as Hx in)
 %             H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
             
-            % NEW: H y in , on half step, using entire E_z slice
-            H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 2 ) - E_z( :, 1 ) )/(obj.dx);   % dy, term staggered 1
+            % NEW: H y in , on SECOND step, using entire E_z slice
+            H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 3 ) - E_z( :, 1 ) )/(2*obj.dx);   % dy, term staggered 1
             
             % power in (at left edge)
 %             Sy_in = real( conj(H_x_in(:)) .* E_z( 2:end-1, 2 ) );           % Sy = real( Ez Hx* )
-            Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );      % Sx = real( -Ez Hy* )
+            Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );              % Sx = real( -Ez Hy* )
 %             P_in  = sum( sqrt( Sy_in.^2 + Sx_in.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
 %             % NEW use just Sx
             P_in = sum( Sx_in(:) )*obj.dy;
