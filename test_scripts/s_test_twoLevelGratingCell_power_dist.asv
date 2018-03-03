@@ -12,7 +12,7 @@ disc        = 10;
 units       = 'nm';
 lambda      = 1550;
 index_clad  = 1.0;
-domain      = [ 4000, 800 ];
+domain      = [ 2500, 800 ];
 
 % directory to save data to
 % unused for this script
@@ -45,6 +45,11 @@ Q = c_synthGrating( 'discretization',   disc,       ...
                      );
 %                     'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
 
+
+% simulation settings
+num_modes   = 1;
+BC          = 0;                                                                % 0 = PEC
+pml_options = [1, 200, 20, 2]; 
 
 % start from waveguide mode and iterate towards the fill factor geometry i want to try
 % make waveguide
@@ -82,25 +87,16 @@ des_ff  = 0.7;                                                                  
 ffs     = linspace( 0.95, des_ff, 10 );
 
 
-% simulation settings
-num_modes   = 1;
-BC          = 0;                                                                % 0 = PEC
-pml_options = [1, 200, 20, 2]; 
-
-
-tic;
 for ii = 1:length(ffs)
     % for each fill factor
-    
-    fprintf('fill factor loop %i of %i...\n', ii, length(ffs) );
 
     % pick some periods to sweep
     sweep_periods = guess_period : disc : guess_period*1.05;
     
     % init saving variables
-    angles          = zeros( size(sweep_periods) );
-    k_vs_period     = zeros( size(sweep_periods) );
-    GC_vs_period    = cell( size(sweep_periods) );
+    angles          = zeros( size(periods) );
+    k_vs_period     = zeros( size(periods) );
+    GC_vs_period    = cell( size(periods) );
     
     
     for i_period = 1:length(sweep_periods)
@@ -110,44 +106,35 @@ for ii = 1:length(ffs)
         
         % run sim
         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+        
 
-        % save angle
-        if strcmp( Q.coupling_direction, 'up' )
-            % coupling direction is upwards
-            angles( i_period ) = GC.max_angle_up;
-        else
-            % coupling direction is downwards
-            angles( i_period ) = GC.max_angle_down;
-        end
+                        % run sim
+                        GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
 
-        % update GC list
-        GC_vs_period{i_period} = GC;
+                        % save angle
+                        if strcmp( obj.coupling_direction, 'up' )
+                            % coupling direction is upwards
+                            angles( i_period ) = GC.max_angle_up;
+                        else
+                            % coupling direction is downwards
+                            angles( i_period ) = GC.max_angle_down;
+                        end
 
-        % update k (units of rad/'units')
-        k_vs_period(i_period)   = GC.k;
-        guessk                  = GC.k;
+                        % update GC list
+                        GC_vs_period{i_period} = GC;
+
+                        % update k (units of rad/'units')
+                        k_vs_period(i_period)   = GC.k;
+                        guessk                  = GC.k;
+
+                        toc;
+
+                    end
         
     end
     
-    % pick best period
-    [angle_error, indx_best_period] = min( abs( Q.optimal_angle - angles ) );
-    guess_period                    = sweep_periods( indx_best_period );
-    guessk                          = k_vs_period( indx_best_period );
-    best_GC                         = GC_vs_period{ indx_best_period };
-    
-    fprintf('...done\n');
-    toc;
-    
-    
 end
-
-% save final results
-best_period = guess_period;
-bestk       = guessk;
     
-
-% calc and plot power vs. x
-best_GC.power_distribution();
 
 
 

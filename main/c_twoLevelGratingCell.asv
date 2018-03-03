@@ -953,8 +953,7 @@ classdef c_twoLevelGratingCell
             omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
             
             % grab field
-            E_z             = obj.E_z;
-            x_coords_all    = 0 : obj.dx : obj.numcells*obj.domain_size(2)-obj.dx;
+            E_z = obj.E_z;
             
             % Calc and plot propagating power vs. x
             
@@ -970,7 +969,7 @@ classdef c_twoLevelGratingCell
             
             % lets plot power traveling in x per slice of x
             figure;
-            plot( x_coords_all(2:end-1), P_per_x_slice );
+            plot( 1:length(P_per_x_slice), P_per_x_slice );
             xlabel('x'); ylabel('total propagating power in x');
             title('Power propagating along x per slice');
             makeFigureNice();
@@ -987,9 +986,9 @@ classdef c_twoLevelGratingCell
             
             % plot power traveling in y per slice of y
             figure;
-            plot( obj.y_coords(2:end-1), P_per_y_slice );
-            xlabel('y'); ylabel('total propagating power in y');
-            title('Power propagating along y per slice');
+            plot( 1:length(P_per_y_slice), P_per_y_slice );
+            xlabel('x'); ylabel('total propagating power along y');
+            title('Power propagating along x per slice');
             makeFigureNice();
             
 %             
