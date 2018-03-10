@@ -86,7 +86,7 @@ ffs     = linspace( 0.95, des_ff, 10 );
 num_modes   = 1;
 BC          = 0;                                                                % 0 = PEC
 pml_options = [1, 200, 20, 2]; 
-
+ncells      = 10;
 
 tic;
 for ii = 1:length(ffs)
@@ -106,7 +106,8 @@ for ii = 1:length(ffs)
     for i_period = 1:length(sweep_periods)
        
         % make grating coupler object
-    	GC = Q.h_makeGratingCell( Q.convertObjToStruct(), sweep_periods(i_period), ffs(ii), ffs(ii), 0.0 );
+    	GC              = Q.h_makeGratingCell( Q.convertObjToStruct(), sweep_periods(i_period), ffs(ii), ffs(ii), 0.0 );
+        GC.numcells     = ncells;        % DEBUG set the number of cells to 1 for comparison
         
         % run sim
         GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
@@ -147,21 +148,97 @@ bestk       = guessk;
     
 
 % calc and plot power vs. x
-best_GC.power_distribution();
+best_GC = best_GC.power_distribution();
 
 
+% plot field
+best_GC.plotEz_w_edges();
+
+% Is energy conserved? Does the radiated power + outputted power = input
+% power?
+total_rad_power = max(best_GC.debug.P_per_y_slice(:)) + abs(min(best_GC.debug.P_per_y_slice(:)));
+P_in            = best_GC.P_in;
+P_out           = best_GC.debug.P_per_x_slice(end);
+P_diff          = P_in - P_out - total_rad_power;
+
+% Assuming that the reflected power is the difference in
+% input/radiated/output power, then we can calc. reflection coeff.
+reflected_power_coeff = P_diff/P_in;
+
+% what if i take the input/output powers at grid points 1/end?
+P_in_grid1      = P_in * exp( 2 * best_GC.dx * imag(best_GC.k) );            % power at grid 1
+P_out_gridend   = P_out * exp( -2 * best_GC.dx * imag(best_GC.k) );          % power at grid end
+P_diff_1_end    = P_in_grid1 - P_out_gridend - total_rad_power;
+reflected_power_coeff_1_end = P_diff_1_end/P_in_grid1;
 
 
+% print results
+disp('Results for not in bandgap:');
+disp([ 'Total radiated power = ' num2str(total_rad_power) ]);
+disp([ 'Input power, at grid point 2 = ' num2str(P_in) ]);
+disp([ 'Output power, at grid point end-1 = ' num2str(P_out) ]);
+disp([ 'Difference in power, grid end points - 1 = ' num2str(P_diff) ]);
+disp([ 'Power reflection coeff, grid end points - 1 = ' num2str(reflected_power_coeff) ]);
+disp([ 'Input power, at grid point 1 = ' num2str(P_in_grid1) ]);
+disp([ 'Output power, at grid point end = ' num2str(P_out_gridend) ]);
+disp([ 'Difference in power, grid end points = ' num2str(P_diff_1_end) ]);
+disp([ 'Power reflection coeff, grid end points = ' num2str(reflected_power_coeff_1_end) ]);
 
 
+% re-run simulation but in bandgap
+% make grating coupler object
+new_period                   = 780;
+% best_GC_bandgap              = Q.h_makeGratingCell( Q.convertObjToStruct(), ...
+%                                                     new_period, ...
+%                                                     des_ff*best_GC.domain_size(2)/new_period, ...
+%                                                     des_ff*best_GC.domain_size(2)/new_period, ...
+%                                                     0.0 );
+best_GC_bandgap              = Q.h_makeGratingCell( Q.convertObjToStruct(), ...
+                                                    new_period, ...
+                                                    des_ff, ...
+                                                    des_ff, ...
+                                                    0.0 );
+best_GC_bandgap.numcells     = ncells;        % DEBUG set the number of cells to 1 for comparison
+% run sim
+best_GC_bandgap = best_GC_bandgap.runSimulation( num_modes, BC, pml_options, best_GC.k );
+
+% DEBUG plot field
+best_GC_bandgap.plotEz_w_edges()
 
 
+% calc and plot power vs. x
+best_GC_bandgap = best_GC_bandgap.power_distribution();
 
 
+% calculate energy
+total_rad_power = max(best_GC_bandgap.debug.P_per_y_slice(:)) + abs(min(best_GC_bandgap.debug.P_per_y_slice(:)));
+P_in            = best_GC_bandgap.P_in;
+P_out           = best_GC_bandgap.debug.P_per_x_slice(end);
+P_diff          = P_in - P_out - total_rad_power;
+
+% Assuming that the reflected power is the difference in
+% input/radiated/output power, then we can calc. reflection coeff.
+reflected_power_coeff = P_diff/P_in;
+
+% what if i take the input/output powers at grid points 1/end?
+P_in_grid1      = P_in * exp( 2 * best_GC_bandgap.dx * imag(best_GC_bandgap.k) );            % power at grid 1
+P_out_gridend   = P_out * exp( -2 * best_GC_bandgap.dx * imag(best_GC_bandgap.k) );          % power at grid end
+P_diff_1_end    = P_in_grid1 - P_out_gridend - total_rad_power;
+reflected_power_coeff_1_end = P_diff_1_end/P_in_grid1;
 
 
-
-
+% print results
+disp('');
+disp('Results for in bandgap:');
+disp([ 'Total radiated power = ' num2str(total_rad_power) ]);
+disp([ 'Input power, at grid point 2 = ' num2str(P_in) ]);
+disp([ 'Output power, at grid point end-1 = ' num2str(P_out) ]);
+disp([ 'Difference in power, grid end points - 1 = ' num2str(P_diff) ]);
+disp([ 'Power reflection coeff, grid end points - 1 = ' num2str(reflected_power_coeff) ]);
+disp([ 'Input power, at grid point 1 = ' num2str(P_in_grid1) ]);
+disp([ 'Output power, at grid point end = ' num2str(P_out_gridend) ]);
+disp([ 'Difference in power, grid end points = ' num2str(P_diff_1_end) ]);
+disp([ 'Power reflection coeff, grid end points = ' num2str(reflected_power_coeff_1_end) ]);
 
 
 

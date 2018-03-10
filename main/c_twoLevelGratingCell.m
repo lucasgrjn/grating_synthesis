@@ -97,7 +97,8 @@ classdef c_twoLevelGratingCell
         % debugging
         %   Current fields: k_all, phi_all, unguided_power, guided_power,
         %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down, Sx_in
-        %                   P_rad_up_onecell, P_rad_down_onecell
+        %                   P_rad_up_onecell, P_rad_down_onecell,
+        %                   Sx, Sy, P_per_y_slice, P_per_x_slice
         %   Some of the above fields may have been removed.
         debug;
         
@@ -457,6 +458,9 @@ classdef c_twoLevelGratingCell
 %             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
             x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
             phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
+            % DEBUG
+%             disp( size(phase_all) );
+%             disp( size( repmat( Phi, 1, numcells ) ) );
             E_z             = repmat( Phi, 1, numcells ).*phase_all;
             
             % save E_z
@@ -891,16 +895,9 @@ classdef c_twoLevelGratingCell
             H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 3 ) - E_z( :, 1 ) )/(2*obj.dx);   % dy, term staggered 1
             
             % power in (at left edge)
-%             Sy_in = real( conj(H_x_in(:)) .* E_z( 2:end-1, 2 ) );           % Sy = real( Ez Hx* )
-            Sx_in = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );              % Sx = real( -Ez Hy* )
-%             P_in  = sum( sqrt( Sy_in.^2 + Sx_in.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
-%             % NEW use just Sx
-            P_in = sum( Sx_in(:) )*obj.dy;
+            Sx_in   = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );              % Sx = real( -Ez Hy* )
+            P_in    = sum( Sx_in(:) )*obj.dy;
 
-%             % DEBUG let H_y_in be on half step'
-%             H_y_in_half = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 2 ) - E_z( 2:end-1, 1 ) )/(obj.dx);   % dy, term staggered 1
-%             Sx_in_athalf = real( -1 * conj(H_y_in_half(:)) .* E_z( 2:end-1, 1 ) );                         % Sx = real( -Ez Hy* )
-%             P_in_athalf  = sum( sqrt( Sy_in.^2 + Sx_in_athalf.^2 ) )*obj.dy;              % using both Sx and Sy compmonents
             
             % DEBUG save Sx_in
             obj.debug.Sx_in = Sx_in;
@@ -944,6 +941,14 @@ classdef c_twoLevelGratingCell
         function obj = power_distribution(obj)
             % Mostly for debugging
             % plots x y dependence of power
+            %
+            % also saving poynting vector components Sx and Sy to
+            % obj.debug.Sx and obj.debug.Sy
+            % Sx and Sy have same dimensions as E field - y vs. x
+            % except Sx is only defined from x_coords(2:end-1)
+            % and Sy is only defined from y_coords(2:end-1)
+            % and saving power per slice as:
+            % obj.debug.P_per_y_slice, obj.debug.P_per_x_slice
             
             % define constants
             mu0     = 4*pi*1e-7;                % units of H/m
@@ -955,6 +960,7 @@ classdef c_twoLevelGratingCell
             % grab field
             E_z             = obj.E_z;
             x_coords_all    = 0 : obj.dx : obj.numcells*obj.domain_size(2)-obj.dx;
+            
             
             % Calc and plot propagating power vs. x
             
@@ -979,6 +985,7 @@ classdef c_twoLevelGratingCell
             % Calculate and plot power propagating upwards vs. y
             
             % calculate H_x
+            % dimensions H_x vs. y vs x
             H_x  = 1/(1i*omega0*mu0) .* ( E_z( 3:end,:) - E_z( 1:end-2,:) )/(2*obj.dy);
 
             % power flowing across y
@@ -992,6 +999,11 @@ classdef c_twoLevelGratingCell
             title('Power propagating along y per slice');
             makeFigureNice();
             
+            % DEBUG Save Sx and Sy, power per slice
+            obj.debug.Sx            = Sx;
+            obj.debug.Sy            = Sy;
+            obj.debug.P_per_y_slice = P_per_y_slice;
+            obj.debug.P_per_x_slice = P_per_x_slice;
 %             
 %             % calculate alpha efficiency (in 1/units)
 %             period          = obj.domain_size(2);
