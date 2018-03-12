@@ -6,7 +6,6 @@ clear; close all;
 
 % dependencies
 addpath(['..' filesep 'main']);
-addpath(['..' filesep '45RFSOI']);
 
 % initial settings
 disc        = 10;
@@ -42,8 +41,7 @@ Q = c_synthGrating( 'discretization',   disc,       ...
                     'data_filename',    data_filename, ...
                     'data_notes',       data_notes, ...
                     'data_mode',        'new', ...
-                    'num_par_workers',  n_workers, ...
-                    'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
+                    'num_par_workers',  n_workers ...
                      );
 %                     'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
 
@@ -88,7 +86,7 @@ ffs     = linspace( 0.95, des_ff, 10 );
 num_modes   = 1;
 BC          = 0;                                                                % 0 = PEC
 pml_options = [1, 200, 20, 2]; 
-ncells      = 1;
+ncells      = 10;
 
 tic;
 for ii = 1:length(ffs)
@@ -201,23 +199,10 @@ xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
 set( gca, 'YDir', 'normal' );
 title( 'S_y distribution ()' );
 
-% quiver/vector field plot
-scale = 1.5;
-figure;
-quiver( best_GC.debug.x_coords_all(2:10:end-1), ...
-        best_GC.y_coords(2:10:end-1), ...
-        best_GC.debug.Sx(2:10:end-1, 1:10:end-1), ...
-        best_GC.debug.Sy(1:10:end, 2:10:end-1), ...
-        scale, 'LineWidth', 0.8, 'MaxHeadSize', 0.2 );
-xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
-set( gca, 'YDir', 'normal' );
-title( 'Poynting vector distribution (structure outside bandgap)' );
-
-
 
 % re-run simulation but in bandgap
 % make grating coupler object
-new_period                   = 650;
+new_period                   = 780;
 % best_GC_bandgap              = Q.h_makeGratingCell( Q.convertObjToStruct(), ...
 %                                                     new_period, ...
 %                                                     des_ff*best_GC.domain_size(2)/new_period, ...
@@ -287,16 +272,8 @@ title( 'S_y distribution (structure in bandgap)' );
 
 
 % quiver/vector field plot
-scale = 1.5;
 figure;
-quiver( best_GC_bandgap.debug.x_coords_all(2:10:end-1), ...
-        best_GC_bandgap.y_coords(2:10:end-1), ...
-        best_GC_bandgap.debug.Sx(2:10:end-1, 1:10:end-1), ...
-        best_GC_bandgap.debug.Sy(1:10:end, 2:10:end-1), ...
-        scale, 'LineWidth', 0.8, 'MaxHeadSize', 0.2 );
-xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
-set( gca, 'YDir', 'normal' );
-title( 'Poynting vector distribution (structure in bandgap)' );
+quiver( best_GC_bandgap.debug.x_coords_all, best_GC_bandgap.y_coords(2:end-1), (best_GC_bandgap.debug.Sy) );
 
 
 

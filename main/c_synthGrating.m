@@ -2370,7 +2370,7 @@ classdef c_synthGrating
             % set fill factors and offsets
             fill_tops           = fliplr( 0.0:0.025:1 );
             fill_bots           = fliplr( 0.0:0.025:1 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.05:1.4 );
+            fill_top_bot_ratio  = fliplr( 0.95:0.05:1.4 );
             offsets             = 0:0.04:0.98;
             offsets_orig        = offsets;
             

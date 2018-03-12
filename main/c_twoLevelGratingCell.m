@@ -960,7 +960,7 @@ classdef c_twoLevelGratingCell
             % grab field
             E_z             = obj.E_z;
             x_coords_all    = 0 : obj.dx : obj.numcells*obj.domain_size(2)-obj.dx;
-            
+            obj.debug.x_coords_all = x_coords_all;
             
             % Calc and plot propagating power vs. x
             
@@ -1064,6 +1064,7 @@ classdef c_twoLevelGratingCell
             
             % define x coordinates
             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
+            
             
             % plot the field, real
             figure;
