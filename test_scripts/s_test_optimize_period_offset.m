@@ -90,16 +90,16 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % -------------------------------------------------------------------------
 
 % chosen fills
-fill_top = 1.4 * 0.4;
-fill_bot = 0.4;
+fill_bot = 0.7;
+fill_top = fill_bot * 1;
 
 % period and offset ranges to sweep
 % periods = 650:10:770;                     % good range when fill top = fill bot = 80%
 % periods = 730:10:830;                       % good range when fill top = 0.6, fill bot = 0.8
 % periods = 980:10:1080;                       % good range when fill top = 0.3, fill bot = 0.3
 % periods     = 630:10:670;                       % good range when fills = 95%
-periods     = 860:-10:800;                    
-offsets     = 0.44:0.04:1.44;
+periods     = 760:10:820;                    
+offsets     = 0.72:0.04:1.72;
 % periods     = 1020;
 % offsets = [0.4, 0.5, 0.6, 0.7];
 
@@ -117,7 +117,7 @@ GC_all          = cell( length(periods), length(offsets) );     % GC objects, di
 
 
 % set guessk
-guessk = 8.36e-3 + 1i * 1.17e-4;
+guessk = 0.009449 + 1i * 7.8965e-5;
 
 
 % main loop simulation settings

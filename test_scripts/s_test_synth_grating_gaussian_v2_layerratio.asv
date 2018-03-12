@@ -15,10 +15,10 @@ addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synth
 disc                = 10;
 units               = 'nm';
 lambda              = 1550;
-index_clad          = 1.0;
+index_clad          = 1.44;
 domain              = [2500, 800];      % useful
 optimal_angle       = 15;             % still useful
-coupling_direction  = 'down';
+coupling_direction  = 'do';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
 data_notes          = 'meh';

@@ -40,6 +40,9 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 domain_size     = synth_obj.domain_size;
 domain_size(2)  = period;
 
+% wrap offsets to range 0 to 1
+offset_ratio = mod( offset_ratio, 1 );
+
 % make grating cell
 GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
                             'units', synth_obj.units.name, ...
@@ -63,13 +66,13 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 
 % define layer thicknesses
 t_air       = 500;
-t_SiO2_bot  = 500;
+t_SiO2_bot  = 700;
 t_SiN       = 70;
 t_cSi       = 80;
 t_pSi       = 80;
 
 % draw layers
-GC = GC.addLayer( t_air, domain_size(1)-t_SiO2_bot, n_SiO2 );     % add in SiO2
+GC = GC.addLayer( t_air, domain_size(1)-t_air, n_SiO2 );     % add in SiO2
                         
 % draw cell
 % draw two levels using two level builder function
