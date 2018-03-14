@@ -298,7 +298,7 @@ classdef c_twoLevelGratingCell
         end
         
         
-        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk )
+        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk, OPTS )
             % Runs new mode solver
             %
             % Description:
@@ -324,6 +324,13 @@ classdef c_twoLevelGratingCell
             %       type: scalar, double (can be complex)
             %       desc: guess k value. Works best when closest to desired
             %             mode. In units rad/'units'
+            %   OPTS
+            %       type: struct
+            %       desc: optional options with the following fields
+            %           'fix_neg_k'
+            %               type: bool
+            %               desc: set to false to turn off the auto fixing
+            %               of backwards propagating modes
             %
             % Outputs:
             %   Sets these object properties:
@@ -345,6 +352,11 @@ classdef c_twoLevelGratingCell
             %   calls obj.calc_scattering_strength()
             %
 
+            % default OPTS
+            if nargin < 6
+                OPTS = struct();
+            end
+            
             % spatial variables, in units nm
             nm          = 1e9;
             a           = obj.domain_size(2) * obj.units.scale * nm;
@@ -393,52 +405,57 @@ classdef c_twoLevelGratingCell
             y_top   = obj.wg_max_y;
             y       = obj.y_coords;
             
-            for ii = 1:length(k)
-                % for each mode
-                
-                % check if k is backwards propagating
-                % if it is, then the mode must be resimulated with -k
-                if imag( k(ii) ) < 0
+            % Fix backwards propagating modes
+            if isfield( OPTS, 'fix_neg_k' ) && OPTS.fix_neg_k == true
+            
+                for ii = 1:length(k)
+                    % for each mode
 
-                    fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
-                              'Re-running solver with flipped k\n' ]);
-                    fprintf('Current k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
-
-                    % re-run solver
-                    [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
-                                                               dx, ...
-                                                               k0, ...
-                                                               1, ...
-                                                               -( k(ii) * obj.units.scale * nm ), ...
-                                                               BC, ...
-                                                               pml_options );
-
-                    % re-scale k
-                    k(ii) = k_nm * nm * obj.units.scale;
-                    
-                    % now check, if imag(k) is still < 0, kill the mode
-                    % from consideration, meaning set the field = 0
+                    % check if k is backwards propagating
+                    % if it is, then the mode must be resimulated with -k
                     if imag( k(ii) ) < 0
-                        % set field = 0
-                        fprintf('Mode %i has imag(k) < 0, killing this mode\n', ii );
-                        Phi_all( :, :, ii ) = zeros(size(Phi));
-                    else
-                        % overwrite Phi
-                        fprintf('New k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
-                        Phi_all( :, :, ii ) = Phi;
+
+                        fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+                                  'Re-running solver with flipped k\n' ]);
+                        fprintf('Current k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+
+                        % re-run solver
+                        [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
+                                                                   dx, ...
+                                                                   k0, ...
+                                                                   1, ...
+                                                                   -( k(ii) * obj.units.scale * nm ), ...
+                                                                   BC, ...
+                                                                   pml_options );
+
+                        % re-scale k
+                        k(ii) = k_nm * nm * obj.units.scale;
+
+                        % now check, if imag(k) is still < 0, kill the mode
+                        % from consideration, meaning set the field = 0
+                        if imag( k(ii) ) < 0
+                            % set field = 0
+                            fprintf('Mode %i has imag(k) < 0, killing this mode\n', ii );
+                            Phi_all( :, :, ii ) = zeros(size(Phi));
+                        else
+                            % overwrite Phi
+                            fprintf('New k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+                            Phi_all( :, :, ii ) = Phi;
+                        end
+
                     end
 
-                end
+                    % grab guided portion of field
+                    phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
+                    cur_phi     = Phi_all( :, :, ii );
 
-                % grab guided portion of field
-                phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
-                cur_phi     = Phi_all( :, :, ii );
+                    % sum area of field
+                    guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+                    total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
 
-                % sum area of field
-                guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-                total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
-
-            end
+                end     % end for
+                 
+            end     % end if isfield
             
             % DEBUG storing the guided power
             obj.debug.guided_power          = guided_power;
