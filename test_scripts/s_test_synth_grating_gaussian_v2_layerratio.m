@@ -15,7 +15,7 @@ addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synth
 disc                = 10;
 units               = 'nm';
 lambda              = 1200;
-index_clad          = 1.448; %1.0;
+index_clad          = 1.0; % 1.448; %1.0;
 domain              = [2500, 800];      % useful
 optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
