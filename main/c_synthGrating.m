@@ -146,6 +146,23 @@ classdef c_synthGrating
         fill_bots;
         offsets;
         fill_top_bot_ratio;
+        dir_b4_period_vs_fills;
+        
+        % final synth results
+        dir_synth
+        bot_fill_synth
+        top_bot_fill_ratio_synth
+        period_synth
+        offset_synth
+        angles_synth
+        scatter_str_synth
+        k_synth
+        GC_synth    
+        des_scatter_norm
+        
+        % struct that holds debug field
+        % currently has fields: final_index
+        debug;
 
                             
     end
@@ -2369,9 +2386,9 @@ classdef c_synthGrating
             
             % set fill factors and offsets
             fill_tops           = fliplr( 0.0:0.025:1 );
-            fill_bots           = fliplr( 0.3:0.05:0.95 );
-            fill_top_bot_ratio  = fliplr( 0.95:0.05:1.3 );
-            offsets             = 0:0.02:0.98;
+            fill_bots           = fliplr( 0.36:0.02:0.96 );
+            fill_top_bot_ratio  = 1;        % fliplr( 0.8:0.02:1.3 );
+            offsets             = fliplr(0:0.01:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -2388,6 +2405,7 @@ classdef c_synthGrating
             scatter_str_vs_fills    = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
             k_vs_fills              = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
             GC_vs_fills             = cell( length( fill_bots ), length( fill_top_bot_ratio ) );      % dimensions bot fill vs. top/bot ratio
+            dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
             
             % set solver settings
             num_modes   = 1;
@@ -2474,6 +2492,8 @@ classdef c_synthGrating
                     [ ~, indx_best_offset ]     = max( directivities );
                     best_offset                 = offsets( indx_best_offset );
                     best_offset_k               = k_vs_offset( indx_best_offset );
+                    
+                    dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )      = max( directivities );
 
                     % DEBUG plot grating with best directivity
                     if DEBUG
@@ -2613,6 +2633,7 @@ classdef c_synthGrating
             obj.offsets_vs_fills        = offsets_vs_fills;
             obj.k_vs_fills              = k_vs_fills;
             obj.GC_vs_fills             = GC_vs_fills;
+            obj.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
             
             % DEBUG plot stuff
             if DEBUG == true
@@ -2680,6 +2701,185 @@ classdef c_synthGrating
                 
             end
 
+            
+            % -----------------------------------
+            % Picking which cells to use
+            
+            % let's try normalizing the alphas, because I know that they
+            % aren't on the same order of magnitude right now.
+            alpha_des_norm              = alpha_des./max(alpha_des(:));
+            scatter_str_vs_fills_norm   = scatter_str_vs_fills./max(abs(scatter_str_vs_fills));
+            
+            % starting point
+            start_alpha_des     = 1e-2;
+            [~, indx_x]         = min(abs( alpha_des_norm - start_alpha_des ) );
+            cur_x               = xvec(indx_x);
+            
+            % final synthesized variables
+%             obj.dir_synth                   = zeros(1,n_cells);
+%             obj.bot_fill_synth              = zeros(1,n_cells);
+%             obj.top_bot_fill_ratio_synth    = zeros(1,n_cells);
+%             obj.period_synth                = zeros(1,n_cells);
+%             obj.offset_synth                = zeros(1,n_cells);
+%             obj.angles_synth                = zeros(1,n_cells);
+%             obj.scatter_str_synth           = zeros(1,n_cells);
+%             obj.k_synth                     = zeros(1,n_cells);
+%             obj.GC_synth                    = cell(1,n_cells);
+%             obj.des_scatter_norm            = zeros(1,n_cells);
+
+            obj.dir_synth                   = [];
+            obj.bot_fill_synth              = [];
+            obj.top_bot_fill_ratio_synth    = [];
+            obj.period_synth                = [];
+            obj.offset_synth                = [];
+            obj.angles_synth                = [];
+            obj.scatter_str_synth           = [];
+            obj.k_synth                     = [];
+            obj.GC_synth                    = {};
+            obj.des_scatter_norm            = [];
+ 
+            ii = 1;
+            while cur_x < xvec(end)
+                % build grating one cell at a time
+                % TEMP CURRENTLY ASSUMING 1:1 line
+                
+                % pick design with scattering strength closest to desired
+                % alpha
+                des_scatter                 = alpha_des_norm(indx_x);                                   % desired alpha
+                [~, indx_closest_scatter]   = min( abs(scatter_str_vs_fills_norm - des_scatter) );      % index of closest scatter design         
+                
+                % save parameters
+                obj.dir_synth(ii)                   = directivities_vs_fills( indx_closest_scatter );
+                obj.bot_fill_synth(ii)              = fill_bots( indx_closest_scatter );
+                obj.top_bot_fill_ratio_synth(ii)    = 1;    % TEMP?
+                obj.offset_synth(ii)                = offsets_vs_fills( indx_closest_scatter );
+                obj.period_synth(ii)                = periods_vs_fills( indx_closest_scatter );
+                obj.angles_synth(ii)                = angles_vs_fills( indx_closest_scatter );
+                obj.scatter_str_synth(ii)           = scatter_str_vs_fills( indx_closest_scatter );
+                obj.k_synth(ii)                     = k_vs_fills( indx_closest_scatter );
+                obj.GC_synth{ii}                    = GC_vs_fills{ indx_closest_scatter };
+                obj.des_scatter_norm(ii)            = des_scatter;
+                
+                % move onto next
+                cur_x       = cur_x + obj.period_synth(ii);
+                [~, indx_x] = min( abs(xvec - cur_x) );
+                cur_x       = xvec( indx_x );
+                ii          = ii + 1;
+                
+            end     % end for ii = 1:ncells
+            
+            n_cells = length(obj.dir_synth);
+            
+            % lets stitch together the index distribution
+            % i'm curious to see what it looks like
+            final_index = obj.GC_synth{1}.N;
+            for ii = 2:n_cells
+               
+                final_index = [ final_index, obj.GC_synth{ii}.N ];
+                
+            end
+            
+            % save to obj
+%             obj.debug.final_index = final_index;
+
+             % NOW to verify the design
+            % Run it in EME
+            % Set Up Simulation
+            % note that emeSim uses 'z' as propagation direction and 'x'
+            % as transverse (synthGrating uses 'x' and 'y' respectively)
+            % and units are in um
+            um          = 1e6;
+            disc_eme    = obj.discretization * obj.units.scale * um .* [ 1, 1 ];
+%             dx          = obj.discretization * obj.units.scale * um;                % in um
+%             dz          = 5e-3;                                                     % in um
+            pol         = 0;                                                        % 0 for TE, 1 for TM
+%             z_in        = 1.5;                                                      % length of input section of waveguide
+            xf          = obj.domain_size(1) * obj.units.scale * um;                % in um (transverse domain)
+%             zf          = sum( periods_synth )*obj.units.scale*um + z_in;           % in um
+            zf          = size(final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
+            lambda_um   = obj.lambda * obj.units.scale * um;                        % wl in um
+            eme_obj     = emeSim(   'discretization', disc_eme, ...
+                                'pml', 0.2, ...
+                                'domain', [xf, zf], ...
+                                'backgroundIndex', obj.background_index, ...
+                                'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
+                                'debug', 'no',...                   
+                                'polarization', pol );
+%             diel        = eme_obj.diel;
+            % grab emeSim coordinates
+%             z_coords_eme    = eme_obj.domain.z;
+%             cur_z           = z_coords_eme(1);          % current z coordinate
+            
+%             % draw the input waveguide section
+%             % using the trick that i can write and return the index from
+%             % the two level grating cell
+%             % first override the discretization
+%             obj_as_struct                   = obj.convertObjToStruct();
+%             obj_as_struct.discretization    = [ dx, dz ] / ( um * obj.units.scale );
+%             % now make the grating cell
+%             gratingcell_in  = obj.h_makeGratingCell( obj_as_struct, ...
+%                                                      z_in/(um*obj.units.scale), ...
+%                                                      1.0, ...
+%                                                      0.0, ...
+%                                                      0.0 );
+
+%             % draw to diel
+%             diel( :, z_coords_eme >= cur_z & z_coords_eme < cur_z + z_in ) = gratingcell_in.N;
+%             % update z
+%             cur_z               = cur_z + z_in;
+%             [~, cur_z_indx ]    = min( abs( z_coords_eme - cur_z ) );   % convert to array index
+            
+%             % draw each cell
+%             for ii = 1:n_cells
+%                
+%                 % TRICK - i can use the twoLeveLgratingcell to build the
+%                 % dielectric for the emeSim
+%                 gratingcell = obj.h_makeGratingCell(  obj_as_struct, ...
+%                                                      periods_synth(ii), ...
+%                                                      fills_synth(ii), ...
+%                                                      ratios_synth(ii), ...
+%                                                      offsets_synth(ii) );                                                
+% 
+%                 % draw to diel
+%                 try
+%                     diel( :, cur_z_indx:( cur_z_indx + size(gratingcell.N,2) - 1) ) = gratingcell.N;
+%                 catch ME
+%                     fprintf('ERROR dielectric sizes don''t match ya better debug this bud\n');
+%                     error(ME);
+%                 end
+%                 % update z
+%                 cur_z_indx = cur_z_indx + size(gratingcell.N,2);
+%                 
+%             end
+            
+            % replace the dielectric in the eme object
+            eme_obj.diel = final_index;
+            
+%             % DEBUG plot the diel
+%             eme_obj.plotDiel();
+            
+            % run EME sim
+            % Converts the dielectric distribution into layers for eigen mode expansion
+            eme_obj = eme_obj.convertDiel();   
+            % Runs simulation
+            eme_obj = eme_obj.runSimulation('plotSource','yes');      
+            % compute fiber overlap
+            eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
+                                            'angleVec', -45:1:45,...
+                                            'MFD', MFD * obj.units.scale * um,...
+                                            'overlapDir', obj.coupling_direction, ...
+                                            'nClad', obj.background_index );
+                                        
+            % DEBUG show results
+            gratingUI(eme_obj);
+            
+            % save final results
+            final_design.max_coupling_angle = eme_obj.fiberCoup.optAngle;
+            final_design.max_coupling_offset = eme_obj.fiberCoup.optZOffset;
+            final_design.power_reflection   = eme_obj.scatterProperties.PowerRefl(1,1);
+            final_design.eme_obj            = eme_obj;
+            final_design.final_index        = final_index;
+            obj.final_design                = final_design;
             
         end     % end synthesizeGaussianGrating()
         

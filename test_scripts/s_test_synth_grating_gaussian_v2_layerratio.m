@@ -12,12 +12,12 @@ addpath(['..' filesep '45RFSOI']);                                          % 45
 addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\code\IMEC_2018_02_07_tapeout\' ); 
 
 % initial settings
-disc                = 5;
+disc                = 10;
 units               = 'nm';
-lambda              = 1550;
-index_clad          = 1.0;
+lambda              = 1200;
+index_clad          = 1.448; %1.0;
 domain              = [2500, 800];      % useful
-optimal_angle       = 15;             % still useful
+optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
@@ -67,6 +67,17 @@ xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) vs. fill factors');
 savefig('dir_v_ff.fig');
 saveas(gcf, 'dir_v_ff.png');
+
+% directivity BEFORE sweeping periods vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.dir_b4_period_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
+savefig('dir_b4_period_v_ff.fig');
+saveas(gcf, 'dir_b4_period_v_ff.png');
+
+
 
 % directivity vs. fill, saturated
 dir_v_fill_sat                                  = 10*log10(Q.directivities_vs_fills);
@@ -185,6 +196,110 @@ xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Imag k vs. fill factors');
 savefig('k_imag_v_ff.fig');
 saveas(gcf, 'k_imag_v_ff.png');
+
+
+% offset (jelena's definition) vs. fills
+offset_jelena = Q.offsets_vs_fills + ...
+                repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) - ...
+                repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) .* repmat(Q.fill_top_bot_ratio, length(Q.fill_bots), 1);
+offset_jelena = mod( offset_jelena, 1.0 );
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, offset_jelena );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Offset (jelena''s def) vs. fill factors');
+savefig('offsets_jelena_v_ff.fig');
+saveas(gcf, 'offsets_jelena_v_ff.png');
+
+
+% plot of the final designs
+
+% final synthesized fills
+figure;
+plot( 1:length(Q.bot_fill_synth), Q.bot_fill_synth, '-o' ); hold on;
+plot( 1:length(Q.top_bot_fill_ratio_synth), Q.top_bot_fill_ratio_synth, '-o' );
+xlabel('cell #');
+legend('bottom fill ratio', 'top/bottom fill ratio');
+title('Final synthesized fill factor');
+makeFigureNice();
+savefig('final_fill_ratios.fig');
+saveas(gcf, 'final_fill_ratios.png');
+
+% final synthesized fills
+figure;
+plot( 1:length(Q.bot_fill_synth), Q.bot_fill_synth.*Q.period_synth, '-o' ); hold on;
+plot( 1:length(Q.top_bot_fill_ratio_synth), Q.top_bot_fill_ratio_synth.*Q.bot_fill_synth.*Q.period_synth, '-o' );
+xlabel('cell #');
+legend('bottom fill', 'top fill');
+title('Final synthesized fills (nm)');
+makeFigureNice();
+savefig('final_fills.fig');
+saveas(gcf, 'final_fills.png');
+
+% final synthesized offset
+figure;
+plot( 1:length(Q.offset_synth), Q.offset_synth, '-o' );
+xlabel('cell #');
+legend('offset ratio');
+title('Final synthesized offset ratio');
+makeFigureNice();
+savefig('final_offsets.fig');
+saveas(gcf, 'final_offsets.png');
+
+% final synthesized period
+figure;
+plot( 1:length(Q.period_synth), Q.period_synth, '-o' );
+xlabel('cell #');
+legend(['period, ' units]);
+title('Final synthesized period');
+makeFigureNice();
+savefig('final_periods.fig');
+saveas(gcf, 'final_periods.png');
+
+% final synthesized angles
+figure;
+plot( 1:length(Q.angles_synth), Q.angles_synth, '-o' );
+xlabel('cell #');
+legend('angle, deg');
+title('Final synthesized angles');
+makeFigureNice();
+savefig('final_angles.fig');
+saveas(gcf, 'final_angles.png');
+
+% final synthesized scattering strength
+figure;
+plot( 1:length(Q.scatter_str_synth), Q.scatter_str_synth, '-o' );
+xlabel('cell #');
+legend(['scattering strength (units 1/' units]);
+title('Final synthesized scattering strength');
+makeFigureNice();
+savefig('final_scattering_str.fig');
+saveas(gcf, 'final_scattering_str.png');
+
+% final synthesized scattering strength normalized comparison
+figure;
+plot( 1:length(Q.scatter_str_synth), Q.des_scatter_norm, '-o' ); hold on;
+plot( 1:length(Q.scatter_str_synth), Q.scatter_str_synth./abs(max(Q.scatter_str_synth(:))), '-o' );
+xlabel('cell #');
+legend('desired scatter str', 'normalized scatter str');
+title('Final synthesized scattering strength, normalized comparison');
+makeFigureNice();
+savefig('final_scattering_str_norm.fig');
+saveas(gcf, 'final_scattering_str_norm.png');
+
+% final synthesized directivity
+figure;
+plot( 1:length(Q.dir_synth), 10*log10(Q.dir_synth), '-o' );
+xlabel('cell #');
+legend('Directivity, dB');
+title('Final synthesized directivity');
+makeFigureNice();
+savefig('final_dir.fig');
+saveas(gcf, 'final_dir.png');
+
+
+
+
 
 
 
