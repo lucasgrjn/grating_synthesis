@@ -1179,14 +1179,11 @@ classdef c_twoLevelGratingCell
             %               desc: Which mode to plot
             %                     Mainly for debugging
             %                     Optional, if not set, then the plotted
-            %                     mode is the chosen "most guided" mode
+            %                     mode is the chosen "g
             
             % default to both
             if nargin < 2
-                OPTS = struct( 'plots', 'both' );
-            end
-            if ~isfield( OPTS, 'plots' )
-                OPTS.plots = 'both';
+                OPTS = struct( 'plots', 'both', 'mode_num', 1 );
             end
             
             numcells = obj.numcells;
@@ -1199,24 +1196,10 @@ classdef c_twoLevelGratingCell
             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
             
             
-            if ~isfield( OPTS, 'mode_num' )
-                % Plot the chosen "most guided" mode
-                field_to_plot = E_z;
-            else
-                % plot the selected mode #
-                
-                % stitch together e field, including the phase
-                phi_chosen_mode = obj.debug.phi_all( :, :, OPTS.mode_num );
-                k_chosen_mode   = obj.debug.k_all( OPTS.mode_num );
-                phase_all       = repmat( exp( 1i*k_chosen_mode*x_coords_all ), size(phi_chosen_mode,1), 1 );
-                field_to_plot   = repmat( obj.debug.phi_all(:,:,OPTS.mode_num), 1, obj.numcells ).*phase_all;
-                
-            end
-            
             % plot the field, real
             if strcmp( OPTS.plots, 'real' ) || strcmp( OPTS.plots, 'both' ) 
                 figure;
-                imagesc( x_coords_all, obj.y_coords, real(field_to_plot) ); hold on;
+                imagesc( x_coords_all, obj.y_coords, real(E_z) ); hold on;
                 xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
                 set( gca, 'YDir', 'normal' );
                 title( sprintf('Real E_z, %i periods', numcells) );
@@ -1233,7 +1216,7 @@ classdef c_twoLevelGratingCell
             % plot the field, abs
             if strcmp( OPTS.plots, 'amp' ) || strcmp( OPTS.plots, 'both' ) 
                 figure;
-                imagesc( x_coords_all, obj.y_coords, abs(field_to_plot) ); hold on;
+                imagesc( x_coords_all, obj.y_coords, abs(E_z) ); hold on;
                 xlabel('x'); ylabel('y'); colormap('redbluehilight'); colorbar;
                 set( gca, 'YDir', 'normal' );
                 title( sprintf('Amplitude E_z, %i periods', numcells) );
@@ -1246,9 +1229,7 @@ classdef c_twoLevelGratingCell
                 set( h, 'AlphaData', N_edges );
                 set( gca, 'YDir', 'normal' );
             end
-
-                
-                
+            
         end     % end function plotEz()
    
         

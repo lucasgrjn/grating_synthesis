@@ -15,7 +15,7 @@ addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synth
 disc                = 10;
 units               = 'nm';
 lambda              = 1200;
-index_clad          = 1.0; % 1.448; %1.0;
+index_clad          = 1.448; %1.0;
 domain              = [2500, 800];      % useful
 optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
@@ -76,6 +76,15 @@ xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
 savefig('dir_b4_period_v_ff.fig');
 saveas(gcf, 'dir_b4_period_v_ff.png');
+
+% % TEMP remove sat
+% figure;
+% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(dir_vs_fill_b4_temp) );
+% colorbar; set( gca, 'ydir', 'normal' );
+% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+% title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
+% savefig('dir_b4_period_TEMP_v_ff.fig');
+% saveas(gcf, 'dir_b4_period_TEMP_v_ff.png');
 
 
 
