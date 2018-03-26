@@ -82,6 +82,8 @@ classdef c_twoLevelGratingCell
         Phi;            % field envelope
         numcells;       % number of cells repeated in E_z
         E_z             % saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
+        k_vs_mode;      % k vs mode #
+        Phi_vs_mode;    % Phi vs mode #, dimensions y vs. x vs mode #
         
         % radiation parameters
         directivity;        % ratio of power radiated up/power radiated down
@@ -241,8 +243,6 @@ classdef c_twoLevelGratingCell
         function obj = twoLevelBuilder( obj, wgs_min_y, wgs_thick, wgs_indx, ...
                                              wgs_duty_cycles, wgs_offsets )
             % Draws the two level waveguide grating
-            % TODO: add option to include passivation layer (SiN)
-            % sometime...
             % 
             % Inputs:
             %   wg_min_y
@@ -262,6 +262,11 @@ classdef c_twoLevelGratingCell
             %       type: double, array
             %       desc: 1x2 array, offset of each grating tooth from the
             %             left edge of the unit cell
+            %
+            % Sets these properties:
+            %   obj.wg_min_y
+            %   obj.wg_max_y
+            
             
             % grab period
             a = obj.domain_size(2);
@@ -387,8 +392,8 @@ classdef c_twoLevelGratingCell
             
             % DEBUG store temporary copies of k and phi_all b4 removing and
             % sorting
-            obj.debug.k_all     = k;
-            obj.debug.phi_all   = Phi_all;
+            obj.debug.k_all_before_fix_backwards     = k;
+            obj.debug.phi_all_before_fix_backwards   = Phi_all;
 
             
             % sort on guided power
@@ -405,11 +410,14 @@ classdef c_twoLevelGratingCell
             y_top   = obj.wg_max_y;
             y       = obj.y_coords;
             
-            % Fix backwards propagating modes
-            if isfield( OPTS, 'fix_neg_k' ) && OPTS.fix_neg_k == true
             
-                for ii = 1:length(k)
-                    % for each mode
+            % Calculated guided power and fix backwards modes if option is
+            % selected
+            for ii = 1:length(k)
+                % for each mode
+
+                % Fix backwards propagating modes
+                if isfield( OPTS, 'fix_neg_k' ) && OPTS.fix_neg_k == true
 
                     % check if k is backwards propagating
                     % if it is, then the mode must be resimulated with -k
@@ -443,19 +451,24 @@ classdef c_twoLevelGratingCell
                             Phi_all( :, :, ii ) = Phi;
                         end
 
-                    end
+                    end     % end if imag( k(ii) ) < 0
 
-                    % grab guided portion of field
-                    phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
-                    cur_phi     = Phi_all( :, :, ii );
+                end     % end if isfield
+                    
+                % grab guided portion of field
+                phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
+                cur_phi     = Phi_all( :, :, ii );
 
-                    % sum area of field
-                    guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-                    total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
+                % sum area of field
+                guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+                total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
 
-                end     % end for
-                 
-            end     % end if isfield
+            end     % end for
+  
+            
+            % save k and phi vs mode #
+            obj.k_vs_mode   = k;
+            obj.Phi_vs_mode = Phi_all;
             
             % DEBUG storing the guided power
             obj.debug.guided_power          = guided_power;
@@ -496,15 +509,13 @@ classdef c_twoLevelGratingCell
             obj = obj.calc_output_angle( y_up, y_down );
             
             % calculate up/down directivity
-            obj             = obj.calc_radiated_power( y_up, y_down );
+            obj             = obj.calc_radiated_power();
             obj.directivity = obj.P_rad_up/obj.P_rad_down;
             
             
             
             % calculate power scattering strength
             obj                       = obj.calc_scattering_strength();
-%             obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
-%             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
             
             
         end     % end function runSimulation()
@@ -668,7 +679,7 @@ classdef c_twoLevelGratingCell
 %         end     % end function runSimulation_old()
         
         
-        function obj = calc_radiated_power(obj, y_up, y_down)
+        function obj = calc_radiated_power(obj)
             % Calculates the radiated power in both the upwards and
             % downwards directions
             % Only run AFTER mode solver has been run, since this function
@@ -677,6 +688,7 @@ classdef c_twoLevelGratingCell
             % Inputs:
             %   y_up    - location of top slice of E field to take
             %   y_down  - location of bot slice of E field to take
+            %       y_up and y_down are deprecated.
             %
             % Uses these object properties:
             %   E_z
@@ -686,77 +698,65 @@ classdef c_twoLevelGratingCell
             %   P_rad_down      - saves power radiated down
             %   P_rad_up        - saves power radiated up
             
-            % define constants
-            mu0     = 4*pi*1e-7;                % units of H/m
-            mu0     = mu0 * obj.units.scale;    % units of H/(units)
-            c       = 3e8;                      % units of m/s
-            c       = c/obj.units.scale;        % units of (units)/s
-            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+%             % define constants
+%             mu0     = 4*pi*1e-7;                % units of H/m
+%             mu0     = mu0 * obj.units.scale;    % units of H/(units)
+%             c       = 3e8;                      % units of m/s
+%             c       = c/obj.units.scale;        % units of (units)/s
+%             omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+%             
+%            
+%             % Stich field and phase together
+%             phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
+%             Ez_onecell      = obj.Phi .* phase_onecell;
+%            
+%             
+%             % Calc propagating power vs. x
+%             
+%             % H y in , on second to end-1 steps, using entire E_z
+%             % dimensions are y (transverse) vs. x
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+%             
+%             % poynting vector in, dimensions are y vs x(2:end-1)
+%             Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+% 
+%             % power per x slice
+%             P_per_x_slice = sum( Sx, 1 )*obj.dy;
+%             
+%             % save to obj
+%             obj.Sx              = Sx;
+%             obj.P_per_x_slice 	= P_per_x_slice;
+%             
+% 
+%             % Calculate power radiated up
+%             
+%             
+%             % Calculate and plot power propagating upwards vs. y
+%             
+%             % calculate H_x
+%             % dimensions H_x vs. y vs x
+%             H_x  = 1/(1i*omega0*mu0) .* ( Ez_onecell( 3:end,:) - Ez_onecell( 1:end-2,:) )/(2*obj.dy);
+% 
+%             % power flowing across y
+%             Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
+%             P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
             
-           
-            % Stich field and phase together
-            phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
-            Ez_onecell      = obj.Phi .* phase_onecell;
-           
-            
-            % Calc propagating power vs. x
-            
-            % H y in , on second to end-1 steps, using entire E_z
-            % dimensions are y (transverse) vs. x
-            H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
-            
-            % poynting vector in, dimensions are y vs x(2:end-1)
-            Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
-
-            % power per x slice
-            P_per_x_slice = sum( Sx, 1 )*obj.dy;
-            
-            % save to obj
-            obj.Sx              = Sx;
-            obj.P_per_x_slice 	= P_per_x_slice;
-            
-
-            % Calculate power radiated up
+            % calculate power distributions for the chosen mode
+            [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = obj.calc_power_distribution_onecell();
             
             
-            % Calculate and plot power propagating upwards vs. y
-            
-            % calculate H_x
-            % dimensions H_x vs. y vs x
-            H_x  = 1/(1i*omega0*mu0) .* ( Ez_onecell( 3:end,:) - Ez_onecell( 1:end-2,:) )/(2*obj.dy);
-
-            % power flowing across y
-            Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
-            P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
             [~, indx_max_up]    = max( P_per_y_slice );
             [~, indx_max_down]  = min( P_per_y_slice );
             Sy_up               = Sy( indx_max_up, : );                                 % dimensions Sy vs. x
             Sy_down             = Sy( indx_max_down, : );
             
             % save to obj
+            obj.Sx              = Sx;
+            obj.P_per_x_slice 	= P_per_x_slice;
             obj.Sy              = Sy;
             obj.P_per_y_slice   = P_per_y_slice;
             
-            
-%             % calculate H_x
-%             H_x_up_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_up-1,:) - Ez_onecell(y_up+1,:) )/(2*obj.dy);
-% 
-%             % power radiated up
-%             Sy_up_onecell       = real( conj( H_x_up_onecell ) .* Ez_onecell(y_up,:) );                          % Sy = real( Ez Hx* )
-%             % old ver. 
-% %             P_rad_up            = sum( abs(Sy_up_onecell) )*obj.dx;                                          % using Sy compmonent
-%             
-%             % calculate power radiated down
-%             
-%             % calculate H_x
-%             H_x_down_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_down-1,:) - Ez_onecell(y_down+1,:) )/(2*obj.dy);
-% 
-%             % power radiated down
-%             Sy_down_onecell     = real( H_x_down_onecell(:) .* Ez_onecell(y_down,:) );             % Sy = real( Ez Hx* )
-%             % old ver.
-% %             P_rad_down          = sum( abs(Sy_down_onecell) )*obj.dx;                               % Only using Sy component
-            
-            
+        
 %             % new version, take the flux including both Sx and Sy
 %             % components
 %             P_rad_up    = sum( sqrt( abs( Sy_up(2:end-1) ).^2 + abs( Sx(y_up,:) ).^2 ) ) * obj.dx;
@@ -772,75 +772,8 @@ classdef c_twoLevelGratingCell
             
             
             % DEBUG calculate angle from Sx and Sy
-            obj.debug.tan_sx_sy_up = (180/pi) * atan( Sx(y_up,:)./ Sy_up(2:end-1) );
-            
-            
-%             obj.debug.P_rad_up_onecell      = P_rad_up_onecell;
-%             obj.debug.P_rad_down_onecell    = P_rad_down_onecell;
-            
-            
-%             % OLD version that used multiiple cells
-%              % grab k and E_z
-%             E_z = obj.E_z;
-%             k   = obj.k; 
-%             
-%             % Calculate power radiated up
-%             
-%             % calculate H_x
-%             H_x_up  = 1/(1i*omega0*mu0) .* ( E_z(y_up-1,:) - E_z(y_up+1,:) )/(2*obj.dy);
-% 
-%             % power radiated up
-%             Sy_up = real( H_x_up(:)' .* E_z(y_up,:) );                          % Sy = real( Ez Hx* )
-%             P_rad_up      = sum( abs(Sy_up) )*obj.dx;                           % using Sy compmonent
-% 
-% 
-%             % calculate power radiated down
-%             
-%             % calculate H_x
-%             H_x_down  = 1/(1i*omega0*mu0) .* ( E_z(y_down-1,:) - E_z(y_down+1,:) )/(2*obj.dy);
-% 
-%             % power radiated down
-%             Sy_down = real( H_x_down(:)' .* E_z(y_down,:) );                % Sy = real( Ez Hx* )
-%             P_rad_down    = sum( abs(Sy_down) )*obj.dx;                     % Only using Sy component
-% 
-%             % save power radiated up and down
-%             obj.P_rad_down    = P_rad_down;
-%             obj.P_rad_up      = P_rad_up;
-%             
-%             % DEBUG save Sx and Sy
-%             obj.debug.Sy_up     = Sy_up;
-%             obj.debug.Sy_down   = Sy_down;
-%             
-%             
-%             % DEBUG
-%             % Comparing radiated power of ncells with 1 cell
-%             % stitch together e field, including the phase
-%             phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
-%             Ez_onecell      = obj.Phi .* phase_onecell;
-%             
-%             % Calculate power radiated up
-%             
-%             % calculate H_x
-%             H_x_up_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_up-1,:) - Ez_onecell(y_up+1,:) )/(2*obj.dy);
-% 
-%             % power radiated up
-%             Sy_up_onecell       = real( H_x_up_onecell(:)' .* Ez_onecell(y_up,:) );                          % Sy = real( Ez Hx* )
-%             P_rad_up_onecell    = sum( abs(Sy_up_onecell) )*obj.dx;                                          % using Sy compmonent
-%             
-%             % calculate power radiated down
-%             
-%             % calculate H_x
-%             H_x_down_onecell  = 1/(1i*omega0*mu0) .* ( Ez_onecell(y_down-1,:) - Ez_onecell(y_down+1,:) )/(2*obj.dy);
-% 
-%             % power radiated down
-%             Sy_down             = real( H_x_down_onecell(:)' .* Ez_onecell(y_down,:) );             % Sy = real( Ez Hx* )
-%             P_rad_down_onecell  = sum( abs(Sy_down) )*obj.dx;                                       % Only using Sy component
-%             
-%             
-%             % save to object
-%             obj.debug.P_rad_up_onecell      = P_rad_up_onecell;
-%             obj.debug.P_rad_down_onecell    = P_rad_down_onecell;
-%             
+% %             obj.debug.tan_sx_sy_up = (180/pi) * atan( Sx(y_up,:)./ Sy_up(2:end-1) );
+        
             
         end     % end function calc_radiated_power()
         
@@ -1015,7 +948,7 @@ classdef c_twoLevelGratingCell
         end     % end function calc_scattering_strength()
         
         
-        function obj = power_distribution(obj)
+        function obj = calc_power_distribution(obj)
             % Mostly for debugging
             % plots x y dependence of power
             %
@@ -1081,38 +1014,98 @@ classdef c_twoLevelGratingCell
             obj.debug.Sy            = Sy;
             obj.debug.P_per_y_slice = P_per_y_slice;
             obj.debug.P_per_x_slice = P_per_x_slice;
-%             
-%             % calculate alpha efficiency (in 1/units)
-%             period          = obj.domain_size(2);
-%             obj.alpha_up    = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/P_in );
-%             obj.alpha_down  = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_down/P_in );
-
-
-            % DEBUG calculate efficiency from one cell
             
-                     
-%             % DEBUG let's calculate, numerically, the loss coefficient from
-%             % input to output and compare with imag(k)
-%             % H x out, at grid point end-1
-%             H_x_out1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, end-1 ) - E_z( 1:2:end-2, end-1 ) )/(2*obj.dy);   % dy, term staggered 1
-%             H_x_out2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, end-1 ) - E_z( 2:2:end-2, end-1 ) )/(2*obj.dy);   % dy, term staggered 2
-%             % interleave two arrays
-%             H_x_out                                 = zeros( size( [H_x_out1, H_x_out2] ) );
-%             H_x_out( ( 1:length(H_x_out1) )*2 - 1)  = H_x_out1;
-%             H_x_out( ( 1:length(H_x_out2) )*2 )     = H_x_out2;
-%             
-%             % H y out (on the same grid as Hx out)
-%             H_y_out = (1i/(omega0*mu0)) * ( E_z( 2:end-1, end ) - E_z( 2:end-1, end-2 ) )/(2*obj.dx);   % dy, term staggered 1
-%             
-%             % power in (at left edge)
-%             Sy_out = real( conj(H_x_out(:)) .* E_z( 2:end-1, end-1 ) );         % Sy = real( Ez Hx* )
-%             Sx_out = real( -1 * conj(H_y_out(:)) .* E_z( 2:end-1, end-1 ) );    % Sx = real( -Ez Hy* )
-%             P_out  = sum( sqrt( Sy_out.^2 + Sx_out.^2 ) )*obj.dy;                 % using both Sx and Sy compmonents
-%             
-%             % numerical calculation of loss coeff
-%             alpha_tot = ( -1/( 2*obj.numcells*period ) ) * log( P_out/P_in );
+        end     % end function calc_power_distribution()
+        
+        
+        function [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = ...
+                        calc_power_distribution_onecell(obj, mode_num)
+            % Calculates Sx and Sy, power distribution for a single unit
+            % cell
+            %
+            % Pre-requisite for running calc_radiated_power
+            %
+            % inputs:
+            %   mode_num
+            %       type: scalar, int
+            %       desc: OPTIONAL, mode number to calc Sx and Sy for
+            %
+            % outputs:
+            %   Sx
+            %       type: matrix, double
+            %       desc: x component (in dir. of waveguide prop) of poynting vector
+            %             dimensions y vs. x(2:end-1)
+            %   Sy
+            %       type: matrix, double
+            %       desc: y component (transverse dir, pos = up) of poynting vector
+            %             dimensions y(2:end-1) vs. x
+            %   P_per_x_slice
+            %       type: vector, double
+            %       desc: integral of Sx aka power propagating through each
+            %             x slice of the domain
+            %             dimensions power vs. x(2:end-1)
+            %   P_per_y_slice
+            %       type: vector, double
+            %       desc: integral of Sy aka power propagating through each
+            %             y slice of the domain
+            %             dimensions power vs. y(2:end-1)
             
-        end     % end function calc_scattering_strength()
+            if nargin < 2
+                choose_mode = false;
+            else
+                choose_mode = true;
+            end
+            
+            % define constants
+            mu0     = 4*pi*1e-7;                % units of H/m
+            mu0     = mu0 * obj.units.scale;    % units of H/(units)
+            c       = 3e8;                      % units of m/s
+            c       = c/obj.units.scale;        % units of (units)/s
+            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+            
+            % Choose field to use
+            if ~choose_mode
+                % use the chosen "most guided" mode
+
+                % Stich field and phase together
+                phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
+                Ez_onecell      = obj.Phi .* phase_onecell;
+            else
+                % choose which mode to use
+                
+                k_chosen    = obj.k_vs_mode( mode_num );
+                phi_chosen  = obj.Phi_vs_mode( mode_num );
+                % Stich field and phase together
+                phase_onecell   = repmat( exp( 1i * k_chosen * obj.x_coords ), size( phi_chosen, 1 ), 1 );
+                Ez_onecell      = phi_chosen .* phase_onecell;
+                
+            end
+       
+            % Calc propagating power vs. x
+            
+            % H y in , on second to end-1 steps, using entire E_z
+            % dimensions are y (transverse) vs. x
+            H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+            
+            % poynting vector in, dimensions are y vs x(2:end-1)
+            Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+
+            % power per x slice
+            P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*omega0*mu0) .* ( Ez_onecell( 3:end,:) - Ez_onecell( 1:end-2,:) )/(2*obj.dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
+            P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
+
+            
+        end     % end function calc_power_distribution_onecell()
         
         
         
@@ -1206,10 +1199,10 @@ classdef c_twoLevelGratingCell
                 % plot the selected mode #
                 
                 % stitch together e field, including the phase
-                phi_chosen_mode = obj.debug.phi_all( :, :, OPTS.mode_num );
-                k_chosen_mode   = obj.debug.k_all( OPTS.mode_num );
+                phi_chosen_mode = obj.Phi_vs_mode( :, :, OPTS.mode_num );
+                k_chosen_mode   = obj.k_vs_mode( OPTS.mode_num );
                 phase_all       = repmat( exp( 1i*k_chosen_mode*x_coords_all ), size(phi_chosen_mode,1), 1 );
-                field_to_plot   = repmat( obj.debug.phi_all(:,:,OPTS.mode_num), 1, obj.numcells ).*phase_all;
+                field_to_plot   = repmat( obj.Phi_vs_mode(:,:,OPTS.mode_num), 1, obj.numcells ).*phase_all;
                 
             end
             
