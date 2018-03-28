@@ -370,7 +370,7 @@ classdef c_twoLevelGratingCell
             guessk_nm   = guessk / ( obj.units.scale * nm );            % units rad/nm
 
             % store options
-            obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
+            obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options, 'OPTS', OPTS );
 
             % set guessk if not entered
             if nargin < 5
