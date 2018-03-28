@@ -2645,10 +2645,10 @@ classdef c_synthGrating
             % set fill factors and offsets
 %             fill_bots           = fliplr( 0.4:0.05:0.95 );
 %             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.25 );
-            fill_bots           = fliplr( 0.4:0.025:1.0 );
+            fill_bots           = [ 0.98, 0.9 ]; %fliplr( 0.4:0.025:1.0 );
             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.01:0.99);
+            offsets             = fliplr(0:0.1:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -3476,40 +3476,12 @@ classdef c_synthGrating
             % save final results
             final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
             final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
-            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
             final_design.eme_obj                = eme_obj;
             final_design.final_index            = obj.final_index;
             obj.final_design                    = final_design;
             
         end     % end runFinalDesignEME()
-        
-        
-        function obj = runFinalDesignEME_fiber_overlap(obj, MFD)
-            % mostly for debugging purposes
-            % only runs the fiber oveerlap and not the EME simulation
-            % because its faster lol
-            
-            eme_obj = obj.final_design.eme_obj;
-            
-            % compute fiber overlap
-            um      = 1e6;
-            eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
-                                            'angleVec', 0:0.5:45,...
-                                            'MFD', MFD * obj.units.scale * um,...
-                                            'overlapDir', obj.coupling_direction, ...
-                                            'nClad', obj.background_index );
-                                        
-            % save final results
-            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
-            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
-            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
-            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-            final_design.eme_obj                = eme_obj;
-            final_design.final_index            = obj.final_index;
-            obj.final_design                    = final_design;
-            
-        end
         
         
         function obj  = sweepPeriodFill(obj)
