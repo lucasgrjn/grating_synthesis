@@ -309,92 +309,92 @@ saveas(gcf, 'final_dir.png');
 % buncha extra test cases
 % -------------------------------------------------------------------------
 
-% TESTING max eff. vs. MFD
-MFDs            = 5000:500:15000;
-max_eff_vs_MFD  = zeros(size(MFDs));
-
-tic;
-for ii = 1:length(MFDs)
-    
-    fprintf('mfd iteration %i of %i\n', ii, length(MFDs) );
-    
-    % run EME sim
-    Q = Q.runFinalDesignEME_fiber_overlap( MFDs(ii) );
-    % save result
-    max_eff_vs_MFD(ii) = Q.final_design.max_coupling_eff;
-    
-    toc;
-    
-end
-
-% plot result
-figure;
-plot( MFDs, max_eff_vs_MFD, '-o' );
-xlabel(['MFD (' units ')']); ylabel('Max eff.');
-title('Max coupling eff. vs. MFD');
-makeFigureNice();
-
-
-% TESTING eff. vs. angle at BEST MFD
-[~, indx_best_mfd]  = max( max_eff_vs_MFD );
-best_MFD            = MFDs( indx_best_mfd );
-eme_obj_temp        = Q.final_design.eme_obj;
-angle_vec           = 15:0.1:25;
-eme_obj_temp.fiberCoup.coup = zeros( 1, length(angle_vec) );                % annoying but I have to re-size this
-% compute fiber overlap
-um              = 1e6;
-eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', Q.final_design.eme_obj.fiberCoup.optZOffset,...
-                                'angleVec', angle_vec,...
-                                'MFD', best_MFD * Q.units.scale * um,...
-                                'overlapDir', Q.coupling_direction, ...
-                                'nClad', Q.background_index );
-
-% plot eff vs angle
-figure;
-plot( eme_obj_temp.fiberCoup.angleVec, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
-xlabel('Angle'); ylabel('Coupling eff');
-title(['Coupling eff. (dB) vs. angle for MFD = ' num2str(best_MFD) ' ' units ]);
-makeFigureNice();
-
-
-% TESTING eff. vs. angle at DESIRED/SYNTHESIZED MFD
-eme_obj_temp        = Q.final_design.eme_obj;
-angle_vec           = 15:0.1:25;
-eme_obj_temp.fiberCoup.coup = zeros( 1, length(angle_vec) );                % annoying but I have to re-size this
-% compute fiber overlap
-um              = 1e6;
-eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', Q.final_design.eme_obj.fiberCoup.optZOffset,...
-                                'angleVec', angle_vec,...
-                                'MFD', MFD * Q.units.scale * um,...
-                                'overlapDir', Q.coupling_direction, ...
-                                'nClad', Q.background_index );
-
-% plot eff vs angle
-figure;
-plot( eme_obj_temp.fiberCoup.angleVec, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
-xlabel('Angle'); ylabel('Coupling eff');
-title(['Coupling eff. (dB) vs. angle for MFD = ' num2str(MFD) ' ' units ]);
-makeFigureNice();
-
-
-% TESTING eff. vs. offset at BEST MFD
-eme_obj_temp        = Q.final_design.eme_obj;
-offset_vec          = 0:0.1:12;
-eme_obj_temp.fiberCoup.coup = zeros( length(offset_vec), 1 );                % annoying but I have to re-size this
-% compute fiber overlap
-um              = 1e6;
-eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', offset_vec,...
-                                'angleVec', Q.optimal_angle,...
-                                'MFD', best_MFD * Q.units.scale * um,...
-                                'overlapDir', Q.coupling_direction, ...
-                                'nClad', Q.background_index );
-
-% plot eff vs angle
-figure;
-plot( eme_obj_temp.fiberCoup.zOffset, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
-xlabel('Offset (um)'); ylabel('Coupling eff');
-title(['Coupling eff. (dB) vs. offset for MFD = ' num2str(best_MFD) ' ' units ]);
-makeFigureNice();
+% % TESTING max eff. vs. MFD
+% MFDs            = 5000:500:15000;
+% max_eff_vs_MFD  = zeros(size(MFDs));
+% 
+% tic;
+% for ii = 1:length(MFDs)
+%     
+%     fprintf('mfd iteration %i of %i\n', ii, length(MFDs) );
+%     
+%     % run EME sim
+%     Q = Q.runFinalDesignEME_fiber_overlap( MFDs(ii) );
+%     % save result
+%     max_eff_vs_MFD(ii) = Q.final_design.max_coupling_eff;
+%     
+%     toc;
+%     
+% end
+% 
+% % plot result
+% figure;
+% plot( MFDs, max_eff_vs_MFD, '-o' );
+% xlabel(['MFD (' units ')']); ylabel('Max eff.');
+% title('Max coupling eff. vs. MFD');
+% makeFigureNice();
+% 
+% 
+% % TESTING eff. vs. angle at BEST MFD
+% [~, indx_best_mfd]  = max( max_eff_vs_MFD );
+% best_MFD            = MFDs( indx_best_mfd );
+% eme_obj_temp        = Q.final_design.eme_obj;
+% angle_vec           = 15:0.1:25;
+% eme_obj_temp.fiberCoup.coup = zeros( 1, length(angle_vec) );                % annoying but I have to re-size this
+% % compute fiber overlap
+% um              = 1e6;
+% eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', Q.final_design.eme_obj.fiberCoup.optZOffset,...
+%                                 'angleVec', angle_vec,...
+%                                 'MFD', best_MFD * Q.units.scale * um,...
+%                                 'overlapDir', Q.coupling_direction, ...
+%                                 'nClad', Q.background_index );
+% 
+% % plot eff vs angle
+% figure;
+% plot( eme_obj_temp.fiberCoup.angleVec, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
+% xlabel('Angle'); ylabel('Coupling eff');
+% title(['Coupling eff. (dB) vs. angle for MFD = ' num2str(best_MFD) ' ' units ]);
+% makeFigureNice();
+% 
+% 
+% % TESTING eff. vs. angle at DESIRED/SYNTHESIZED MFD
+% eme_obj_temp        = Q.final_design.eme_obj;
+% angle_vec           = 15:0.1:25;
+% eme_obj_temp.fiberCoup.coup = zeros( 1, length(angle_vec) );                % annoying but I have to re-size this
+% % compute fiber overlap
+% um              = 1e6;
+% eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', Q.final_design.eme_obj.fiberCoup.optZOffset,...
+%                                 'angleVec', angle_vec,...
+%                                 'MFD', MFD * Q.units.scale * um,...
+%                                 'overlapDir', Q.coupling_direction, ...
+%                                 'nClad', Q.background_index );
+% 
+% % plot eff vs angle
+% figure;
+% plot( eme_obj_temp.fiberCoup.angleVec, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
+% xlabel('Angle'); ylabel('Coupling eff');
+% title(['Coupling eff. (dB) vs. angle for MFD = ' num2str(MFD) ' ' units ]);
+% makeFigureNice();
+% 
+% 
+% % TESTING eff. vs. offset at BEST MFD
+% eme_obj_temp        = Q.final_design.eme_obj;
+% offset_vec          = 0:0.1:12;
+% eme_obj_temp.fiberCoup.coup = zeros( length(offset_vec), 1 );                % annoying but I have to re-size this
+% % compute fiber overlap
+% um              = 1e6;
+% eme_obj_temp    = eme_obj_temp.fiberOverlap( 'zOffset', offset_vec,...
+%                                 'angleVec', Q.optimal_angle,...
+%                                 'MFD', best_MFD * Q.units.scale * um,...
+%                                 'overlapDir', Q.coupling_direction, ...
+%                                 'nClad', Q.background_index );
+% 
+% % plot eff vs angle
+% figure;
+% plot( eme_obj_temp.fiberCoup.zOffset, 10*log10(eme_obj_temp.fiberCoup.coup), '-o' );
+% xlabel('Offset (um)'); ylabel('Coupling eff');
+% title(['Coupling eff. (dB) vs. offset for MFD = ' num2str(best_MFD) ' ' units ]);
+% makeFigureNice();
 
 
 

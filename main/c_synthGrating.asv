@@ -2643,12 +2643,13 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-%             fill_bots           = fliplr( 0.4:0.05:0.95 );
-%             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.25 );
-            fill_bots           = [ 0.98, 0.9 ]; %fliplr( 0.4:0.025:1.0 );
-            fill_top_bot_ratio  = 1;
+            fill_bots           = fliplr( 0.4:0.05:0.95 );
+            fill_top_bot_ratio  = fliplr( 0.9:0.05:1.25 );
+            % on normal 1:1 line
+%             fill_bots           = fliplr( 0.4:0.025:1.0 );
+%             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.1:0.99);
+            offsets             = fliplr(0:0.01:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -2690,6 +2691,20 @@ classdef c_synthGrating
             tic;
             ii = 0;
             
+            
+            % start a parallel pool session
+            my_cluster = parcluster('local');                       % cores on compute node are "local"
+            if getenv('ENVIRONMENT')                                % true if this is a batch job
+                my_cluster.JobStorageLocation = getenv('TMPDIR');    % points to TMPDIR
+            end
+
+            poolobj = gcp('nocreate'); % If no pool, do not create new one.
+            if ~isempty(poolobj)
+                % shut down previously made parallel pool
+                delete(gcp('nocreate'));
+            end
+            parpool(my_cluster, my_cluster.NumWorkers);
+            
             % sweep normal
             
             % make grating cell, normal
@@ -2728,17 +2743,134 @@ classdef c_synthGrating
             
             % now run the sweep
             
+            % first fill in the right side of the domain
+            for i_ff_bot = 1:length( fill_bots )
+               
+                % print iteration
+                fprintf('Right side of domain, iteration %i of %i\n', ii, length(fill_bots) );
+                
+                % init saving variables
+                directivities = zeros( size(offsets) );
+                k_vs_offset   = zeros( size(offsets) );
+                angles        = zeros( size(offsets) );     % for debugging
+                
+                % Sweep offsets, pick offset with best directivity
+                fprintf('Sweeping offsets...\n');
+                for i_offset = 1:length( offsets )
+
+                    fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
+
+                    % make grating cell
+                    fill_top = fill_top_bot_ratio_norm(1) * fill_bots(i_ff_bot);
+                    GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                guess_period, ...
+                                                fill_top, ...
+                                                fill_bots(i_ff_bot), ...
+                                                offsets(i_offset) );
+
+                    % run sim
+                    GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+
+                    % save directivity
+                    if strcmp( obj.coupling_direction, 'up' )
+                        % coupling direction is upwards
+                        directivities( i_offset )   = GC.directivity;
+                        angles( i_offset )          = GC.max_angle_up;
+                    else
+                        % coupling direction is downwards
+                        directivities( i_offset )   = 1./( GC.directivity );
+                        angles( i_offset )          = GC.max_angle_down;
+                    end
+
+                    % update the guessk (units rad/'units')
+                    guessk                  = GC.k;
+                    k_vs_offset( i_offset ) = GC.k;
+
+                    toc;
+
+                end     % end for i_offset = ...
+                fprintf('...done.\n');
+                
+                % pick best offset
+                [ ~, indx_best_offset ]     = max( directivities );
+                best_offset                 = offsets( indx_best_offset );
+                best_offset_k               = k_vs_offset( indx_best_offset );
+                best_offset_angle           = angles( indx_best_offset );
+
+                dir_b4_period_vs_fills_norm( i_ff_bot, 1 )      = max( directivities );
+                
+                % now sweep periods
+                % decide whether to sweep larger or smaller periods
+                % based on the angle
+                if best_offset_angle > obj.optimal_angle
+                    % only sweep smaller periods
+                    decrease_periods = true;
+                else
+                    % only sweep larger periods
+                    decrease_periods = false;
+                end
+
+                % init saving variables
+                angles          = zeros( size(periods) );
+                k_vs_period     = zeros( size(periods) );
+                GC_vs_period    = cell( size(periods) );
+
+                % sweep periods
+                guessk = best_offset_k;
+                fprintf('Sweeping periods...\n');
+                for i_period = 1:length(periods)
+
+                    fprintf('Iteration %i of %i\n', i_period, length(periods) );
+
+                    % make grating cell
+                    fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
+                    GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                periods(i_period), ...
+                                                fill_top, ...
+                                                fill_bots(i_ff_bot), ...
+                                                best_offset );
+
+                    % run sim
+                    GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
+
+                    % save angle
+                    if strcmp( obj.coupling_direction, 'up' )
+                        % coupling direction is upwards
+                        angles( i_period ) = GC.max_angle_up;
+                    else
+                        % coupling direction is downwards
+                        angles( i_period ) = GC.max_angle_down;
+                    end
+
+                    % update GC list
+                    GC_vs_period{i_period} = GC;
+
+                    % update k (units of rad/'units')
+                    k_vs_period(i_period)   = GC.k;
+                    guessk                  = GC.k;
+
+                    toc;
+
+                end     % end period sweep
+                fprintf('...done.\n');
+                
+                toc;
+                
+                
+            end     % end initial normal domain sweep
+            
+            
             for i_ff_bot = 1:length( fill_bots )
                 % For each bottom fill factor
                 
-                for i_ff_ratio_norm = 1:length( fill_top_bot_ratio_norm )
+                for i_ff_ratio_norm = 2:length( fill_top_bot_ratio_norm )
                     % for each top/bottom fill factor ratio
                     
-                    % print iteration
-                    ii = ii + 1;
-                    fprintf('Fill factor iteration %i of %i\n', ii, length( fill_top_bot_ratio ) * length( fill_bots ) );
-                    fprintf('Bottom fill factor %f of %f\n', fill_bots(i_ff_bot), fill_bots(end) );
-                    fprintf('Top/Bottom fill ratio %f of %f\n', fill_top_bot_ratio_norm(i_ff_ratio_norm), fill_top_bot_ratio(end) );
+%                     % print iteration
+%                     ii = ii + 1;
+%                     fprintf('Fill factor iteration %i of %i\n', ii, length( fill_top_bot_ratio ) * length( fill_bots ) );
+%                     fprintf('Bottom fill factor %f of %f\n', fill_bots(i_ff_bot), fill_bots(end) );
+%                     fprintf('Top/Bottom fill ratio %f of %f\n', fill_top_bot_ratio_norm(i_ff_ratio_norm), fill_top_bot_ratio(end) );
 
                     % init saving variables
                     directivities = zeros( size(offsets) );
@@ -3217,8 +3349,8 @@ classdef c_synthGrating
 
 
             % generate final designs:
-            obj = obj.generateFinalDesignGaussian( MFD );
-            obj = obj.runFinalDesignEME( MFD );
+%             obj = obj.generateFinalDesignGaussian( MFD );
+%             obj = obj.runFinalDesignEME( MFD );
             
             
             
@@ -3292,6 +3424,243 @@ classdef c_synthGrating
 %             obj = obj.runFinalDesignEME(MFD);
             
         end     % end synthesizeGaussianGrating()
+        
+        
+        function [  obj, best_directivity, best_angle, best_scatter_str, ...
+                    dir_b4_period_vs_fill ] ...
+                    = optimizePeriodOffset(obj, offsets, fill_top, fill_bot, guess_period, guessk, sim_opts)
+            % optimizes period and offset for best angle/directivity
+            %
+            % Inputs:
+            %   offsets
+            %   fill_top
+            %   fill_bot
+            %   guess_period
+            %   guessk
+            %   sim_opts
+            %       structure with these fields:
+            %           num_modes
+            %           BC
+            %           pml_options
+            %
+            % Outputs:
+            %   best_directivity
+            %   best_angle
+            %   best_scatter_str
+            %   
+            %   dir_b4_period_vs_fill
+            %       mostly for debugging purposes
+            
+            % enable/disable debug mode
+            DEBUG = false;
+
+            
+             % init saving variables
+            directivities = zeros( size(offsets) );
+            k_vs_offset   = zeros( size(offsets) );
+            angles        = zeros( size(offsets) );
+
+
+            % Sweep offsets, pick offset with best directivity
+            fprintf('Sweeping offsets...\n');
+            for i_offset = 1:length( offsets )
+
+                fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
+
+                % make grating cell
+%                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
+                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                            guess_period, ...
+                                            fill_top, ...
+                                            fill_bot, ...
+                                            offsets(i_offset) );
+
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk );
+
+
+                % save directivity
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    directivities( i_offset )   = GC.directivity;
+                    angles( i_offset )          = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    directivities( i_offset )   = 1./( GC.directivity );
+                    angles( i_offset )          = GC.max_angle_down;
+                end
+
+                % update the guessk (units rad/'units')
+                guessk                  = GC.k;
+                k_vs_offset( i_offset ) = GC.k;
+
+                toc;
+
+            end     % end for i_offset = ...
+            fprintf('...done.\n');
+
+%                         % DEBUG plot directivity vs. offset
+            if DEBUG
+                figure;
+                plot( offsets, directivities, '-o' );
+                xlabel('offsets'); ylabel('directivities');
+                title('DEBUG directivities vs offsets');
+                makeFigureNice();
+%                             
+%                             figure;
+%                             plot( offsets, angles, '-o' );
+%                             xlabel('offsets'); ylabel('angles');
+%                             title('DEBUG angles vs offsets for first run');
+%                             makeFigureNice();
+%                             
+            end
+
+            % pick best offset
+            [ ~, indx_best_offset ]     = max( directivities );
+            best_offset                 = offsets( indx_best_offset );
+            best_offset_k               = k_vs_offset( indx_best_offset );
+
+            % here's an output variable
+            dir_b4_period_vs_fill = max( directivities );
+
+            % DEBUG plot grating with best directivity
+            if DEBUG
+
+                % make grating cell
+                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                            guess_period, ...
+                                            fill_tops(i_ff_top), ...
+                                            fill_bots(i_ff_bot), ...
+                                            best_offset );
+
+                % run sim
+                GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
+
+                % plot field
+                GC.plotEz_w_edges();
+
+            end
+
+
+%             % now sweep periods
+%             % only sweep larger periods. Doubtful that the period
+%             % will be smaller
+%             periods     = guess_period : obj.discretization : 1.05 * guess_period;
+%             periods     = obj.discretization * round(periods/obj.discretization);
+% %                         periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
+
+            % now sweep periods
+            % decide whether to sweep larger or smaller periods
+            % based on the angle
+            if best_offset_angle > obj.optimal_angle
+                % only sweep smaller periods
+                decrease_periods = true;
+            else
+                % only sweep larger periods
+                decrease_periods = false;
+            end
+
+            % init saving variables
+            angles_vs_period    = []; %= zeros( size(periods) );
+            k_vs_period         = []; %zeros( size(periods) );
+            GC_vs_period        = {}; % cell( size(periods) );
+
+            % sweep periods
+            guessk = best_offset_k;
+            period = guess_period;
+            fprintf('Sweeping periods...\n');
+            
+            % set while loop exit flag
+            angle_err_sign_flip = false;
+            
+%             for i_period = 1:length(periods)
+            i_period    = 0;
+            while ~angle_err_sign_flip
+
+                i_period = i_period + 1;
+                fprintf('Iteration %i\n', i_period );
+
+                % make grating cell
+%                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
+                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                            period, ...
+                                            fill_top, ...
+                                            fill_bot, ...
+                                            best_offset );
+
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk );
+
+                % save angle
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    angles_vs_period( i_period ) = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    angles_vs_period( i_period ) = GC.max_angle_down;
+                end
+
+                % update GC list
+                GC_vs_period{i_period} = GC;
+
+                % update k (units of rad/'units')
+                k_vs_period(i_period)   = GC.k;
+                guessk                  = GC.k;
+                
+                % update period
+                if decrease_periods == true
+                    
+                
+                toc;
+
+            end     % end period sweep
+            fprintf('...done.\n');
+
+            % pick best period
+            [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles ) );
+            best_period                     = periods( indx_best_period );
+            best_period_k                   = k_vs_period( indx_best_period );
+            best_GC                         = GC_vs_period{ indx_best_period };
+
+            % return data
+                    
+            % return data
+            if strcmp( obj.coupling_direction, 'up' )
+                % coupling direction is upwards
+                best_directivity    = best_GC.directivity;
+                best_angle          = best_GC.max_angle_up;
+                best_scatter_str    = best_GC.alpha_up;
+            else
+                % coupling direction is downwards
+                best_directivity    = 1./best_GC.directivity;
+                best_angle          = best_GC.max_angle_down;
+                best_scatter_str    = best_GC.alpha_down;
+            end
+            periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )  = best_period;
+            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )  = best_offset;
+            k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )        = best_GC.k;
+            GC_vs_fills_norm{ i_ff_bot, i_ff_ratio_norm }       = best_GC;
+                    
+                    
+                    % update the guess parameters, period, k, offset
+                    if i_ff_ratio_norm == 1
+                        % first iteration, save these guess parameters for
+                        % the next top level loop
+                        next_top_loop_period    = best_period;
+                        next_top_loop_k         = best_GC.k;
+                        next_top_loop_offset    = best_offset;
+                    end
+                    guessk              = best_GC.k;
+                    guess_period        = best_period;
+                    guess_offset        = best_offset;
+                    
+                    % update the offsets
+                    % grab previous offset index
+                    [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+                    % shift offsets to start at previous offset
+                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                    
+        end
         
         
         function obj = generateFinalDesignGaussian(obj, MFD)
@@ -3476,12 +3845,176 @@ classdef c_synthGrating
             % save final results
             final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
             final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
+            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
             final_design.eme_obj                = eme_obj;
             final_design.final_index            = obj.final_index;
             obj.final_design                    = final_design;
             
         end     % end runFinalDesignEME()
+        
+        
+        function obj = runFinalDesignEME_fiber_overlap(obj, MFD, fiber_offsets, angles)
+            % mostly for debugging purposes
+            % only runs the fiber oveerlap and not the EME simulation
+            % because its faster lol
+            %
+            % Inputs
+            %   MFD
+            %       units of 'units'
+            %   fiber_offsets
+            %       units of 'units'
+            %   angles
+            %       deg.
+            
+            eme_obj = obj.final_design.eme_obj;
+            
+            % compute fiber overlap
+            um      = 1e6;
+            eme_obj = eme_obj.fiberOverlap( 'zOffset', fiber_offsets * obj.units.scale * um,...
+                                            'angleVec', angles,...
+                                            'MFD', MFD * obj.units.scale * um,...
+                                            'overlapDir', obj.coupling_direction, ...
+                                            'nClad', obj.background_index );
+                                        
+            % save final results
+            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
+            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
+            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
+            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
+            final_design.eme_obj                = eme_obj;
+            final_design.final_index            = obj.final_index;
+            obj.final_design                    = final_design;
+            
+        end     % end runFinalDesignEME_fiber_overlap()
+        
+        
+        function [obj, up_down_directivity] = calc_final_design_directivity(obj)
+            % mostly for debugging purposes
+            % calculates the directivity of the final designed grating,
+            % using the field from the simulated eme obj
+            
+            % repeating code from twoLevelGratingCell which I don't like to
+            % do this is bad prog. practice but whatever
+            
+            % define constants (all eme obj units are in um)
+            mu0     = 4*pi*1e-7;                % units of H/m
+            mu0     = mu0 * obj.units.scale;    % units of H/(units)
+            c       = 3e8;                      % units of m/s
+            c       = c/obj.units.scale;        % units of (units)/s
+            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+       
+            % grab field and coordinates
+            % defined as Ey in eme obj but Ez in my def.
+            Ez = obj.final_design.eme_obj.fullFields.Ey;
+            dy = obj.final_design.eme_obj.domain.discretization(1);
+            dx = obj.final_design.eme_obj.domain.discretization(2);
+            
+            
+%             % Calc propagating power vs. x
+%             
+%             % H y in , on second to end-1 steps, using entire E_z
+%             % dimensions are y (transverse) vs. x
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+%             
+%             % poynting vector in, dimensions are y vs x(2:end-1)
+%             Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+% 
+%             % power per x slice
+%             P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*omega0*mu0) .* ( Ez( 3:end,:) - Ez( 1:end-2,:) )/(2*dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez( 2:end-1,: ) );           % Sy = real( Ez Hx* )
+            P_per_y_slice       = -sum( Sy, 2 )*dx;                                 % using Sy compmonent, for some reason up/down are flipped
+
+            [~, indx_max_up]    = max( P_per_y_slice );
+            [~, indx_max_down]  = min( P_per_y_slice );
+            Sy_up               = Sy( indx_max_up, : );                                 % dimensions Sy vs. x
+            Sy_down             = Sy( indx_max_down, : );
+            
+%             % save to obj
+% %             obj.Sx              = Sx;
+% %             obj.P_per_x_slice 	= P_per_x_slice;
+%             obj.Sy              = Sy;
+%             obj.P_per_y_slice   = P_per_y_slice;
+
+            % calc radiated power (Sy only, not including angle of
+            % incidence)
+            P_rad_up    = sum( abs( Sy_up(:) ) ) * dx;
+            P_rad_down  = sum( abs( Sy_down(:) ) ) * dx;
+            
+            % calc directivity save to object
+            up_down_directivity                  = P_rad_up/P_rad_down;
+            obj.final_design.up_down_directivity = up_down_directivity;
+            
+        end     % end calc_final_design_directivity()
+        
+        
+        function [obj, max_eff_vs_MFD] = calc_eff_vs_MFD(obj, MFDs)
+            % mostly for debugging
+            % plotting max efficiency vs. different MFDs
+            %
+            % returns max efficiency vs. mfd
+            %
+            % Inputs
+            %   MFDs
+            %       type: double, vector
+            %       desc: mode field diameters to try, units 'units'
+            %
+            % Outputs
+            %   max_eff_vs_MFD
+            %       type: 3d tensor, double
+            %       desc: eff vs. 
+            
+            % init vars
+            max_eff_vs_MFD  = zeros(size(MFDs));
+            fiber_offsets   = ( 0:0.5:12 ) * 1e-6 / obj.units.scale;        % units 'units'
+            angles          = 0:0.1:45;
+
+            for ii = 1:length(MFDs)
+
+                fprintf('mfd iteration %i of %i\n', ii, length(MFDs) );
+
+                % run EME sim
+                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
+                % save result
+                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
+
+            end
+            
+        end     % end calc_eff_vs_MFD()
+        
+        
+        function [obj, eff_vs_wavelength_angle] = calc_eff_vs_wavelength(obj, wavelengths)
+            % mostly for debugging
+            % plotting eff. vs. wavelength and angle
+            %
+            % i dont really want to do this right now haha
+            
+            % init vars
+            angles                  = 0:0.1:45;
+            eff_vs_wavelength_angle = zeros( length(wavelengths), length(angles) );     % dimensions eff. vs. wl vs. angle
+            
+            for ii = 1:length(wavelengths)
+               
+                fprintf('wavelength iteration %i of %i\n', ii, length(wavelengths) );
+                
+                % run EME sim
+                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
+                % save result
+                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
+                
+            end
+            
+            
+        end     % end calc_eff_vs_wavelength()
         
         
         function obj  = sweepPeriodFill(obj)

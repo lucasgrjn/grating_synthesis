@@ -1328,6 +1328,9 @@ classdef emeSim
             % NEW
             z = obj.domain.z;
             
+            % init coupling matrix
+            obj.fiberCoup.coup = zeros( length(zOff), length(angleVec), length(obj.domain.k0) );    % dimensions offset vs angle vs k(lambda)
+            
             for  ii = 1:length(obj.domain.k0)
                 if obj.domain.polarization == 0
                     if strcmp(obj.fiberCoup.overlapDir, 'up')  
