@@ -53,7 +53,9 @@ Q = c_synthGrating( 'discretization',   disc,       ...
 % note units are in 'nm'
 MFD     = 10000;
 DEBUG   = false;
+tic;
 Q       = Q.synthesizeGaussianGrating(MFD, DEBUG);
+toc;
 
 
 
