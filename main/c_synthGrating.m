@@ -2645,8 +2645,8 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:0.95 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.025:0.95 );
+            fill_bots           = fliplr( 0.9:0.05:0.95 );
+            fill_top_bot_ratio  = fliplr( 0.0:0.05:0.95 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
 %             fill_top_bot_ratio  = 0.2:-0.05:0;
             % on normal 1:1 line
