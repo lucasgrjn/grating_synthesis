@@ -2645,15 +2645,15 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-%             fill_bots           = fliplr( 0.4:0.05:0.95 );
-%             fill_top_bot_ratio  = fliplr( 0.0:0.05:0.75 );
+            fill_bots           = fliplr( 0.4:0.025:0.95 );
+            fill_top_bot_ratio  = fliplr( 0.0:0.025:0.95 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
-            fill_top_bot_ratio  = 0.2:-0.05:0;
+%             fill_top_bot_ratio  = 0.2:-0.05:0;
             % on normal 1:1 line
-            fill_bots           = fliplr( 0.9:0.025:0.975 );
+%             fill_bots           = fliplr( 0.9:0.025:0.975 );
 %             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.02:0.99);
+            offsets             = fliplr(0:0.01:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -2688,7 +2688,7 @@ classdef c_synthGrating
             
             
             % set solver settings
-            num_modes   = 1;
+            num_modes   = 5;
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 200, 20, 2]; 
             sim_opts    = struct('num_modes', num_modes, 'BC', BC, 'pml_options', pml_options);
@@ -2696,22 +2696,7 @@ classdef c_synthGrating
             tic;
             ii = 0;
             
-            
-            % start a parallel pool session
-            my_cluster = parcluster('local');                       % cores on compute node are "local"
-            if getenv('ENVIRONMENT')                                % true if this is a batch job
-                my_cluster.JobStorageLocation = getenv('TMPDIR');    % points to TMPDIR
-            end
-
-            poolobj = gcp('nocreate'); % If no pool, do not create new one.
-            if ~isempty(poolobj)
-                % shut down previously made parallel pool
-                delete(gcp('nocreate'));
-            end
-            parpool(my_cluster, my_cluster.NumWorkers);
-            
-            
-            
+ 
             
             % sweep normal
             
@@ -2753,7 +2738,7 @@ classdef c_synthGrating
             
             % only run if normal domain exists
             if length(fill_top_bot_ratio_norm) > 0
-            
+                
                 % first fill in the right side of the domain
                 for i_ff_bot = 1:length( fill_bots )
 
@@ -2814,10 +2799,23 @@ classdef c_synthGrating
                 % calc number of loops, also necessary apparently for parfor
                 n_fill_bots                 = length(fill_bots);
                 n_fill_top_bot_ratio_norm   = length(fill_top_bot_ratio_norm);
+                
+                % start a parallel pool session
+                my_cluster = parcluster('local');                       % cores on compute node are "local"
+                if getenv('ENVIRONMENT')                                % true if this is a batch job
+                    my_cluster.JobStorageLocation = getenv('TMPDIR');    % points to TMPDIR
+                end
+
+                poolobj = gcp('nocreate'); % If no pool, do not create new one.
+                if ~isempty(poolobj)
+                    % shut down previously made parallel pool
+                    delete(gcp('nocreate'));
+                end
+                parpool(my_cluster, my_cluster.NumWorkers);
 
 
                 % create a parforprogmon object
-                ppm = ParforProgMon('Progress on parfor', n_fill_bots );
+                ppm = ParforProgMon('Progress on normal parfor: ', n_fill_bots );
 
                 % now fill in the rest of the domain
                 parfor i_ff_bot = 1:n_fill_bots
@@ -2827,6 +2825,8 @@ classdef c_synthGrating
     %                 if length( fill_top_bot_ratio_norm ) == 0
     %                     break;
     %                 end
+    
+                    fprintf('Normal parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
 
                     % update the offsets
                     % grab previous offset index
@@ -3002,14 +3002,29 @@ classdef c_synthGrating
                 n_fill_bots                 = length(fill_bots);
                 n_fill_top_bot_ratio_inv    = length(fill_top_bot_ratio_inv);
 
+                
+                % start a parallel pool session
+                my_cluster = parcluster('local');                       % cores on compute node are "local"
+                if getenv('ENVIRONMENT')                                % true if this is a batch job
+                    my_cluster.JobStorageLocation = getenv('TMPDIR');    % points to TMPDIR
+                end
+
+                poolobj = gcp('nocreate'); % If no pool, do not create new one.
+                if ~isempty(poolobj)
+                    % shut down previously made parallel pool
+                    delete(gcp('nocreate'));
+                end
+                parpool(my_cluster, my_cluster.NumWorkers);
 
                 % create a parforprogmon object
-                ppm = ParforProgMon('Progress on parfor', n_fill_bots );
+                ppm = ParforProgMon('Progress on inverted parfor: ', n_fill_bots );
 
                 % now fill in the rest of the domain
                 parfor i_ff_bot = 1:n_fill_bots
                     % For each bottom fill factor
 
+                    fprintf('Invert parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
+                    
                     % update the offsets
                     % grab previous offset index
                     [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills_inv_1( i_ff_bot ) ) );
@@ -3433,10 +3448,10 @@ classdef c_synthGrating
 
 
             % Sweep offsets, pick offset with best directivity
-            fprintf('Sweeping offsets...\n');
+%             fprintf('Sweeping offsets...\n');
             for i_offset = 1:length( offsets )
 
-                fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
+%                 fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
@@ -3468,7 +3483,7 @@ classdef c_synthGrating
 %                 toc;
 
             end     % end for i_offset = ...
-            fprintf('...done.\n');
+%             fprintf('...done.\n');
 
 %                         % DEBUG plot directivity vs. offset
             if DEBUG
@@ -3541,7 +3556,7 @@ classdef c_synthGrating
             % sweep periods
             guessk = best_offset_k;
             period = guess_period;
-            fprintf('Sweeping periods...\n');
+%             fprintf('Sweeping periods...\n');
             
             % set while loop exit flag
             angle_err_sign_flip = false;
@@ -3551,7 +3566,7 @@ classdef c_synthGrating
             while ~angle_err_sign_flip
 
                 i_period = i_period + 1;
-                fprintf('Iteration %i\n', i_period );
+%                 fprintf('Iteration %i\n', i_period );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
@@ -3607,7 +3622,7 @@ classdef c_synthGrating
 %                 toc;
 
             end     % end period sweep
-            fprintf('...done.\n');
+%             fprintf('...done.\n');
 
             % pick best period
             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
