@@ -220,7 +220,7 @@ classdef c_synthGrating
                 p = f_parse_varargin( inputs, varargin{:} );
 
                 % save starting time
-                obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd HH_MM_SS ' );
+                obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS ' );
 
                 % set units
                 obj.units.name  = p.units;

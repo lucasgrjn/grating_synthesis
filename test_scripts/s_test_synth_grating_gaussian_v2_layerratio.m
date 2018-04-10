@@ -57,6 +57,8 @@ tic;
 Q       = Q.synthesizeGaussianGrating(MFD, DEBUG);
 toc;
 
+% save data
+save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q');
 
 
 % directivity vs. fill
