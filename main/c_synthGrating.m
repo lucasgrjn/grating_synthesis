@@ -2815,7 +2815,7 @@ classdef c_synthGrating
 
 
                 % create a parforprogmon object
-                ppm = ParforProgMon('Progress on normal parfor: ', n_fill_bots );
+%                 ppm = ParforProgMon('Progress on normal parfor: ', n_fill_bots );
 
                 % now fill in the rest of the domain
                 parfor i_ff_bot = 1:n_fill_bots
@@ -2890,7 +2890,7 @@ classdef c_synthGrating
                     end     % end for i_ff_ratio = ...
 
                     % update progress monitor
-                    ppm.increment();
+%                     ppm.increment();
 
                 end     % end for i_ff_bot = ...
                 
@@ -3017,7 +3017,7 @@ classdef c_synthGrating
                 parpool(my_cluster, my_cluster.NumWorkers);
 
                 % create a parforprogmon object
-                ppm = ParforProgMon('Progress on inverted parfor: ', n_fill_bots );
+%                 ppm = ParforProgMon('Progress on inverted parfor: ', n_fill_bots );
 
                 % now fill in the rest of the domain
                 parfor i_ff_bot = 1:n_fill_bots
@@ -3087,7 +3087,7 @@ classdef c_synthGrating
                     end     % end for i_ff_ratio = ...
 
                     % update progress monitor
-                    ppm.increment();
+%                     ppm.increment();
 
                 end     % end for i_ff_bot = ...
                 
