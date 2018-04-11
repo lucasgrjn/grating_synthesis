@@ -2645,15 +2645,15 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.9:0.05:0.95 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.05:0.95 );
+            fill_bots           = fliplr( 0.4:0.025:1 );
+            fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
 %             fill_top_bot_ratio  = 0.2:-0.05:0;
             % on normal 1:1 line
 %             fill_bots           = fliplr( 0.9:0.025:0.975 );
 %             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.01:0.99);
+            offsets             = fliplr(0:0.02:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -2747,44 +2747,63 @@ classdef c_synthGrating
 
                     % Optimize period and offset
                     fill_top = fill_top_bot_ratio_norm(1) * fill_bots(i_ff_bot);
-                    [ obj, best_period, best_offset, best_directivity, ...
-                      best_angle, best_scatter_str, best_GC, ...
-                      best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
-                                                                                  fill_top, ...
-                                                                                  fill_bots(i_ff_bot), ...
-                                                                                  guess_period,...
-                                                                                  guessk, ...
-                                                                                  sim_opts );
+                    if fill_top < 1
+                        % Only run optimization if theres a perturbation 
+                        
+                        [ obj, best_period, best_offset, best_directivity, ...
+                          best_angle, best_scatter_str, best_GC, ...
+                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                                                                                      fill_top, ...
+                                                                                      fill_bots(i_ff_bot), ...
+                                                                                      guess_period,...
+                                                                                      guessk, ...
+                                                                                      sim_opts );
+
+                        % save data
+                        if strcmp( obj.coupling_direction, 'up' )
+                            % coupling direction is upwards
+                            directivities_vs_fills_norm( i_ff_bot, 1 )   = best_GC.directivity;
+                            angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_up;
+                            scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_up;
+                        else
+                            % coupling direction is downwards
+                            directivities_vs_fills_norm( i_ff_bot, 1 )   = 1./best_GC.directivity;
+                            angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_down;
+                            scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_down;
+                        end
+                        periods_vs_fills_norm( i_ff_bot, 1 )          = best_period;
+                        offsets_vs_fills_norm( i_ff_bot, 1 )          = best_offset;
+                        k_vs_fills_norm( i_ff_bot, 1 )                = best_GC.k;
+                        GC_vs_fills_norm{ i_ff_bot, 1 }               = best_GC;
+                        dir_b4_period_vs_fills_norm( i_ff_bot, 1 )    = dir_b4_period_vs_fill;
 
 
-                    % save data
-                    if strcmp( obj.coupling_direction, 'up' )
-                        % coupling direction is upwards
-                        directivities_vs_fills_norm( i_ff_bot, 1 )   = best_GC.directivity;
-                        angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_up;
-                        scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_up;
+                        % update the guess parameters, period, k, offset
+                        guessk              = best_GC.k;
+                        guess_period        = best_period;
+
+                        % update the offsets
+                        % grab previous offset index
+                        [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+                        % shift offsets to start at previous offset
+                        offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                        
                     else
-                        % coupling direction is downwards
-                        directivities_vs_fills_norm( i_ff_bot, 1 )   = 1./best_GC.directivity;
-                        angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_down;
-                        scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_down;
+                        % we're in a waveguide, there's no reason to run
+                        % the optimization (and actually the period sweep
+                        % bugs out when the fill = 100%)
+                        
+                        % save dummy 
+                        directivities_vs_fills_norm( i_ff_bot, 1 )   = 1;
+                        angles_vs_fills_norm( i_ff_bot, 1 )          = 0;
+                        scatter_str_vs_fills_norm( i_ff_bot, 1 )     = 0;
+                        periods_vs_fills_norm( i_ff_bot, 1 )          = guess_period;
+                        offsets_vs_fills_norm( i_ff_bot, 1 )          = 0;
+                        k_vs_fills_norm( i_ff_bot, 1 )                = guessk;
+                        GC_vs_fills_norm{ i_ff_bot, 1 }               = waveguide;
+                        dir_b4_period_vs_fills_norm( i_ff_bot, 1 )    = 1;
+                        
                     end
-                    periods_vs_fills_norm( i_ff_bot, 1 )          = best_period;
-                    offsets_vs_fills_norm( i_ff_bot, 1 )          = best_offset;
-                    k_vs_fills_norm( i_ff_bot, 1 )                = best_GC.k;
-                    GC_vs_fills_norm{ i_ff_bot, 1 }               = best_GC;
-                    dir_b4_period_vs_fills_norm( i_ff_bot, 1 )    = dir_b4_period_vs_fill;
-
-
-                    % update the guess parameters, period, k, offset
-                    guessk              = best_GC.k;
-                    guess_period        = best_period;
-
-                    % update the offsets
-                    % grab previous offset index
-                    [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                    % shift offsets to start at previous offset
-                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
                     toc;
 
@@ -2847,44 +2866,61 @@ classdef c_synthGrating
 
                         % Optimize period and offset
                         fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bot;
-                        [ tempobj, best_period, best_offset, best_directivity, ...
-                          best_angle, best_scatter_str, best_GC, ...
-                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
-                                                                                      fill_top, ...
-                                                                                      fill_bot, ...
-                                                                                      guess_period,...
-                                                                                      guessk, ...
-                                                                                      sim_opts );
+                        if fill_top < 1
+                            % Only run optimization if theres a perturbation 
+                            [ tempobj, best_period, best_offset, best_directivity, ...
+                              best_angle, best_scatter_str, best_GC, ...
+                              best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                                                                                          fill_top, ...
+                                                                                          fill_bot, ...
+                                                                                          guess_period,...
+                                                                                          guessk, ...
+                                                                                          sim_opts );
 
+                            % save data
+                            if strcmp( obj.coupling_direction, 'up' )
+        %                         coupling direction is upwards
+                                directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = best_GC.directivity;
+                                angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_GC.max_angle_up;
+                                scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = best_GC.alpha_up;
+                            else
+                                % coupling direction is downwards
+                                directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = 1./best_GC.directivity;
+                                angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_GC.max_angle_down;
+                                scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = best_GC.alpha_down;
+                            end
+                            periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_period;
+                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_offset;
+                            k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )                = best_GC.k;
+                            GC_vs_fills_norm{ i_ff_bot, i_ff_ratio_norm }               = best_GC;
+                            dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )    = dir_b4_period_vs_fill;
 
-                        % save data
-                        if strcmp( obj.coupling_direction, 'up' )
-    %                         coupling direction is upwards
-                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = best_GC.directivity;
-                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_GC.max_angle_up;
-                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = best_GC.alpha_up;
+                            % update the guess parameters, period, k, offset
+                            guessk              = best_GC.k;
+                            guess_period        = best_period;
+
+                            % update the offsets
+                            % grab previous offset index
+                            [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+                            % shift offsets to start at previous offset
+                            offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                            
                         else
-                            % coupling direction is downwards
-                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = 1./best_GC.directivity;
-                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_GC.max_angle_down;
-                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = best_GC.alpha_down;
+                            % we're in a waveguide, there's no reason to run
+                            % the optimization (and actually the period sweep
+                            % bugs out when the fill = 100%)
+
+                            % save dummy 
+                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = 1;
+                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = 0;
+                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = 0;
+                            periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = guess_period;
+                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = 0;
+                            k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )                = guessk;
+                            GC_vs_fills_norm{ i_ff_bot, i_ff_ratio_norm }               = waveguide;
+                            dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )    = 1;
+
                         end
-                        periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_period;
-                        offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_offset;
-                        k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )                = best_GC.k;
-                        GC_vs_fills_norm{ i_ff_bot, i_ff_ratio_norm }               = best_GC;
-                        dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )    = dir_b4_period_vs_fill;
-
-
-                        % update the guess parameters, period, k, offset
-                        guessk              = best_GC.k;
-                        guess_period        = best_period;
-
-                        % update the offsets
-                        % grab previous offset index
-                        [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                        % shift offsets to start at previous offset
-                        offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
 
                     end     % end for i_ff_ratio = ...
