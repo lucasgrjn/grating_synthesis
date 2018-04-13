@@ -124,7 +124,7 @@ classdef c_synthGrating
         
         u;                  % gaussian profile, not sure if this will stay a property tho
         
-        num_par_workers;    % number of parallel workers to use
+        num_par_workers;    % number of parallel workers to use THIS IS DEPRECATED
         
 %         modesolver_opts;    % STRUCT that stores the modesolver options
                             % CURRENTLY hardcoded.
@@ -2911,9 +2911,9 @@ classdef c_synthGrating
                             % bugs out when the fill = 100%)
 
                             % save dummy 
-                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )   = 1;
-                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = 0;
-                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = 0;
+                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )    = 1;
+                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )           = 0;
+                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )      = 0;
                             periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = guess_period;
                             offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = 0;
                             k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )                = guessk;
@@ -3370,75 +3370,7 @@ classdef c_synthGrating
             % generate final designs:
 %             obj = obj.generateFinalDesignGaussian( MFD );
 %             obj = obj.runFinalDesignEME( MFD );
-            
-            
-            
-%             % -----------------------------------
-%             % Picking which cells to use
-%             
-%             % let's try normalizing the alphas, because I know that they
-%             % aren't on the same order of magnitude right now.
-%             alpha_des_norm              = alpha_des./max(alpha_des(:));
-%             scatter_str_vs_fills_norm   = scatter_str_vs_fills./max(abs(scatter_str_vs_fills));
-%             
-%             % starting point
-%             start_alpha_des     = 1e-2;
-%             [~, indx_x]         = min(abs( alpha_des_norm - start_alpha_des ) );
-%             cur_x               = xvec(indx_x);
-%             
-%             % final synthesized variables
-% %             obj.dir_synth                   = zeros(1,n_cells);
-% %             obj.bot_fill_synth              = zeros(1,n_cells);
-% %             obj.top_bot_fill_ratio_synth    = zeros(1,n_cells);
-% %             obj.period_synth                = zeros(1,n_cells);
-% %             obj.offset_synth                = zeros(1,n_cells);
-% %             obj.angles_synth                = zeros(1,n_cells);
-% %             obj.scatter_str_synth           = zeros(1,n_cells);
-% %             obj.k_synth                     = zeros(1,n_cells);
-% %             obj.GC_synth                    = cell(1,n_cells);
-% %             obj.des_scatter_norm            = zeros(1,n_cells);
-% 
-%             obj.dir_synth                   = [];
-%             obj.bot_fill_synth              = [];
-%             obj.top_bot_fill_ratio_synth    = [];
-%             obj.period_synth                = [];
-%             obj.offset_synth                = [];
-%             obj.angles_synth                = [];
-%             obj.scatter_str_synth           = [];
-%             obj.k_synth                     = [];
-%             obj.GC_synth                    = {};
-%             obj.des_scatter_norm            = [];
-%  
-%             ii = 1;
-%             while cur_x < xvec(end)
-%                 % build grating one cell at a time
-%                 % TEMP CURRENTLY ASSUMING 1:1 line
-%                 
-%                 % pick design with scattering strength closest to desired
-%                 % alpha
-%                 des_scatter                 = alpha_des_norm(indx_x);                                   % desired alpha
-%                 [~, indx_closest_scatter]   = min( abs(scatter_str_vs_fills_norm - des_scatter) );      % index of closest scatter design         
-%                 
-%                 % save parameters
-%                 obj.dir_synth(ii)                   = directivities_vs_fills( indx_closest_scatter );
-%                 obj.bot_fill_synth(ii)              = fill_bots( indx_closest_scatter );
-%                 obj.top_bot_fill_ratio_synth(ii)    = 1;    % TEMP?
-%                 obj.offset_synth(ii)                = offsets_vs_fills( indx_closest_scatter );
-%                 obj.period_synth(ii)                = periods_vs_fills( indx_closest_scatter );
-%                 obj.angles_synth(ii)                = angles_vs_fills( indx_closest_scatter );
-%                 obj.scatter_str_synth(ii)           = scatter_str_vs_fills( indx_closest_scatter );
-%                 obj.k_synth(ii)                     = k_vs_fills( indx_closest_scatter );
-%                 obj.GC_synth{ii}                    = GC_vs_fills{ indx_closest_scatter };
-%                 obj.des_scatter_norm(ii)            = des_scatter;
-%                 
-%                 % move onto next
-%                 cur_x       = cur_x + obj.period_synth(ii);
-%                 [~, indx_x] = min( abs(xvec - cur_x) );
-%                 cur_x       = xvec( indx_x );
-%                 ii          = ii + 1;
-%                 
-%             end     % end for ii = 1:ncells
-%             
+
 %             % run final design in EME
 %             obj = obj.runFinalDesignEME(MFD);
             
@@ -3451,7 +3383,10 @@ classdef c_synthGrating
             % optimizes period and offset for best angle/directivity
             %
             % Inputs:
-            %   offsets
+            %   offsets - OLD BUT STILL IN USE
+            %   guess_offset - NEW BUT NOT IMPLEMENTED
+            %       - guess starting offset value, in absolute value (Units
+            %       'units')
             %   fill_top
             %   fill_bot
             %   guess_period

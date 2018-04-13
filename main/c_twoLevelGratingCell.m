@@ -787,17 +787,25 @@ classdef c_twoLevelGratingCell
             %   y_down  - location of bot slice of E field to take
             
             % load stuff
-            E_z = obj.E_z;
+%             E_z = obj.E_z;
             f0  = 1/obj.lambda;     % spatial freq
+            
+            % generate field, without the exponential growth or decay
+            numcells        = 1000;                                                  % i'm purposefully setting my own number of cells here
+            nx              = round( numcells*obj.domain_size(2)/obj.dx );
+            x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
+            phase_all       = repmat( exp( 1i*real(obj.k)*x_coords_all ), size(obj.Phi,1), 1 );
+            E_z             = repmat( obj.Phi, 1, numcells ).*phase_all;
             
             % grab slices
             E_z_up          = E_z( y_up, : );
             E_z_down        = E_z( y_down, : );
             
-            % do some zero padding
-            pad_factor  = 10;
-            E_z_up      = [ zeros( 1, pad_factor*length(E_z_up) ), E_z_up, zeros( 1, pad_factor*length(E_z_up) ) ];
-            E_z_down    = [ zeros( 1, pad_factor*length(E_z_down) ), E_z_down, zeros( 1, pad_factor*length(E_z_down) ) ];
+            % do some zero padding and repeating
+            % currently zero padding is turned off.
+%             pad_factor  = 0;
+%             E_z_up      = [ zeros( 1, pad_factor*length(E_z_up) ), E_z_up, zeros( 1, pad_factor*length(E_z_up) ) ];
+%             E_z_down    = [ zeros( 1, pad_factor*length(E_z_down) ), E_z_down, zeros( 1, pad_factor*length(E_z_down) ) ];
             
             % index of refraction of top and bottom cladding
             n_top = obj.N( y_up, 1 );
@@ -817,11 +825,11 @@ classdef c_twoLevelGratingCell
             E_z_fx_up       = fftshift( fft( ifftshift( E_z_up ) ) );
             E_z_fx_down     = fftshift( fft( ifftshift( E_z_down ) ) );
             
-            % DEBUG plot E_fz
-            % first normalize E fields
-            E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-            E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-            
+%             % DEBUG plot E_fz
+%             % first normalize E fields
+%             E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
+%             E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
+%             
 %             % DEBUG plot E_fz down
 %             figure;
 %             plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
