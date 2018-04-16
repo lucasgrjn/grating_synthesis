@@ -60,7 +60,7 @@ GC = Q.h_makeGratingCell(  Q.convertObjToStruct(), ...
 num_modes   = 500;
 BC          = 0;
 pml_options = [ 1, 200, 20, 2 ];
-guessk      = -(0.01183 + 1i * 1.58e-4);
+guessk      = 0.01183 + 1i * 1.58e-4;
 
 % run sim
 tic;
@@ -99,7 +99,7 @@ axis equal;
         
 % normalize k to within brillouin zone
 k_div_pi_a = GC.k_vs_mode/(pi/period);
-
+k_mod_pi_a = 
 
 
 % plot k distribution
@@ -128,19 +128,6 @@ xlabel('mode number'); ylabel('imag k');
 title('imaginary k, divided by pi/a vs. mode num');
 makeFigureNice();
 
-% plot k wrapped up in brillouin zone
-% i THINK the way to do it is
-% mod pi/a
-% then, all values greater than pi/a/2, make them = to pi/a - their value
-% i'm not really sure what to do with the imaginary part tho....
-k_wrapped_real = mod( real(GC.k_vs_mode), pi/period );
-k_wrapped_real( k_wrapped_real > (pi/(2*period)) ) = pi/period - k_wrapped_real( k_wrapped_real > (pi/(2*period)) );
-
-figure;
-plot( 1:num_modes, real(k_wrapped_real), 'o' );
-xlabel('mode number'); ylabel('real k');
-title('real k, within brillouin zone vs. mode num');
-makeFigureNice();
 
         
 % % -------------------------------------------------------------------------

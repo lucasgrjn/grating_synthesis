@@ -78,12 +78,13 @@ classdef c_twoLevelGratingCell
         sim_opts;
         
         % mode characteristics
-        k;              % complex k, units rad/'units'
-        Phi;            % field envelope
-        numcells;       % number of cells repeated in E_z
-        E_z             % saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
-        k_vs_mode;      % k vs mode #
-        Phi_vs_mode;    % Phi vs mode #, dimensions y vs. x vs mode #
+        k;                  % complex k, units rad/'units'
+        Phi;                % field envelope
+        numcells;           % number of cells repeated in E_z
+        E_z                 % saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
+        k_vs_mode;          % k vs mode #
+        Phi_vs_mode;        % Phi vs mode #, dimensions y vs. x vs mode #
+        chosen_mode_num;    % which mode was chosen
         
         % radiation parameters
         directivity;        % ratio of power radiated up/power radiated down
@@ -481,8 +482,9 @@ classdef c_twoLevelGratingCell
             
 
             % save wavevectors and field
-            obj.k   = k;
-            obj.Phi = Phi;
+            obj.k               = k;
+            obj.Phi             = Phi;
+            obj.chosen_mode_num = indx_k;
             
             % number of cells to repeat
             numcells = obj.numcells;

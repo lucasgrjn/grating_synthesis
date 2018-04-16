@@ -2646,14 +2646,16 @@ classdef c_synthGrating
             
             % set fill factors and offsets
             fill_bots           = fliplr( 0.4:0.025:1 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
+%             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
 %             fill_top_bot_ratio  = 0.2:-0.05:0;
+            fill_top_bot_ratio  = fliplr( 0.8:0.025:1.2 );
+%             fill_bots           = 0.975;
             % on normal 1:1 line
 %             fill_bots           = fliplr( 0.9:0.025:0.975 );
 %             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.02:0.99);
+            offsets             = fliplr(0:0.01:0.99);
             offsets_orig        = offsets;
             
             % save fills and offsets
@@ -2688,7 +2690,7 @@ classdef c_synthGrating
             
             
             % set solver settings
-            num_modes   = 5;
+            num_modes   = 1;
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 200, 20, 2]; 
             sim_opts    = struct('num_modes', num_modes, 'BC', BC, 'pml_options', pml_options);
@@ -2864,6 +2866,8 @@ classdef c_synthGrating
                     for i_ff_ratio_norm = 2:n_fill_top_bot_ratio_norm
                         % for each top/bottom fill factor ratio
 
+                         fprintf('Fill factor ratio %i of %i, Normal parfor iteration %i of %i\n', i_ff_ratio_norm, n_fill_top_bot_ratio_norm, i_ff_bot, n_fill_bots);
+                        
                         % Optimize period and offset
                         fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bot;
                         if fill_top < 1
