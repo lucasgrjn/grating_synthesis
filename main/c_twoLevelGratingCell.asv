@@ -1285,10 +1285,9 @@ classdef c_twoLevelGratingCell
             ax  = axes('Units','pixels');
 
             % default settings
-            mode_num            = 1;
-            mode_comp           = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
-            phase_on            = true;         % determines whether the propagation phase is included
-            index_overlay_on    = true;         % determines whether index overlay is on or off
+            mode_num    = 1;
+            mode_comp   = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
+            phase_on    = false;        % determines whether the propagation phase is included
 
             % number of modes
             n_modes = length( obj.k_vs_mode );
@@ -1352,15 +1351,15 @@ classdef c_twoLevelGratingCell
             % Create checkbox for selecting/deselecting phase
             checkbox_phase = uicontrol(    'Style', 'checkbox', ...
                                            'String', {'Phase on'}, ...
-                                           'Value', phase_on, ...
-                                           'Position', [20, ax.Position(4) - 50, 100, 30], ...
+                                           'Value', true, ...
+                                           'Position', [20, ax.Position(4) - 50, 100, 50], ...
                                            'Callback', @toggle_phase );   
                                        
             % Create checkbox for turning grating index edges on and off
             checkbox_index_overlay = uicontrol(    'Style', 'checkbox', ...
-                                                   'String', {'Index overlay on'}, ...
-                                                   'Value', index_overlay_on, ...
-                                                   'Position', [20, ax.Position(4) - 75, 100, 30], ...
+                                                   'String', {'Index mask overlay on'}, ...
+                                                   'Value', true, ...
+                                                   'Position', [20, ax.Position(4) - 100, 100, 50], ...
                                                    'Callback', @toggle_index_overlay );   
 
 
@@ -1401,9 +1400,9 @@ classdef c_twoLevelGratingCell
             function toggle_index_overlay( source, event )
 
                 if source.Value == true
-                    index_overlay_on = true;
+                    toggle_ind;
                 else
-                    index_overlay_on = false;
+                    Ez = Ez_no_phase;
                 end 
                 plot_field( mode_num, mode_comp );
             end
@@ -1442,20 +1441,15 @@ classdef c_twoLevelGratingCell
                 xlabel(['x (' obj.units.name ')']); ylabel(['y (' obj.units.name ')']);
                 colorbar;
 
-                if index_overlay_on == true
-                    % overplot the index with transparency
-                    
-                    % first things first, edge detection:
-                    filt    = 'roberts';            % filter
-                    N_edges = edge( N_repmat, filt );
-                    
-                    % overplot the detected edges
-                    hold on;
-                    h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
-                    set( h, 'AlphaData', N_edges );
-                    set( gca, 'YDir', 'normal' );
-                    
-                end
+                % overplot the index with transparency
+                % first things first, edge detection:
+                filt    = 'roberts';            % filter
+                N_edges = edge( N_repmat, filt );
+                % overplot the detected edges
+                hold on;
+                h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
+                set( h, 'AlphaData', N_edges );
+                set( gca, 'YDir', 'normal' );
 
 
             end     % end function plot_field()

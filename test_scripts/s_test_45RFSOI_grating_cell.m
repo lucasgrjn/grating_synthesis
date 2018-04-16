@@ -57,10 +57,10 @@ GC = Q.h_makeGratingCell(  Q.convertObjToStruct(), ...
                             offset );
                         
 % simulation settings
-num_modes   = 500;
+num_modes   = 10;
 BC          = 0;
 pml_options = [ 1, 200, 20, 2 ];
-guessk      = -(0.01183 + 1i * 1.58e-4);
+guessk      = (0.01183 + 1i * 1.58e-4);
 
 % run sim
 tic;
@@ -71,12 +71,12 @@ toc;
 GC.plotIndex();
 
 
-% Plot the accepted mode
-figure;
-imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*period/(2*pi) ) ) );
+% % Plot the accepted mode
+% figure;
+% imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*period/(2*pi) ) ) );
 
 % display calculated k
 fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
@@ -91,11 +91,12 @@ fprintf('\nAngle of maximum radiation up = %f deg\n', GC.max_angle_up);
 fprintf('\nAngle of maximum radiation down = %f deg\n', GC.max_angle_down);
 
 % plot full Ez with grating geometry overlaid
-GC.plotEz_w_edges();
-axis equal;
+% GC.plotEz_w_edges();
+% axis equal;
 %         
 % % plot all modes
 % f_plot_all_modes_gui( GC.debug.phi_all, GC.x_coords, GC.y_coords, GC.debug.k_all )
+GC = GC.plot_E_field_gui();
         
 % normalize k to within brillouin zone
 k_div_pi_a = GC.k_vs_mode/(pi/period);
