@@ -523,6 +523,62 @@ classdef c_twoLevelGratingCell
         end     % end function runSimulation()
         
         
+        function [obj, max_overlaps] = calc_mode_overlaps( obj, mode_to_overlap )
+            % Takes in a mode and overlaps it with the modes that were
+            % solved in this object
+            % Overlap is performed using a cross correlation
+            %
+            % I
+            
+            % number of modes
+            n_modes = length( obj.k_vs_mode );
+            
+            % size of mode to overlap
+            [ ny_mode_to_overlap, nx_mode_to_overlap ] = size( mode_to_overlap );
+
+            % save max overlaps
+            max_overlaps = zeros( n_modes, 1 );
+            
+            for mode_num = 1:n_modes
+                % for each of this object's saved modes
+                
+                % grab size of this object's mode
+                [ ny_this_mode, nx_this_mode ]  = size( obj.Phi_vs_mode(:,:,mode_num) );
+            
+                % grab this mode, including phase
+                this_mode   = obj.Phi_vs_mode(:,:,mode_num) .* repmat( exp( 1i * obj.x_coords * real(obj.k_vs_mode( mode_num ) )), ny_this_mode, 1 );
+            
+                % zero pad
+                mode_to_overlap_pad = padarray( mode_to_overlap, [ ny_this_mode, nx_this_mode ] );
+                this_mode_pad       = padarray( this_mode, [ ny_mode_to_overlap, nx_mode_to_overlap ] );
+            
+                % x-correlate
+%                 mode_xcorr = ifftshift( ifft2( conj( fft2( fftshift( mode_to_overlap_pad ) ) ) .* fft2( fftshift( this_mode_pad ) ) ) );
+                mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap_pad ) ) .* fft2( this_mode_pad ) ) );
+                
+                % save max overlap
+                max_overlaps( mode_num ) = max( abs( mode_xcorr(:) ) );
+
+%                 % DEBUG plot results
+%                             figure;
+%                             imagesc( abs(mode_xcorr) );
+%                             title('DEBUG mode xcorr');
+%                             colorbar;
+% 
+%                             % DEBUG plot error in modes
+%                             figure;
+%                             imagesc( abs( mode_to_overlap_pad - this_mode_pad ) );
+%                             colorbar;
+%                             title('DEBUG error difference in modes');
+
+            end
+            
+            
+            
+            
+        end
+        
+        
 %         function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )
 %             % LEGACY VERSION
 %             % Runs old mode solver (jelena/mark)
@@ -1285,9 +1341,10 @@ classdef c_twoLevelGratingCell
             ax  = axes('Units','pixels');
 
             % default settings
-            mode_num    = 1;
-            mode_comp   = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
-            phase_on    = false;        % determines whether the propagation phase is included
+            mode_num            = 1;
+            mode_comp           = 'real';       % 'real', 'imag', 'amplitude', 'intensity'
+            phase_on            = true;         % determines whether the propagation phase is included
+            index_overlay_on    = true;         % determines whether index overlay is on or off
 
             % number of modes
             n_modes = length( obj.k_vs_mode );
@@ -1351,15 +1408,15 @@ classdef c_twoLevelGratingCell
             % Create checkbox for selecting/deselecting phase
             checkbox_phase = uicontrol(    'Style', 'checkbox', ...
                                            'String', {'Phase on'}, ...
-                                           'Value', true, ...
-                                           'Position', [20, ax.Position(4) - 50, 100, 50], ...
+                                           'Value', phase_on, ...
+                                           'Position', [20, ax.Position(4) - 50, 100, 30], ...
                                            'Callback', @toggle_phase );   
                                        
             % Create checkbox for turning grating index edges on and off
             checkbox_index_overlay = uicontrol(    'Style', 'checkbox', ...
-                                                   'String', {'Index mask overlay on'}, ...
-                                                   'Value', true, ...
-                                                   'Position', [20, ax.Position(4) - 100, 100, 50], ...
+                                                   'String', {'Index overlay on'}, ...
+                                                   'Value', index_overlay_on, ...
+                                                   'Position', [20, ax.Position(4) - 75, 100, 30], ...
                                                    'Callback', @toggle_index_overlay );   
 
 
@@ -1400,9 +1457,9 @@ classdef c_twoLevelGratingCell
             function toggle_index_overlay( source, event )
 
                 if source.Value == true
-                    toggle_ind;
+                    index_overlay_on = true;
                 else
-                    Ez = Ez_no_phase;
+                    index_overlay_on = false;
                 end 
                 plot_field( mode_num, mode_comp );
             end
@@ -1441,15 +1498,20 @@ classdef c_twoLevelGratingCell
                 xlabel(['x (' obj.units.name ')']); ylabel(['y (' obj.units.name ')']);
                 colorbar;
 
-                % overplot the index with transparency
-                % first things first, edge detection:
-                filt    = 'roberts';            % filter
-                N_edges = edge( N_repmat, filt );
-                % overplot the detected edges
-                hold on;
-                h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
-                set( h, 'AlphaData', N_edges );
-                set( gca, 'YDir', 'normal' );
+                if index_overlay_on == true
+                    % overplot the index with transparency
+                    
+                    % first things first, edge detection:
+                    filt    = 'roberts';            % filter
+                    N_edges = edge( N_repmat, filt );
+                    
+                    % overplot the detected edges
+                    hold on;
+                    h       = imagesc( x_coords_all, obj.y_coords, repmat( ~N_edges, 1, 1, 3 ) );
+                    set( h, 'AlphaData', N_edges );
+                    set( gca, 'YDir', 'normal' );
+                    
+                end
 
 
             end     % end function plot_field()

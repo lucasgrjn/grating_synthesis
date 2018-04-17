@@ -523,6 +523,55 @@ classdef c_twoLevelGratingCell
         end     % end function runSimulation()
         
         
+        function [obj, max_overlaps] = calc_mode_overlaps( obj, mode_to_overlap )
+            % Takes in a mode and overlaps it with the modes that were
+            % solved in this object
+            % Overlap is performed using a cross correlation
+            %
+            % Inputs:
+            %   mode_to_overlap
+            %       type: matrix, double
+            %       desc: field to overlap with. Remove the exponential
+            %             term from it
+            %
+            % Outputs:
+            %   max_overlaps
+            %       type: vector, double
+            %       desc: Max mode overlap vs. mode #     
+            
+            % number of modes
+            n_modes = length( obj.k_vs_mode );
+            
+            % size of mode to overlap
+            [ ny_mode_to_overlap, nx_mode_to_overlap ] = size( mode_to_overlap );
+
+            % save max overlaps
+            max_overlaps = zeros( n_modes, 1 );
+            
+            for mode_num = 1:n_modes
+                % for each of this object's saved modes
+                
+                % grab size of this object's mode
+                [ ny_this_mode, nx_this_mode ]  = size( obj.Phi_vs_mode(:,:,mode_num) );
+            
+                % grab this mode, including phase
+                this_mode   = obj.Phi_vs_mode(:,:,mode_num) .* repmat( exp( 1i * obj.x_coords * real(obj.k_vs_mode( mode_num ) )), ny_this_mode, 1 );
+            
+                % zero pad
+                mode_to_overlap_pad = padarray( mode_to_overlap, [ ny_this_mode, nx_this_mode ] );
+                this_mode_pad       = padarray( this_mode, [ ny_mode_to_overlap, nx_mode_to_overlap ] );
+            
+                % x-correlate
+                mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap_pad ) ) .* fft2( this_mode_pad ) ) );
+                
+                % save max overlap
+                max_overlaps( mode_num ) = max( abs( mode_xcorr(:) ) );
+
+            end
+
+        end     % end function calc_mode_overlaps()
+        
+        
 %         function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )
 %             % LEGACY VERSION
 %             % Runs old mode solver (jelena/mark)

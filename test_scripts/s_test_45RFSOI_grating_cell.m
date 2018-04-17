@@ -42,11 +42,11 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
 
 % grating geometry
-period              = 630;
-fill_top_bot_ratio  = 0.35;
-fill_bot            = 0.8;
+period              = 690;
+fill_top_bot_ratio  = 0.0;
+fill_bot            = 0.7;
 fill_top            = fill_bot * fill_top_bot_ratio;
-offset              = 0.92;
+offset              = 0.64;
         
         
 % make grating cell
@@ -57,10 +57,10 @@ GC = Q.h_makeGratingCell(  Q.convertObjToStruct(), ...
                             offset );
                         
 % simulation settings
-num_modes   = 10;
+num_modes   = 5;
 BC          = 0;
 pml_options = [ 1, 200, 20, 2 ];
-guessk      = (0.01183 + 1i * 1.58e-4);
+guessk      = 0.01084 + 1i * 0.0001073;
 
 % run sim
 tic;
