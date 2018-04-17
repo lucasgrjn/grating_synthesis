@@ -66,17 +66,39 @@ tic;
 GC = GC.runSimulation( num_modes, BC, pml_options, guessk );        
 toc;
 
+fprintf('chosen mode is mode #%i\n', GC.chosen_mode_num);
+
 % plot index
 GC.plotIndex();
 
 
-% correlate first mode with the other modes
-% first_mode              = GC.Phi_vs_mode(:,:,1) .* repmat( exp( 1i * GC.x_coords * real(GC.k_vs_mode( 1 )) ), size(GC.Phi_vs_mode(:,:,1), 1), 1 );
-second_mode             = GC.Phi_vs_mode(:,:,2) .* repmat( exp( 1i * GC.x_coords * real(GC.k_vs_mode( 2 )) ), size(GC.Phi_vs_mode(:,:,2), 1), 1 );
-[GC, max_overlaps]      = GC.calc_mode_overlaps( second_mode );
+% % correlate first mode with the other modes
+% % first_mode              = GC.Phi_vs_mode(:,:,1) .* repmat( exp( 1i * GC.x_coords * real(GC.k_vs_mode( 1 )) ), size(GC.Phi_vs_mode(:,:,1), 1), 1 );
+% second_mode             = GC.Phi_vs_mode(:,:,2) .* repmat( exp( 1i * GC.x_coords * real(GC.k_vs_mode( 2 )) ), size(GC.Phi_vs_mode(:,:,2), 1), 1 );
+% [GC, max_overlaps]      = GC.calc_mode_overlaps( second_mode );
         
+
+
+% run simulation again but with mode overlap
+% OPTS = struct( 'mode_to_overlap', GC.E_z_for_overlap );
+[~,mode_to_overlap] = GC.stitch_E_field( GC.Phi_vs_mode(:,:,3), real(GC.k_vs_mode(3)), 1 );
+OPTS                = struct( 'mode_to_overlap', mode_to_overlap );
+tic;
+GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );        
+toc;
+
+fprintf('chosen mode is mode #%i\n', GC.chosen_mode_num);
+
 % plot all modes
 GC = GC.plot_E_field_gui();
+
+
+
+
+
+
+
+
 
         
 

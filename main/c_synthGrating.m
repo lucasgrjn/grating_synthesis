@@ -2647,12 +2647,13 @@ classdef c_synthGrating
             % set fill factors and offsets
             fill_bots           = fliplr( 0.4:0.025:1 );
 %             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
+            fill_top_bot_ratio  = fliplr( 0.0:0.05:0.75 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
 %             fill_top_bot_ratio  = 0.2:-0.05:0;
-            fill_top_bot_ratio  = fliplr( 0.8:0.025:1.2 );
+%             fill_top_bot_ratio  = fliplr( 0.8:0.025:1.2 );
 %             fill_bots           = 0.975;
             % on normal 1:1 line
-%             fill_bots           = fliplr( 0.9:0.025:0.975 );
+%             fill_bots           = fliplr( 0.9:0.025:1.0 );
 %             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
             offsets             = fliplr(0:0.01:0.99);
@@ -2690,7 +2691,7 @@ classdef c_synthGrating
             
             
             % set solver settings
-            num_modes   = 1;
+            num_modes   = 5;
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 200, 20, 2]; 
             sim_opts    = struct('num_modes', num_modes, 'BC', BC, 'pml_options', pml_options);
@@ -2703,7 +2704,7 @@ classdef c_synthGrating
             % sweep normal
             
             % make grating cell, normal
-            waveguide = obj.h_makeGratingCell( obj.convertObjToStruct(), obj.discretization, 1.0, 1.0, 0.0 );
+            waveguide = obj.h_makeGratingCell( obj.convertObjToStruct(), 2*obj.discretization, 1.0, 1.0, 0.0 );
             
             % run waveguide simulation
             % sim settings
@@ -2733,13 +2734,21 @@ classdef c_synthGrating
             
             % snap period to discretization
             guess_period    = obj.discretization * round(period/obj.discretization);
-%             guess_period_nm = guess_period * obj.units.scale * 1e9; 
+            
+            % ugh this is really annoying but i have to - extend the
+            % waveguide's e z overlap
+            [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
+            waveguide.E_z_for_overlap       = e_z_overlap_ext;
+            
             fprintf('...done\n\n');
             
             % now run the sweep
             
             % only run if normal domain exists
             if length(fill_top_bot_ratio_norm) > 0
+                
+                % initially start with waveguide GC
+                guess_GC = waveguide;
                 
                 % first fill in the right side of the domain
                 for i_ff_bot = 1:length( fill_bots )
@@ -2759,7 +2768,8 @@ classdef c_synthGrating
                                                                                       fill_bots(i_ff_bot), ...
                                                                                       guess_period,...
                                                                                       guessk, ...
-                                                                                      sim_opts );
+                                                                                      sim_opts, ...
+                                                                                      guess_GC );
 
                         % save data
                         if strcmp( obj.coupling_direction, 'up' )
@@ -2783,6 +2793,7 @@ classdef c_synthGrating
                         % update the guess parameters, period, k, offset
                         guessk              = best_GC.k;
                         guess_period        = best_period;
+                        guess_GC            = best_GC;
 
                         % update the offsets
                         % grab previous offset index
@@ -2817,6 +2828,7 @@ classdef c_synthGrating
                 offsets_vs_fills_norm_1 = offsets_vs_fills_norm(:,1);
                 periods_vs_fills_norm_1 = periods_vs_fills_norm(:,1);
                 k_vs_fills_norm_1       = k_vs_fills_norm(:,1);
+                GC_vs_fills_norm_1      = GC_vs_fills_norm(:,1);
                 % calc number of loops, also necessary apparently for parfor
                 n_fill_bots                 = length(fill_bots);
                 n_fill_top_bot_ratio_norm   = length(fill_top_bot_ratio_norm);
@@ -2858,6 +2870,7 @@ classdef c_synthGrating
                     % grab starting guess period and k
                     guess_period    = periods_vs_fills_norm_1( i_ff_bot );
                     guessk          = k_vs_fills_norm_1( i_ff_bot );
+                    guess_GC        = GC_vs_fills_norm_1{ i_ff_bot };
 
                     % grab bottom fill
                     fill_bot = fill_bots( i_ff_bot );
@@ -2879,7 +2892,8 @@ classdef c_synthGrating
                                                                                           fill_bot, ...
                                                                                           guess_period,...
                                                                                           guessk, ...
-                                                                                          sim_opts );
+                                                                                          sim_opts, ...
+                                                                                          guess_GC );
 
                             % save data
                             if strcmp( obj.coupling_direction, 'up' )
@@ -2902,6 +2916,7 @@ classdef c_synthGrating
                             % update the guess parameters, period, k, offset
                             guessk              = best_GC.k;
                             guess_period        = best_period;
+                            guess_GC            = best_GC;
 
                             % update the offsets
                             % grab previous offset index
@@ -2971,6 +2986,12 @@ classdef c_synthGrating
             
             % snap period to discretization
             guess_period    = obj.discretization * round(period/obj.discretization);
+            
+            % ugh this is really annoying but i have to - extend the
+            % waveguide's e z overlap
+            [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
+            waveguide.E_z_for_overlap       = e_z_overlap_ext;
+            
             fprintf('...done\n\n');
             
             % reset offsets 
@@ -2981,6 +3002,9 @@ classdef c_synthGrating
             % only run if invert domain exists
             if length(fill_top_bot_ratio_inv) > 0
             
+                % initially start with waveguide GC
+                guess_GC = waveguide;
+                
                 % first fill in the left side of the domain
                 for i_ff_bot = 1:length( fill_bots )
 
@@ -2997,7 +3021,8 @@ classdef c_synthGrating
                                                                                   fill_bots(i_ff_bot), ...
                                                                                   guess_period,...
                                                                                   guessk, ...
-                                                                                  sim_opts );
+                                                                                  sim_opts, ...
+                                                                                  guess_GC );
 
 
                     % save data
@@ -3022,6 +3047,7 @@ classdef c_synthGrating
                     % update the guess parameters, period, k, offset
                     guessk              = best_GC.k;
                     guess_period        = best_period;
+                    guess_GC            = best_GC;
 
                     % update the offsets
                     % grab previous offset index
@@ -3038,6 +3064,7 @@ classdef c_synthGrating
                 offsets_vs_fills_inv_1 = offsets_vs_fills_inv(:,1);
                 periods_vs_fills_inv_1 = periods_vs_fills_inv(:,1);
                 k_vs_fills_inv_1       = k_vs_fills_inv(:,1);
+                GC_vs_fills_inv_1      = GC_vs_fills_inv(:,1);
                 % calc number of loops, also necessary apparently for parfor
                 n_fill_bots                 = length(fill_bots);
                 n_fill_top_bot_ratio_inv    = length(fill_top_bot_ratio_inv);
@@ -3074,6 +3101,7 @@ classdef c_synthGrating
                     % grab starting guess period and k
                     guess_period    = periods_vs_fills_inv_1( i_ff_bot );
                     guessk          = k_vs_fills_inv_1( i_ff_bot );
+                    guess_GC        = GC_vs_fills_inv_1{ i_ff_bot };
 
                     % grab bottom fill
                     fill_bot = fill_bots( i_ff_bot );
@@ -3091,7 +3119,8 @@ classdef c_synthGrating
                                                                                       fill_bot, ...
                                                                                       guess_period,...
                                                                                       guessk, ...
-                                                                                      sim_opts );
+                                                                                      sim_opts, ...
+                                                                                      guess_GC );
 
 
                         % save data
@@ -3116,6 +3145,7 @@ classdef c_synthGrating
                         % update the guess parameters, period, k, offset
                         guessk              = best_GC.k;
                         guess_period        = best_period;
+                        guess_GC            = best_GC;
 
                         % update the offsets
                         % grab previous offset index
@@ -3383,7 +3413,7 @@ classdef c_synthGrating
         
         function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
                     best_GC, best_k, dir_b4_period_vs_fill ] ...
-                    = optimizePeriodOffset(obj, offsets, fill_top, fill_bot, guess_period, guessk, sim_opts)
+                    = optimizePeriodOffset(obj, offsets, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
             % optimizes period and offset for best angle/directivity
             %
             % Inputs:
@@ -3400,6 +3430,9 @@ classdef c_synthGrating
             %           num_modes
             %           BC
             %           pml_options
+            %   guess_gc
+            %       initial grating coupler object to start with (for mode
+            %       overlapping)
             %
             % Outputs:
             %   best_period
@@ -3416,17 +3449,20 @@ classdef c_synthGrating
             DEBUG = false;
 
             
-             % init saving variables vs. offset
+            % init saving variables vs. offset
             directivities = zeros( size(offsets) );
             k_vs_offset   = zeros( size(offsets) );
             angles        = zeros( size(offsets) );
+            GC_vs_offset  = {};
 
+            % grab mode to overlap with
+            OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
 
             % Sweep offsets, pick offset with best directivity
 %             fprintf('Sweeping offsets...\n');
             for i_offset = 1:length( offsets )
 
-%                 fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
+                fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
@@ -3437,8 +3473,7 @@ classdef c_synthGrating
                                             offsets(i_offset) );
 
                 % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk );
-
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
 
                 % save directivity
                 if strcmp( obj.coupling_direction, 'up' )
@@ -3454,6 +3489,10 @@ classdef c_synthGrating
                 % update the guessk (units rad/'units')
                 guessk                  = GC.k;
                 k_vs_offset( i_offset ) = GC.k;
+                
+                % update the mode overlap field
+                GC_vs_offset{i_offset}  = GC;
+                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
 
 %                 toc;
 
@@ -3481,6 +3520,9 @@ classdef c_synthGrating
             best_offset                 = offsets( indx_best_offset );
             best_offset_k               = k_vs_offset( indx_best_offset );
             best_offset_angle           = angles( indx_best_offset );
+            
+            % update mode overlap
+            OPTS.mode_to_overlap    = GC_vs_offset{indx_best_offset}.E_z_for_overlap;
 
             % here's an output variable
             dir_b4_period_vs_fill = max( directivities );
@@ -3552,7 +3594,7 @@ classdef c_synthGrating
                                             best_offset );
 
                 % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk );
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
 
                 % save angle
                 if strcmp( obj.coupling_direction, 'up' )
@@ -3568,6 +3610,7 @@ classdef c_synthGrating
                 GC_vs_period{i_period}  = GC;
                 k_vs_period(i_period)   = GC.k;
                 guessk                  = GC.k;
+                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
                 
                 % update period
                 if decrease_periods == true

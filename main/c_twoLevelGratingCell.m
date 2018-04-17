@@ -334,11 +334,9 @@ classdef c_twoLevelGratingCell
             %   OPTS
             %       type: struct
             %       desc: optional options with the following fields
-            %           'fix_neg_k'
-            %               type: bool
-            %               desc: THIS IS GOING TO BE DEPRECATED
-            %                       set to false to turn off the auto fixing
-            %                       of backwards propagating modes
+            %           'mode_to_overlap'
+            %               type: matrix, double
+            %               desc: mode to overlap
             %
             % Sets these properties:
             %   obj.k
@@ -636,8 +634,11 @@ classdef c_twoLevelGratingCell
                 this_mode   = obj.Phi_vs_mode(:,:,mode_num) .* repmat( exp( 1i * obj.x_coords * real(obj.k_vs_mode( mode_num ) )), ny_this_mode, 1 );
             
                 % zero pad
-                mode_to_overlap_pad = padarray( mode_to_overlap, [ ny_this_mode, nx_this_mode ] );
-                this_mode_pad       = padarray( this_mode, [ ny_mode_to_overlap, nx_mode_to_overlap ] );
+%                 total_ny            = ny_this_mode + ny_mode_to_overlap;
+                mode_to_overlap_pad = padarray( mode_to_overlap, [ floor(ny_this_mode/2), floor(nx_this_mode/2) ], 0, 'pre' );
+                mode_to_overlap_pad = padarray( mode_to_overlap_pad, [ ceil(ny_this_mode/2), ceil(nx_this_mode/2) ], 0, 'post' );
+                this_mode_pad       = padarray( this_mode, [ floor(ny_mode_to_overlap/2), floor(nx_mode_to_overlap/2) ], 0, 'pre' );
+                this_mode_pad       = padarray( this_mode_pad, [ ceil(ny_mode_to_overlap/2), ceil(nx_mode_to_overlap/2) ], 0, 'post' );
             
                 % x-correlate
                 mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap_pad ) ) .* fft2( this_mode_pad ) ) );
@@ -1378,7 +1379,7 @@ classdef c_twoLevelGratingCell
                 % selects which mode to draw
 
                 mode_comp    = source.String{ source.Value };
-                mode_comp    = mode_comp(2:end);                                        % remove whitespace prefix 
+                mode_comp    = lower(mode_comp(2:end));                     % remove whitespace prefix 
 
                 plot_field( mode_num, mode_comp );
             end
@@ -1421,7 +1422,7 @@ classdef c_twoLevelGratingCell
                         imagesc( x_coords_all, obj.y_coords, real(Ez(:,:,mode_num)) );
                         title( sprintf( 'Mode %i, real component', mode_num ));
 
-                    case 'imag'
+                    case 'imaginary'
                         imagesc( x_coords_all, obj.y_coords, imag(Ez(:,:,mode_num)) );
                         title( sprintf( 'Mode %i, imaginary component', mode_num ));
 
