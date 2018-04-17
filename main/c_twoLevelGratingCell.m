@@ -4,7 +4,7 @@ classdef c_twoLevelGratingCell
 % encapsulates a 2 level grating cell simulation
 % adapted from mark's code
 %
-% Notes to consider:
+% Notes:
 %   - propagation direction coordinate is 'x'. 
 %   - transverse (in plane) direction coordinate is 'y'.
 %   - transverse (out of plane) direction is 'z'.
@@ -85,6 +85,7 @@ classdef c_twoLevelGratingCell
         k_vs_mode;          % k vs mode #
         Phi_vs_mode;        % Phi vs mode #, dimensions y vs. x vs mode #
         chosen_mode_num;    % which mode was chosen
+        E_z_for_overlap;    % Field for mode overlapping. One unit cell with only real(k) in the phase
         
         % radiation parameters
         directivity;        % ratio of power radiated up/power radiated down
@@ -335,15 +336,11 @@ classdef c_twoLevelGratingCell
             %       desc: optional options with the following fields
             %           'fix_neg_k'
             %               type: bool
-            %               desc: set to false to turn off the auto fixing
-            %               of backwards propagating modes
+            %               desc: THIS IS GOING TO BE DEPRECATED
+            %                       set to false to turn off the auto fixing
+            %                       of backwards propagating modes
             %
-            % Outputs:
-            %   Sets these object properties:
-            %   obj.debug.k_all
-            %   obj.debug.phi_all
-            %   obj.debug.guided_power
-            %   obj.debug.guided_power_ratio
+            % Sets these properties:
             %   obj.k
             %       units rad/'units'
             %   obj.Phi
@@ -366,9 +363,9 @@ classdef c_twoLevelGratingCell
             % spatial variables, in units nm
             nm          = 1e9;
             a           = obj.domain_size(2) * obj.units.scale * nm;
-            lambda      = obj.lambda * obj.units.scale * nm;
-            dx          = obj.dx * obj.units.scale * nm;
-            guessk_nm   = guessk / ( obj.units.scale * nm );            % units rad/nm
+            lambda_nm   = obj.lambda * obj.units.scale * nm;
+            dx_nm       = obj.dx * obj.units.scale * nm;
+            guessk_nm   = guessk / ( obj.units.scale * nm );                % units rad/nm
 
             % store options
             obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options, 'OPTS', OPTS );
@@ -379,132 +376,137 @@ classdef c_twoLevelGratingCell
             end
             
             % run solver
-            k0          = 2*pi/lambda;
+            k0_nm           = 2*pi/lambda_nm;
             [Phi_all, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
-                                                       dx, ...
-                                                       k0, ...
+                                                       dx_nm, ...
+                                                       k0_nm, ...
                                                        num_modes, ...
                                                        guessk_nm, ...
                                                        BC, ...
                                                        pml_options );
                                                    
-            % re-scale k
-            k = k_nm * nm * obj.units.scale;
-            
-            % DEBUG store temporary copies of k and phi_all b4 removing and
-            % sorting
-            obj.debug.k_all_before_fix_backwards     = k;
-            obj.debug.phi_all_before_fix_backwards   = Phi_all;
-
-            
-            % sort on guided power
-            guided_power  = zeros( size(k) );
-            total_power   = zeros( size(k) );
-
-            % check to see if waveguide boundaries have been set yet
-            if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
-                error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
-                        ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
-            end
-            
-            y_bot   = obj.wg_min_y;
-            y_top   = obj.wg_max_y;
-            y       = obj.y_coords;
-            
-            
-            % Calculated guided power and fix backwards modes if option is
-            % selected
-            for ii = 1:length(k)
-                % for each mode
-
-                % Fix backwards propagating modes
-                if isfield( OPTS, 'fix_neg_k' ) && OPTS.fix_neg_k == true
-
-                    % check if k is backwards propagating
-                    % if it is, then the mode must be resimulated with -k
-                    if imag( k(ii) ) < 0
-
-                        fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
-                                  'Re-running solver with flipped k\n' ]);
-                        fprintf('Current k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
-
-                        % re-run solver
-                        [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
-                                                                   dx, ...
-                                                                   k0, ...
-                                                                   1, ...
-                                                                   -( k(ii) * obj.units.scale * nm ), ...
-                                                                   BC, ...
-                                                                   pml_options );
-
-                        % re-scale k
-                        k(ii) = k_nm * nm * obj.units.scale;
-
-                        % now check, if imag(k) is still < 0, kill the mode
-                        % from consideration, meaning set the field = 0
-                        if imag( k(ii) ) < 0
-                            % set field = 0
-                            fprintf('Mode %i has imag(k) < 0, killing this mode\n', ii );
-                            Phi_all( :, :, ii ) = zeros(size(Phi));
-                        else
-                            % overwrite Phi
-                            fprintf('New k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
-                            Phi_all( :, :, ii ) = Phi;
-                        end
-
-                    end     % end if imag( k(ii) ) < 0
-
-                end     % end if isfield
-                    
-                % grab guided portion of field
-                phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
-                cur_phi     = Phi_all( :, :, ii );
-
-                % sum area of field
-                guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-                total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
-
-            end     % end for
-  
+            % re-scale k to units 'units'
+            k_vs_mode = k_nm * nm * obj.units.scale;
             
             % save k and phi vs mode #
-            obj.k_vs_mode   = k;
+            obj.k_vs_mode   = k_vs_mode;
             obj.Phi_vs_mode = Phi_all;
             
-            % DEBUG storing the guided power
-            obj.debug.guided_power          = guided_power;
-            obj.debug.guided_power_ratio    = guided_power./total_power;
-            
-            % keep mode with LEAST unguided power OR MOST guided power
-            [~, indx_k] = max( abs(guided_power./total_power) );        % most guided
-            k           = k(indx_k);
-            Phi         = Phi_all(:,:,indx_k);
-            
+%             % DEBUG store temporary copies of k and phi_all b4 removing and
+%             % sorting
+%             obj.debug.k_all_before_fix_backwards     = k;
+%             obj.debug.phi_all_before_fix_backwards   = Phi_all;
 
-            % save wavevectors and field
-            obj.k               = k;
-            obj.Phi             = Phi;
-            obj.chosen_mode_num = indx_k;
             
-            % number of cells to repeat
-            numcells = obj.numcells;
-
-            % stitch together e field, including the phase
-            nx              = round( numcells*obj.domain_size(2)/obj.dx );
-%             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
-            x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
-            phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
-            % DEBUG
-%             disp( size(phase_all) );
-%             disp( size( repmat( Phi, 1, numcells ) ) );
-            E_z             = repmat( Phi, 1, numcells ).*phase_all;
+%             % sort on guided power
+%             guided_power  = zeros( size(k) );
+%             total_power   = zeros( size(k) );
+% 
+%             % check to see if waveguide boundaries have been set yet
+%             if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
+%                 error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
+%                         ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
+%             end
+%             
+%             y_bot   = obj.wg_min_y;
+%             y_top   = obj.wg_max_y;
+%             y       = obj.y_coords;
+%             
+%             
+%             % Calculated guided power and fix backwards modes if option is
+%             % selected
+%             for ii = 1:length(k)
+                % for each mode
+% 
+%                 % Fix backwards propagating modes
+%                 if isfield( OPTS, 'fix_neg_k' ) && OPTS.fix_neg_k == true
+% 
+%                     % check if k is backwards propagating
+%                     % if it is, then the mode must be resimulated with -k
+%                     if imag( k(ii) ) < 0
+% 
+%                         fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+%                                   'Re-running solver with flipped k\n' ]);
+%                         fprintf('Current k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+% 
+%                         % re-run solver
+%                         [Phi, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
+%                                                                    dx, ...
+%                                                                    k0, ...
+%                                                                    1, ...
+%                                                                    -( k(ii) * obj.units.scale * nm ), ...
+%                                                                    BC, ...
+%                                                                    pml_options );
+% 
+%                         % re-scale k
+%                         k(ii) = k_nm * nm * obj.units.scale;
+% 
+%                         % now check, if imag(k) is still < 0, kill the mode
+%                         % from consideration, meaning set the field = 0
+%                         if imag( k(ii) ) < 0
+%                             % set field = 0
+%                             fprintf('Mode %i has imag(k) < 0, killing this mode\n', ii );
+%                             Phi_all( :, :, ii ) = zeros(size(Phi));
+%                         else
+%                             % overwrite Phi
+%                             fprintf('New k = %f + i * %f\n', real( k(ii) ), imag( k(ii) ) );
+%                             Phi_all( :, :, ii ) = Phi;
+%                         end
+% 
+%                     end     % end if imag( k(ii) ) < 0
+% 
+%                 end     % end if isfield
+%                     
+%                 % grab guided portion of field
+%                 phi_guided  = Phi_all( y >= y_bot & y <= y_top, :, ii );
+%                 cur_phi     = Phi_all( :, :, ii );
+% 
+%                 % sum area of field
+%                 guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+%                 total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
+% 
+%             end     % end for
+  
             
-            % save E_z
-            obj.E_z         = E_z;
+            
+            
+%             % DEBUG storing the guided power
+%             obj.debug.guided_power          = guided_power;
+%             obj.debug.guided_power_ratio    = guided_power./total_power;
+%             
+%             % keep mode with LEAST unguided power OR MOST guided power
+%             [~, indx_k] = max( abs(guided_power./total_power) );        % most guided
+%             k           = k(indx_k);
+%             Phi         = Phi_all(:,:,indx_k);
+%             
+% 
+%             % save wavevectors and field
+%             obj.k               = k;
+%             obj.Phi             = Phi;
+%             obj.chosen_mode_num = indx_k;
+            
+            % pick which mode to keep
+            if isfield( OPTS, 'mode_to_overlap' )
+                % pick mode with best overlap
+                obj = obj.choose_mode( OPTS.mode_to_overlap );
+            else
+                % pick mode guided mode
+                obj = obj.choose_mode(); 
+            end
+            
+            % stitch together full e field, with the request number of
+            % periods
+            [obj, E_z]  = obj.stitch_E_field( obj.Phi, obj.k, obj.numcells );
+            obj.E_z     = E_z;
+            
+            % for mode overlapping, stitch together single unit cell of E
+            % field, using only real(k)
+            [obj, E_z_for_overlap]  = obj.stitch_E_field( obj.Phi, real(obj.k), 1 );
+            obj.E_z_for_overlap     = E_z_for_overlap;
             
             % pick slices of field to compute directivity, angle, etc.
-            h_pml_d = round( pml_options(2)/obj.dy ); % size of pml in discretizations
-            y_up    = size(E_z,1) - h_pml_d - 1;
+            h_pml_d = round( pml_options(2)/obj.dy );                       % size of pml in discretizations
+            y_up    = size( obj.E_z, 1 ) - h_pml_d - 1;
             y_down  = h_pml_d+2;
             
             % calculate output angle
@@ -513,14 +515,90 @@ classdef c_twoLevelGratingCell
             % calculate up/down directivity
             obj             = obj.calc_radiated_power();
             obj.directivity = obj.P_rad_up/obj.P_rad_down;
-            
-            
-            
+                    
             % calculate power scattering strength
-            obj                       = obj.calc_scattering_strength();
+            obj = obj.calc_scattering_strength();
             
             
         end     % end function runSimulation()
+        
+        
+        function obj = choose_mode( obj, mode_to_overlap )
+            % Function that chooses which mode becomes the accepted mode
+            %
+            % Inputs:
+            %   mode_to_overlap
+            %       type: matrix, double
+            %       desc: OPTIONAL. If passed in as argument, this function
+            %             will choose the mode with the closest overlap.
+            %             Otherwise, the function will choose the mode with
+            %             the mode guided power
+            %
+            % Sets these properties:
+            %   obj.k
+            %       prop. k of chosen mode
+            %   obj.Phi
+            %       field envelope of chosen mode
+            %   obj.chosen_mode_num
+            %       index of chosen mode (chosen mode k = obj.k_vs_mode(
+            %       obj.chosen_mode_num))
+            
+            if nargin < 2
+                % sort on guided power
+                
+                guided_power  = zeros( size(obj.k_vs_mode) );
+                total_power   = zeros( size(obj.k_vs_mode) );
+
+                % check to see if waveguide boundaries have been set yet
+                if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
+                    error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
+                            ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
+                end
+
+                y_bot   = obj.wg_min_y;
+                y_top   = obj.wg_max_y;
+                y       = obj.y_coords;
+
+                % Calculated guided power and fix backwards modes if option is
+                % selected
+                for ii = 1:length(obj.k_vs_mode)
+                    % for each mode
+
+                    % grab guided portion of field
+                    phi_guided  = obj.Phi_vs_mode( y >= y_bot & y <= y_top, :, ii );
+                    cur_phi     = obj.Phi_vs_mode( :, :, ii );
+
+                    % sum area of field
+                    guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+                    total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
+
+                end     % end for
+
+                % DEBUG storing the guided power
+                obj.debug.guided_power          = guided_power;
+                obj.debug.guided_power_ratio    = guided_power./total_power;
+
+                % keep mode with LEAST unguided power OR MOST guided power
+                [~, indx_k]         = max( abs(guided_power./total_power) );        % most guided
+                obj.k               = obj.k_vs_mode(indx_k);
+                obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
+                obj.chosen_mode_num = indx_k;
+                
+            else
+                % sort on mode overlap
+                
+                % run overlaps
+                [obj, max_overlaps] = obj.calc_mode_overlaps( mode_to_overlap );
+                
+                % keep mode with highest overlap
+                [~, indx_k]         = max( max_overlaps );        
+                obj.k               = obj.k_vs_mode(indx_k);
+                obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
+                obj.chosen_mode_num = indx_k;
+                
+            end
+            
+        end     % end function choose_mode()
         
         
         function [obj, max_overlaps] = calc_mode_overlaps( obj, mode_to_overlap )
@@ -572,162 +650,7 @@ classdef c_twoLevelGratingCell
         end     % end function calc_mode_overlaps()
         
         
-%         function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )
-%             % LEGACY VERSION
-%             % Runs old mode solver (jelena/mark)
-%             %
-%             % Description:
-%             %   Runs complex-k mode solver. Stores the mode with the most
-%             %   guided power. Calculates up/down power, directivity,
-%             %   angle of maximum radiation, and scattering strength.
-%             %
-%             % Inputs:
-%             %   num_modes
-%             %       type: integer
-%             %       desc: # of modes (max) to simulate
-%             %   BC
-%             %       type: integer
-%             %       desc: 0 for PEC, 1 for PMC
-%             %   pml_options
-%             %       type: array, double
-%             %       desc: 1x4 Array with the following elements:
-%             %               PML_options(1): PML in y direction (yes=1 or no=0)
-%             %               PML_options(2): length of PML layer in nm
-%             %               PML_options(3): strength of PML in the complex plane
-%             %               PML_options(4): PML polynomial order (1, 2, 3...)
-% 
-%             % spatial variables, in units nm
-%             nm      = 1e9;
-%             a       = obj.domain_size(2) * obj.units.scale * nm;
-%             lambda  = obj.lambda * obj.units.scale * nm;
-%             dx      = obj.dx * obj.units.scale * nm;
-% 
-%             % store options
-%             obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
-% 
-%             % set guessk if not entered
-%             if nargin < 5
-%                 guessk = pi/(2*a);
-%             end
-%             
-%             % run solver
-%             k0          = 2*pi/lambda;
-%             [Phi_1D, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
-%                                                        dx, ...
-%                                                        k0, ...
-%                                                        num_modes, ...
-%                                                        guessk, ...
-%                                                        BC, ...
-%                                                        pml_options );
-%                                                    
-%             % re-scale k
-%             k = k * nm * obj.units.scale;
-%             
-%             % reshape field envelope ("Phi")
-%             Phi_all = zeros( size(obj.N, 1), size(obj.N, 2), length(k) );  % stores all field envelope, dimensions y vs x vs k
-%             for ii = 1:length(k)
-%                 
-%                 % reshape field
-%                 Phi_k = reshape( Phi_1D(:,ii), fliplr( size(obj.N) ) ); % dimensions (x, y) where x = direction of propagation
-%                 Phi_k = Phi_k.';
-%                 
-%                 % save in Phi_all
-%                 Phi_all(:, :, ii) = Phi_k;  % dimensions (y, x, k)
-%                 
-%             end
-%             
-%             % DEBUG store temporary copies of k and phi_all b4 removing and
-%             % sorting
-%             temp_k_orig         = k;
-%             temp_phi_all_orig   = Phi_all;
-%             obj.debug.k_all     = temp_k_orig;
-%             obj.debug.phi_all   = Phi_all;
-% 
-%             
-%             % sort on guided power
-%             guided_power  = zeros( size(k) );
-%             total_power   = zeros( size(k) );
-% 
-%             % check to see if waveguide boundaries have been set yet
-%             if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
-%                 error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
-%                         ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
-%             end
-%             
-%             y_bot   = obj.wg_min_y;
-%             y_top   = obj.wg_max_y;
-%             y       = obj.y_coords;
-%             
-%             for ii = 1:length(k)
-%                 % for each mode
-% 
-%                 % grab guided portion of field
-%                 phi_guided = Phi_all( y >= y_bot & y <= y_top, :, ii );
-%                 cur_phi    = Phi_all( :, :, ii );
-% 
-%                 % sum area of field
-%                 guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
-%                 total_power(ii)     = sum( abs( cur_phi(:) ).^2 );
-% 
-%             end
-%             
-%             % DEBUG storing the guided power
-%             obj.debug.guided_power = guided_power;
-%             
-%             % keep mode with LEAST unguided power OR MOST guided power
-%             [~, indx_k] = max( abs(guided_power./total_power) );        % most guided
-%             k           = k(indx_k);
-%             Phi         = Phi_all(:,:,indx_k);
-%             
-%             % check if k is backwards propagating
-%             % if it is, then the field must be flipped.
-%             if real(k) >=0 & imag(k) <= 0
-%                 
-%                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
-%                           'Flipping the field and inverting the sign of k\n\n' ]);
-%                 
-%                 k   = -k;
-%                 Phi = rot90(Phi, 2);    % equivalent to fliplr(flipud(Phi))
-%                 
-%             end
-% 
-%             % save wavevectors and field
-%             obj.k   = k;
-%             obj.Phi = Phi;
-%             
-%             % number of cells to repeat
-%             numcells = obj.numcells;
-% 
-%             % stitch together e field, including the phase
-%             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
-%             phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
-%             E_z             = repmat( Phi, 1, numcells ).*phase_all;
-%             
-%             % save E_z
-%             obj.E_z         = E_z;
-%             
-%             % DEBUG plot the field
-% %             obj.plotEz();
-%             
-%             % pick slices of field to compute directivity, angle, etc.
-%             h_pml_d = round( pml_options(2)/obj.dy ); % size of pml in discretizations
-%             y_up    = size(E_z,1) - h_pml_d - 1;
-%             y_down  = h_pml_d+2;
-%             
-%             % calculate output angle
-%             obj = obj.calc_output_angle( y_up, y_down );
-%             
-%             % calculate up/down directivity
-%             obj             = obj.calc_radiated_power( y_up, y_down );
-%             obj.directivity = obj.P_rad_up/obj.P_rad_down;
-%                  
-%             % calculate power scattering strength
-%             obj = obj.calc_scattering_strength();
-%             obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
-%             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
-%             
-%             
-%         end     % end function runSimulation_old()
+
         
         
         function obj = calc_radiated_power(obj)
@@ -1167,6 +1090,28 @@ classdef c_twoLevelGratingCell
         end     % end function calc_power_distribution_onecell()
         
         
+        function [obj, E_z] = stitch_E_field( obj, Phi, k, num_cells )
+            % Stitches the E field together from the phase and envelope
+            %
+            % Inputs:
+            %   Phi
+            %       type: matrix, double
+            %       desc: field envelope
+            %   k
+            %       type: scalar, double
+            %       desc: propagation constant
+            %   num_cells
+            %       type: scalar, int
+            %       desc: number of cells to repeat
+            
+            % stitch together e field, including the phase
+            nx              = round( num_cells*obj.domain_size(2)/obj.dx );
+            x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
+            phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
+            E_z             = repmat( Phi, 1, num_cells ).*phase_all;
+            
+        end     % end function stitch_E_field()
+        
         
         function plotIndex(obj)
             % Plots the index distribution
@@ -1218,6 +1163,9 @@ classdef c_twoLevelGratingCell
         function plotEz_w_edges(obj, OPTS)
             % plots electric field, this could probably be part of a gui
             % with grating geometry edges overlaid
+            %
+            % USE THE GUI INSTEAD
+            % obj.plot_E_field_gui()
             %
             % inputs:
             %   OPTS
@@ -1516,3 +1464,164 @@ classdef c_twoLevelGratingCell
     
 end     % end class
 
+
+% -------------------------------------------------------------------------
+% Legacy code
+% -------------------------------------------------------------------------
+
+%         function obj = runSimulation_old( obj, num_modes, BC, pml_options, guessk )
+%             % LEGACY VERSION
+%             % Runs old mode solver (jelena/mark)
+%             %
+%             % Description:
+%             %   Runs complex-k mode solver. Stores the mode with the most
+%             %   guided power. Calculates up/down power, directivity,
+%             %   angle of maximum radiation, and scattering strength.
+%             %
+%             % Inputs:
+%             %   num_modes
+%             %       type: integer
+%             %       desc: # of modes (max) to simulate
+%             %   BC
+%             %       type: integer
+%             %       desc: 0 for PEC, 1 for PMC
+%             %   pml_options
+%             %       type: array, double
+%             %       desc: 1x4 Array with the following elements:
+%             %               PML_options(1): PML in y direction (yes=1 or no=0)
+%             %               PML_options(2): length of PML layer in nm
+%             %               PML_options(3): strength of PML in the complex plane
+%             %               PML_options(4): PML polynomial order (1, 2, 3...)
+% 
+%             % spatial variables, in units nm
+%             nm      = 1e9;
+%             a       = obj.domain_size(2) * obj.units.scale * nm;
+%             lambda  = obj.lambda * obj.units.scale * nm;
+%             dx      = obj.dx * obj.units.scale * nm;
+% 
+%             % store options
+%             obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
+% 
+%             % set guessk if not entered
+%             if nargin < 5
+%                 guessk = pi/(2*a);
+%             end
+%             
+%             % run solver
+%             k0          = 2*pi/lambda;
+%             [Phi_1D, k] = complexk_mode_solver_2D_PML_old( obj.N, ...
+%                                                        dx, ...
+%                                                        k0, ...
+%                                                        num_modes, ...
+%                                                        guessk, ...
+%                                                        BC, ...
+%                                                        pml_options );
+%                                                    
+%             % re-scale k
+%             k = k * nm * obj.units.scale;
+%             
+%             % reshape field envelope ("Phi")
+%             Phi_all = zeros( size(obj.N, 1), size(obj.N, 2), length(k) );  % stores all field envelope, dimensions y vs x vs k
+%             for ii = 1:length(k)
+%                 
+%                 % reshape field
+%                 Phi_k = reshape( Phi_1D(:,ii), fliplr( size(obj.N) ) ); % dimensions (x, y) where x = direction of propagation
+%                 Phi_k = Phi_k.';
+%                 
+%                 % save in Phi_all
+%                 Phi_all(:, :, ii) = Phi_k;  % dimensions (y, x, k)
+%                 
+%             end
+%             
+%             % DEBUG store temporary copies of k and phi_all b4 removing and
+%             % sorting
+%             temp_k_orig         = k;
+%             temp_phi_all_orig   = Phi_all;
+%             obj.debug.k_all     = temp_k_orig;
+%             obj.debug.phi_all   = Phi_all;
+% 
+%             
+%             % sort on guided power
+%             guided_power  = zeros( size(k) );
+%             total_power   = zeros( size(k) );
+% 
+%             % check to see if waveguide boundaries have been set yet
+%             if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
+%                 error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
+%                         ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
+%             end
+%             
+%             y_bot   = obj.wg_min_y;
+%             y_top   = obj.wg_max_y;
+%             y       = obj.y_coords;
+%             
+%             for ii = 1:length(k)
+%                 % for each mode
+% 
+%                 % grab guided portion of field
+%                 phi_guided = Phi_all( y >= y_bot & y <= y_top, :, ii );
+%                 cur_phi    = Phi_all( :, :, ii );
+% 
+%                 % sum area of field
+%                 guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+%                 total_power(ii)     = sum( abs( cur_phi(:) ).^2 );
+% 
+%             end
+%             
+%             % DEBUG storing the guided power
+%             obj.debug.guided_power = guided_power;
+%             
+%             % keep mode with LEAST unguided power OR MOST guided power
+%             [~, indx_k] = max( abs(guided_power./total_power) );        % most guided
+%             k           = k(indx_k);
+%             Phi         = Phi_all(:,:,indx_k);
+%             
+%             % check if k is backwards propagating
+%             % if it is, then the field must be flipped.
+%             if real(k) >=0 & imag(k) <= 0
+%                 
+%                 fprintf([ '\nMode found is backwards propagating (positive real k, negative imag k).\n', ...
+%                           'Flipping the field and inverting the sign of k\n\n' ]);
+%                 
+%                 k   = -k;
+%                 Phi = rot90(Phi, 2);    % equivalent to fliplr(flipud(Phi))
+%                 
+%             end
+% 
+%             % save wavevectors and field
+%             obj.k   = k;
+%             obj.Phi = Phi;
+%             
+%             % number of cells to repeat
+%             numcells = obj.numcells;
+% 
+%             % stitch together e field, including the phase
+%             x_coords_all    = 0 : obj.dx : numcells*obj.domain_size(2)-obj.dx;
+%             phase_all       = repmat( exp( 1i*k*x_coords_all ), size(Phi,1), 1 );
+%             E_z             = repmat( Phi, 1, numcells ).*phase_all;
+%             
+%             % save E_z
+%             obj.E_z         = E_z;
+%             
+%             % DEBUG plot the field
+% %             obj.plotEz();
+%             
+%             % pick slices of field to compute directivity, angle, etc.
+%             h_pml_d = round( pml_options(2)/obj.dy ); % size of pml in discretizations
+%             y_up    = size(E_z,1) - h_pml_d - 1;
+%             y_down  = h_pml_d+2;
+%             
+%             % calculate output angle
+%             obj = obj.calc_output_angle( y_up, y_down );
+%             
+%             % calculate up/down directivity
+%             obj             = obj.calc_radiated_power( y_up, y_down );
+%             obj.directivity = obj.P_rad_up/obj.P_rad_down;
+%                  
+%             % calculate power scattering strength
+%             obj = obj.calc_scattering_strength();
+%             obj.debug.alpha_up_old    = imag(k) * obj.P_rad_up/( obj.P_rad_up + obj.P_rad_down );     % DEPRECATED upwards radiative loss
+%             obj.debug.alpha_down_old  = imag(k) * obj.P_rad_down/( obj.P_rad_up + obj.P_rad_down);    % DEPRECATED downwards radiative loss
+%             
+%             
+%         end     % end function runSimulation_old()

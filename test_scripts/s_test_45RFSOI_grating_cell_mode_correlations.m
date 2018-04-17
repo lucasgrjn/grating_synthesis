@@ -69,9 +69,6 @@ toc;
 % plot index
 GC.plotIndex();
 
-       
-
-
 
 % correlate first mode with the other modes
 % first_mode              = GC.Phi_vs_mode(:,:,1) .* repmat( exp( 1i * GC.x_coords * real(GC.k_vs_mode( 1 )) ), size(GC.Phi_vs_mode(:,:,1), 1), 1 );
