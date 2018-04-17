@@ -66,9 +66,9 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 
 % define layer thicknesses
 t_air       = 1100;
-t_SiO2_bot  = 100;
+t_SiO2_bot  = 140;
 t_SiN       = 70;
-t_cSi       = 80;
+t_cSi       = 70;
 t_pSi       = 80;
 
 % draw layers

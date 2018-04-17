@@ -2645,9 +2645,9 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:1 );
+            fill_bots           = fliplr( 0.4:0.025:1.0 );
 %             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.05:0.75 );
+            fill_top_bot_ratio  = fliplr( 0.0:0.05:1.3 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
 %             fill_top_bot_ratio  = 0.2:-0.05:0;
 %             fill_top_bot_ratio  = fliplr( 0.8:0.025:1.2 );
@@ -3462,7 +3462,7 @@ classdef c_synthGrating
 %             fprintf('Sweeping offsets...\n');
             for i_offset = 1:length( offsets )
 
-                fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
+%                 fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
