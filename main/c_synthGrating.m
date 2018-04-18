@@ -2666,8 +2666,9 @@ classdef c_synthGrating
             obj.offsets             = offsets;
             
             % split domain into inverted and normal domains
-            fill_top_bot_ratio_inv  = fliplr( fill_top_bot_ratio( fill_top_bot_ratio < 0.79 ) );         % inverted. NOTE this array is monotonically increasing
-            fill_top_bot_ratio_norm = fill_top_bot_ratio( fill_top_bot_ratio >= 0.79 );                  % normal
+            inv_norm_thresh         = 0.0;
+            fill_top_bot_ratio_inv  = fliplr( fill_top_bot_ratio( fill_top_bot_ratio < inv_norm_thresh ) );         % inverted. NOTE this array is monotonically increasing
+            fill_top_bot_ratio_norm = fill_top_bot_ratio( fill_top_bot_ratio >= inv_norm_thresh );                  % normal
             
             % initialize saving variables
             % normal domain
