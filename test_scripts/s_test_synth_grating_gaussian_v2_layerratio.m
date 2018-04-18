@@ -21,7 +21,7 @@ optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
-data_notes          = 'meh';
+data_notes          = 'finer sweep with inver/normal threshold of 0.79';
 data_mode           = 'new';
 n_workers           = 1;
 
