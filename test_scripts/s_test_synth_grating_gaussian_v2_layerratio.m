@@ -14,14 +14,14 @@ addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synth
 % initial settings
 disc                = 10;
 units               = 'nm';
-lambda              = 1225;
+lambda              = 1250;
 index_clad          = 1.0; % 1.448;
 domain              = [2500, 800];      % useful
 optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
-data_notes          = 'regular sweep with BOX 150nm, lambda 1150nm';
+data_notes          = 'regular sweep with BOX 150nm, lambda 1250nm';
 data_mode           = 'new';
 n_workers           = 1;
 
