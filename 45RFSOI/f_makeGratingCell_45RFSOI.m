@@ -65,11 +65,12 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 % pml_length  = pml_opts(2);
 
 % define layer thicknesses
-t_air       = 1100;
-t_SiO2_bot  = 140;
-t_SiN       = 70;
-t_cSi       = 70;
-t_pSi       = 80;
+domain_y_half   = round( (domain_size(1)/2) /synth_obj.discretization) * synth_obj.discretization;
+t_SiO2_bot      = 100;
+t_air           = domain_y_half - t_SiO2_bot;
+t_SiN           = 70;
+t_cSi           = 70;
+t_pSi           = 80;
 
 % draw layers
 GC = GC.addLayer( t_air, domain_size(1)-t_air, n_SiO2 );     % add in SiO2
