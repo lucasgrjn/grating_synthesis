@@ -66,7 +66,7 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 
 % define layer thicknesses
 domain_y_half   = round( (domain_size(1)/2) /synth_obj.discretization) * synth_obj.discretization;
-t_SiO2_bot      = 350;
+t_SiO2_bot      = 150;
 t_air           = domain_y_half - t_SiO2_bot;
 t_SiN           = 70;
 t_cSi           = 70;
