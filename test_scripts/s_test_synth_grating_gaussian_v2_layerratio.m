@@ -17,11 +17,11 @@ units               = 'nm';
 lambda              = 1200;
 index_clad          = 1.0; % 1.448;
 domain              = [2500, 800];      % useful
-optimal_angle       = 15;             % still useful
+optimal_angle       = 25;             % still useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
-data_notes          = 'regular sweep with BOX 150nm, angle 15 deg';
+data_notes          = 'regular sweep with BOX 150nm, angle 25 deg';
 data_mode           = 'new';
 n_workers           = 1;
 
