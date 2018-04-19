@@ -48,6 +48,8 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
 %             'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
 
+% display Q for logging purposes
+Q
         
 % run synthesize gaussian grating
 % note units are in 'nm'
@@ -58,26 +60,26 @@ Q       = Q.synthesizeGaussianGrating(MFD, DEBUG);
 toc;
 
 % save data
-save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q', '-v7.3' );
+% save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q', '-v7.3' );
+save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q' );
 
+% directivity vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.directivities_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Directivity (dB) vs. fill factors');
+savefig(['dir_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['dir_v_ff_' Q.start_time '.fig']);
 
-% % directivity vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.directivities_vs_fills) );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Directivity (dB) vs. fill factors');
-% savefig('dir_v_ff.fig');
-% saveas(gcf, 'dir_v_ff.png');
-% 
-% % directivity BEFORE sweeping periods vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.dir_b4_period_vs_fills) );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
-% savefig('dir_b4_period_v_ff.fig');
-% saveas(gcf, 'dir_b4_period_v_ff.png');
+% directivity BEFORE sweeping periods vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.dir_b4_period_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
+savefig(['dir_b4_period_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['dir_b4_period_v_ff_' Q.start_time '.png']);
 
 % % TEMP remove sat
 % figure;
@@ -155,72 +157,72 @@ save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q', '-v7.3' );
 % title('Directivity (dB) (only datapoints on inverted curve) vs. fill factors');
 
 
-% % angles vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.angles_vs_fills );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Angles (deg) vs. fill factors');
-% savefig('angle_v_ff.fig');
-% saveas(gcf, 'angle_v_ff.png');
-% 
-% % scattering strength alpha vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, real(Q.scatter_str_vs_fills) );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Scattering strength (real) vs. fill factors');
-% savefig('scatter_str_v_ff.fig');
-% saveas(gcf, 'scatter_str_v_ff.png');
-% 
-% % period vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.periods_vs_fills );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title(['Period (' Q.units.name ') vs. fill factors']);
-% savefig('period_v_ff.fig');
-% saveas(gcf, 'period_v_ff.png');
-% 
-% % offset vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.offsets_vs_fills );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Offset vs. fill factors');
-% savefig('offsets_v_ff.fig');
-% saveas(gcf, 'offsets_v_ff.png');
-% 
-% % k vs. fill
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, real(Q.k_vs_fills) );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Real k vs. fill factors');
-% savefig('k_real_v_ff.fig');
-% saveas(gcf, 'k_real_v_ff.png');
-% 
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, imag(Q.k_vs_fills) );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Imag k vs. fill factors');
-% savefig('k_imag_v_ff.fig');
-% saveas(gcf, 'k_imag_v_ff.png');
-% 
-% 
-% % offset (jelena's definition) vs. fills
-% offset_jelena = Q.offsets_vs_fills + ...
-%                 repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) - ...
-%                 repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) .* repmat(Q.fill_top_bot_ratio, length(Q.fill_bots), 1);
-% offset_jelena = mod( offset_jelena, 1.0 );
-% figure;
-% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, offset_jelena );
-% colorbar; set( gca, 'ydir', 'normal' );
-% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
-% title('Offset (jelena''s def) vs. fill factors');
-% savefig('offsets_jelena_v_ff.fig');
-% saveas(gcf, 'offsets_jelena_v_ff.png');
+% angles vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.angles_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Angles (deg) vs. fill factors');
+savefig(['angle_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['angle_v_ff_' Q.start_time '.png']);
+
+% scattering strength alpha vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, real(Q.scatter_str_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Scattering strength (real) vs. fill factors');
+savefig(['scatter_str_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['scatter_str_v_ff_' Q.start_time '.png']);
+
+% period vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.periods_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title(['Period (' Q.units.name ') vs. fill factors']);
+savefig(['period_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['period_v_ff_' Q.start_time '.png']);
+
+% offset vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, Q.offsets_vs_fills );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Offset vs. fill factors');
+savefig(['offsets_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['offsets_v_ff_' Q.start_time '.png']);
+
+% k vs. fill
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, real(Q.k_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Real k vs. fill factors');
+savefig(['k_real_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['k_real_v_ff_' Q.start_time '.png']);
+
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, imag(Q.k_vs_fills) );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Imag k vs. fill factors');
+savefig(['k_imag_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['k_imag_v_ff_' Q.start_time '.png']);
+
+
+% offset (jelena's definition) vs. fills
+offset_jelena = Q.offsets_vs_fills + ...
+                repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) - ...
+                repmat(Q.fill_bots.', 1, length(Q.fill_top_bot_ratio) ) .* repmat(Q.fill_top_bot_ratio, length(Q.fill_bots), 1);
+offset_jelena = mod( offset_jelena, 1.0 );
+figure;
+imagesc( Q.fill_top_bot_ratio, Q.fill_bots, offset_jelena );
+colorbar; set( gca, 'ydir', 'normal' );
+xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+title('Offset (jelena''s def) vs. fill factors');
+savefig(['offsets_jelena_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['offsets_jelena_v_ff_' Q.start_time '.png']);
 
 
 % plot of the final designs

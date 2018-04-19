@@ -220,7 +220,7 @@ classdef c_synthGrating
                 p = f_parse_varargin( inputs, varargin{:} );
 
                 % save starting time
-                obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS ' );
+                obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS_' );
 
                 % set units
                 obj.units.name  = p.units;
@@ -2645,7 +2645,7 @@ classdef c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.02:1.0 );
+            fill_bots           = fliplr( 0.4:0.025:1.0 );
 %             fill_top_bot_ratio  = fliplr( 0.0:0.05:1.1 );
             fill_top_bot_ratio  = fliplr( 0.0:0.025:1.2 );
 %             fill_top_bot_ratio  = 1:-0.05:0.9;
@@ -2656,17 +2656,18 @@ classdef c_synthGrating
 %             fill_bots           = fliplr( 0.9:0.025:1.0 );
 %             fill_top_bot_ratio  = 1;
             fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            offsets             = fliplr(0:0.01:0.99);
-            offsets_orig        = offsets;
+%             offsets             = fliplr(0:0.01:0.99);
+%             offsets_orig        = offsets;
+            guess_offset          = 0;
             
             % save fills and offsets
             obj.fill_tops           = fill_tops;
             obj.fill_bots           = fill_bots;
             obj.fill_top_bot_ratio  = fill_top_bot_ratio;
-            obj.offsets             = offsets;
+%             obj.offsets             = offsets;
             
             % split domain into inverted and normal domains
-            inv_norm_thresh         = 0.0;
+            inv_norm_thresh         = 0.79;
             fill_top_bot_ratio_inv  = fliplr( fill_top_bot_ratio( fill_top_bot_ratio < inv_norm_thresh ) );         % inverted. NOTE this array is monotonically increasing
             fill_top_bot_ratio_norm = fill_top_bot_ratio( fill_top_bot_ratio >= inv_norm_thresh );                  % normal
             
@@ -2675,7 +2676,7 @@ classdef c_synthGrating
             directivities_vs_fills_norm  = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
             angles_vs_fills_norm         = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
             periods_vs_fills_norm        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            offsets_vs_fills_norm        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            offsets_vs_fills_norm        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
             scatter_str_vs_fills_norm    = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
             k_vs_fills_norm              = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
             GC_vs_fills_norm             = cell( length( fill_bots ), length( fill_top_bot_ratio_norm ) );      % dimensions bot fill vs. top/bot ratio
@@ -2684,7 +2685,7 @@ classdef c_synthGrating
             directivities_vs_fills_inv  = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
             angles_vs_fills_inv         = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
             periods_vs_fills_inv        = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
-            offsets_vs_fills_inv        = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
+            offsets_vs_fills_inv        = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
             scatter_str_vs_fills_inv    = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
             k_vs_fills_inv              = zeros( length( fill_bots ), length( fill_top_bot_ratio_inv ) );     % dimensions bot fill vs. top/bot ratio
             GC_vs_fills_inv             = cell( length( fill_bots ), length( fill_top_bot_ratio_inv ) );      % dimensions bot fill vs. top/bot ratio
@@ -2764,7 +2765,7 @@ classdef c_synthGrating
                         
                         [ obj, best_period, best_offset, best_directivity, ...
                           best_angle, best_scatter_str, best_GC, ...
-                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
                                                                                       fill_top, ...
                                                                                       fill_bots(i_ff_bot), ...
                                                                                       guess_period,...
@@ -2785,7 +2786,7 @@ classdef c_synthGrating
                             scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_down;
                         end
                         periods_vs_fills_norm( i_ff_bot, 1 )          = best_period;
-                        offsets_vs_fills_norm( i_ff_bot, 1 )          = best_offset;
+                        offsets_vs_fills_norm( i_ff_bot, 1 )          = best_offset/best_period;
                         k_vs_fills_norm( i_ff_bot, 1 )                = best_GC.k;
                         GC_vs_fills_norm{ i_ff_bot, 1 }               = best_GC;
                         dir_b4_period_vs_fills_norm( i_ff_bot, 1 )    = dir_b4_period_vs_fill;
@@ -2795,12 +2796,13 @@ classdef c_synthGrating
                         guessk              = best_GC.k;
                         guess_period        = best_period;
                         guess_GC            = best_GC;
+                        guess_offset        = best_offset;
 
-                        % update the offsets
-                        % grab previous offset index
-                        [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                        % shift offsets to start at previous offset
-                        offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                         % update the offsets
+%                         % grab previous offset index
+%                         [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+%                         % shift offsets to start at previous offset
+%                         offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
                         
                     else
                         % we're in a waveguide, there's no reason to run
@@ -2862,16 +2864,17 @@ classdef c_synthGrating
     
                     fprintf('Normal parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
 
-                    % update the offsets
-                    % grab previous offset index
-                    [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills_norm_1( i_ff_bot ) ) );
-                    % shift offsets to start at previous offset
-                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                     % update the offsets
+%                     % grab previous offset index
+%                     [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills_norm_1( i_ff_bot ) ) );
+%                     % shift offsets to start at previous offset
+%                     offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
                     % grab starting guess period and k
                     guess_period    = periods_vs_fills_norm_1( i_ff_bot );
                     guessk          = k_vs_fills_norm_1( i_ff_bot );
                     guess_GC        = GC_vs_fills_norm_1{ i_ff_bot };
+                    guess_offset    = offsets_vs_fills_norm_1( i_ff_bot ) * guess_period;
 
                     % grab bottom fill
                     fill_bot = fill_bots( i_ff_bot );
@@ -2888,7 +2891,7 @@ classdef c_synthGrating
                             % Only run optimization if theres a perturbation 
                             [ tempobj, best_period, best_offset, best_directivity, ...
                               best_angle, best_scatter_str, best_GC, ...
-                              best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                              best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
                                                                                           fill_top, ...
                                                                                           fill_bot, ...
                                                                                           guess_period,...
@@ -2909,7 +2912,7 @@ classdef c_synthGrating
                                 scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )     = best_GC.alpha_down;
                             end
                             periods_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_period;
-                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_offset;
+                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )          = best_offset/best_period;
                             k_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )                = best_GC.k;
                             GC_vs_fills_norm{ i_ff_bot, i_ff_ratio_norm }               = best_GC;
                             dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio_norm )    = dir_b4_period_vs_fill;
@@ -2918,12 +2921,13 @@ classdef c_synthGrating
                             guessk              = best_GC.k;
                             guess_period        = best_period;
                             guess_GC            = best_GC;
+                            guess_offset        = best_offset;
 
-                            % update the offsets
-                            % grab previous offset index
-                            [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                            % shift offsets to start at previous offset
-                            offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                             % update the offsets
+%                             % grab previous offset index
+%                             [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+%                             % shift offsets to start at previous offset
+%                             offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
                             
                         else
                             % we're in a waveguide, there's no reason to run
@@ -2987,7 +2991,7 @@ classdef c_synthGrating
             
             % snap period to discretization
             guess_period    = obj.discretization * round(period/obj.discretization);
-            
+    
             % ugh this is really annoying but i have to - extend the
             % waveguide's e z overlap
             [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
@@ -2996,7 +3000,7 @@ classdef c_synthGrating
             fprintf('...done\n\n');
             
             % reset offsets 
-            offsets = offsets_orig;
+            guess_offset = 0;
             
             % now run the sweep
             
@@ -3017,7 +3021,7 @@ classdef c_synthGrating
                     fill_top = fill_top_bot_ratio_inv(1) * fill_bots(i_ff_bot);
                     [ obj, best_period, best_offset, best_directivity, ...
                       best_angle, best_scatter_str, best_GC, ...
-                      best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                      best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
                                                                                   fill_top, ...
                                                                                   fill_bots(i_ff_bot), ...
                                                                                   guess_period,...
@@ -3039,7 +3043,7 @@ classdef c_synthGrating
                         scatter_str_vs_fills_inv( i_ff_bot, 1 )     = best_GC.alpha_down;
                     end
                     periods_vs_fills_inv( i_ff_bot, 1 )          = best_period;
-                    offsets_vs_fills_inv( i_ff_bot, 1 )          = best_offset;
+                    offsets_vs_fills_inv( i_ff_bot, 1 )          = best_offset/best_period;
                     k_vs_fills_inv( i_ff_bot, 1 )                = best_GC.k;
                     GC_vs_fills_inv{ i_ff_bot, 1 }               = best_GC;
                     dir_b4_period_vs_fills_inv( i_ff_bot, 1 )    = dir_b4_period_vs_fill;
@@ -3049,12 +3053,13 @@ classdef c_synthGrating
                     guessk              = best_GC.k;
                     guess_period        = best_period;
                     guess_GC            = best_GC;
+                    guess_offset        = best_offset;
 
-                    % update the offsets
-                    % grab previous offset index
-                    [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                    % shift offsets to start at previous offset
-                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                     % update the offsets
+%                     % grab previous offset index
+%                     [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+%                     % shift offsets to start at previous offset
+%                     offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
                     toc;
 
@@ -3093,16 +3098,17 @@ classdef c_synthGrating
 
                     fprintf('Invert parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
                     
-                    % update the offsets
-                    % grab previous offset index
-                    [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills_inv_1( i_ff_bot ) ) );
-                    % shift offsets to start at previous offset
-                    offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                     % update the offsets
+%                     % grab previous offset index
+%                     [~, indx_prev_offset] = min( abs( offsets_orig - offsets_vs_fills_inv_1( i_ff_bot ) ) );
+%                     % shift offsets to start at previous offset
+%                     offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
                     % grab starting guess period and k
                     guess_period    = periods_vs_fills_inv_1( i_ff_bot );
                     guessk          = k_vs_fills_inv_1( i_ff_bot );
                     guess_GC        = GC_vs_fills_inv_1{ i_ff_bot };
+                    guess_offset    = offsets_vs_fills_inv_1( i_ff_bot );
 
                     % grab bottom fill
                     fill_bot = fill_bots( i_ff_bot );
@@ -3115,7 +3121,7 @@ classdef c_synthGrating
                         fill_top = fill_top_bot_ratio_inv(i_ff_ratio_inv) * fill_bot;
                         [ tempobj, best_period, best_offset, best_directivity, ...
                           best_angle, best_scatter_str, best_GC, ...
-                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( offsets, ...
+                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
                                                                                       fill_top, ...
                                                                                       fill_bot, ...
                                                                                       guess_period,...
@@ -3137,7 +3143,7 @@ classdef c_synthGrating
                             scatter_str_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )     = best_GC.alpha_down;
                         end
                         periods_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )          = best_period;
-                        offsets_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )          = best_offset;
+                        offsets_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )          = best_offset/best_period;
                         k_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )                = best_GC.k;
                         GC_vs_fills_inv{ i_ff_bot, i_ff_ratio_inv }               = best_GC;
                         dir_b4_period_vs_fills_inv( i_ff_bot, i_ff_ratio_inv )    = dir_b4_period_vs_fill;
@@ -3147,12 +3153,13 @@ classdef c_synthGrating
                         guessk              = best_GC.k;
                         guess_period        = best_period;
                         guess_GC            = best_GC;
+                        guess_offset        = best_offset;
 
-                        % update the offsets
-                        % grab previous offset index
-                        [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
-                        % shift offsets to start at previous offset
-                        offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+%                         % update the offsets
+%                         % grab previous offset index
+%                         [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+%                         % shift offsets to start at previous offset
+%                         offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
 
 
                     end     % end for i_ff_ratio = ...
@@ -3414,46 +3421,81 @@ classdef c_synthGrating
         
         function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
                     best_GC, best_k, dir_b4_period_vs_fill ] ...
-                    = optimizePeriodOffset(obj, offsets, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
+                    = optimizePeriodOffset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
             % optimizes period and offset for best angle/directivity
             %
             % Inputs:
             %   offsets - OLD BUT STILL IN USE
             %   guess_offset - NEW BUT NOT IMPLEMENTED
-            %       - guess starting offset value, in absolute value (Units
-            %       'units')
+            %       type: scalar, double
+            %       desc: guess offset position to start from, in units
+            %             'units'
             %   fill_top
+            %       type: scalar, double
+            %       desc: ratio of top waveguide to period
             %   fill_bot
+            %       type: scalar, double
+            %       desc: ratio of bottom waveguide to period
             %   guess_period
+            %       type: scalar, double
+            %       desc: starting period to sweep from, in units 'units'
             %   guessk
+            %       type: scalar, double
+            %       desc: starting guess k
             %   sim_opts
-            %       structure with these fields:
-            %           num_modes
-            %           BC
-            %           pml_options
+            %       type: struct
+            %       desc: structure with these fields:  
+            %               num_modes
+            %               BC
+            %               pml_options
             %   guess_gc
-            %       initial grating coupler object to start with (for mode
+            %       type: grating coupler object
+            %       desc: initial grating coupler object to start with (for mode
             %       overlapping)
+            %       
             %
             % Outputs:
             %   best_period
+            %       type:
+            %       desc: 
             %   best_offset
+            %       type:
+            %       desc: absolute value of offset, in 'units'
+            %   best_offset_ratio
+            %       type:
+            %       desc:
             %   best_directivity
+            %       type:
+            %       desc:
             %   best_angle
+            %       type:
+            %       desc:
             %   best_scatter_str
+            %       type:
+            %       desc:
             %   best_GC
+            %       type:
+            %       desc:
             %   best_k
+            %       type:
+            %       desc:
             %   dir_b4_period_vs_fill
+            %       type:
+            %       desc:
             %       mostly for debugging purposes
             
-            % enable/disable debug mode
-            DEBUG = false;
-
+%             % enable/disable debug mode
+%             DEBUG = false;
             
+            % generate vector of absolute offsets
+            offsets         = guess_offset : obj.discretization : guess_offset + guess_period;
+            offsets         = mod( offsets, guess_period );
+            offset_ratios   = offsets / guess_period;
+
             % init saving variables vs. offset
-            directivities = zeros( size(offsets) );
-            k_vs_offset   = zeros( size(offsets) );
-            angles        = zeros( size(offsets) );
+            directivities = zeros( size(offset_ratios) );
+            k_vs_offset   = zeros( size(offset_ratios) );
+            angles        = zeros( size(offset_ratios) );
             GC_vs_offset  = {};
 
             % grab mode to overlap with
@@ -3461,7 +3503,7 @@ classdef c_synthGrating
 
             % Sweep offsets, pick offset with best directivity
 %             fprintf('Sweeping offsets...\n');
-            for i_offset = 1:length( offsets )
+            for i_offset = 1:length( offset_ratios )
 
 %                 fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
 
@@ -3471,7 +3513,7 @@ classdef c_synthGrating
                                             guess_period, ...
                                             fill_top, ...
                                             fill_bot, ...
-                                            offsets(i_offset) );
+                                            offset_ratios(i_offset) );
 
                 % run sim
                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
@@ -3501,12 +3543,12 @@ classdef c_synthGrating
 %             fprintf('...done.\n');
 
 %                         % DEBUG plot directivity vs. offset
-            if DEBUG
-                figure;
-                plot( offsets, directivities, '-o' );
-                xlabel('offsets'); ylabel('directivities');
-                title('DEBUG directivities vs offsets');
-                makeFigureNice();
+%             if DEBUG
+%                 figure;
+%                 plot( offsets, directivities, '-o' );
+%                 xlabel('offsets'); ylabel('directivities');
+%                 title('DEBUG directivities vs offsets');
+%                 makeFigureNice();
 %                             
 %                             figure;
 %                             plot( offsets, angles, '-o' );
@@ -3514,11 +3556,12 @@ classdef c_synthGrating
 %                             title('DEBUG angles vs offsets for first run');
 %                             makeFigureNice();
 %                             
-            end
+%             end
 
             % pick best offset
             [ ~, indx_best_offset ]     = max( directivities );
-            best_offset                 = offsets( indx_best_offset );
+%             best_offset                 = offsets( indx_best_offset );
+            best_offset_ratio           = offset_ratios( indx_best_offset );
             best_offset_k               = k_vs_offset( indx_best_offset );
             best_offset_angle           = angles( indx_best_offset );
             
@@ -3529,22 +3572,22 @@ classdef c_synthGrating
             dir_b4_period_vs_fill = max( directivities );
 
             % DEBUG plot grating with best directivity
-            if DEBUG
-
-                % make grating cell
-                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                            guess_period, ...
-                                            fill_tops(i_ff_top), ...
-                                            fill_bots(i_ff_bot), ...
-                                            best_offset );
-
-                % run sim
-                GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
-
-                % plot field
-                GC.plotEz_w_edges();
-
-            end
+%             if DEBUG
+% 
+%                 % make grating cell
+%                 GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+%                                             guess_period, ...
+%                                             fill_tops(i_ff_top), ...
+%                                             fill_bots(i_ff_bot), ...
+%                                             best_offset );
+% 
+%                 % run sim
+%                 GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
+% 
+%                 % plot field
+%                 GC.plotEz_w_edges();
+% 
+%             end
 
 
 %             % now sweep periods
@@ -3592,7 +3635,7 @@ classdef c_synthGrating
                                             period, ...
                                             fill_top, ...
                                             fill_bot, ...
-                                            best_offset );
+                                            best_offset_ratio );
 
                 % run sim
                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
@@ -3666,6 +3709,7 @@ classdef c_synthGrating
             
             best_period = periods( indx_best_period );
             best_k      = best_GC.k;
+            best_offset = best_offset_ratio * best_period;
                     
         end     % end function optimizePeriodOffset()
         
