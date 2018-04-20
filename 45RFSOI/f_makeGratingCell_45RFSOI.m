@@ -1,4 +1,4 @@
-function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, offset_ratio )
+function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, offset_ratio, BOX_thickness )
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
@@ -20,6 +20,9 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %   offset_ratio
 %       type: double, scalar
 %       desc: ratio of bottom layer offset to period
+%   BOX_thickness
+%       type: double, scalar
+%       desc: optional custom BOX thickness
 %
 % outputs:
 %   GC
@@ -34,7 +37,6 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %   GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
 %       Then you can plot it and look at what the dielectric looks like:
 %   GC.plotIndex()
-
 
 % set domain 
 domain_size     = synth_obj.domain_size;
@@ -66,7 +68,12 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 
 % define layer thicknesses
 domain_y_half   = round( (domain_size(1)/2) /synth_obj.discretization) * synth_obj.discretization;
-t_SiO2_bot      = 150;
+if nargin < 6
+    % default to box of 150nm
+    t_SiO2_bot      = 150;
+else
+    t_SiO2_bot      = BOX_thickness;
+end
 t_air           = domain_y_half - t_SiO2_bot;
 t_SiN           = 70;
 t_cSi           = 70;
