@@ -3718,8 +3718,6 @@ classdef c_synthGrating
             % function for generating the final synthesized design
             % parameters
             %
-            % currently only works for  1:1 line
-            %
             % Inputs:
             %   MFD
             %       type: double, scalar
@@ -3737,7 +3735,7 @@ classdef c_synthGrating
             %   obj.GC_synth                    = {};
             %   obj.des_scatter_norm            = [];
             
-            
+
             % generate x coordinates for the gaussian mode
             % must be large enough to fit mode
             xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
@@ -3763,18 +3761,53 @@ classdef c_synthGrating
             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
             title('DEBUG scattering strength for gaussian');
             makeFigureNice();
+%             
+
+            % lets try synthesizing an inverted design
+            % by taking only the subspace where the fill ratio is < 1?
             
-            % -----------------------------------
-            % Picking which cells to use
+            % first narrow down the space to take the datapoints with the
+            % maximum directivity per bottom fill factor (so for each row
+            % on my design space)
             
-            % let's try normalizing the alphas, because I know that they
-            % aren't on the same order of magnitude right now.
-            alpha_des_norm              = alpha_des./max(alpha_des(:));
-            scatter_str_vs_fills_norm   = obj.scatter_str_vs_fills./max(abs(obj.scatter_str_vs_fills));
+            % meshgrid the fills
+            [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
             
+            indx_invert_space   = obj.fill_top_bot_ratio < 1;
+            
+            % grab variables (remember dimensions are bot fill x top bot
+            % ratio)
+            topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_invert_space );
+            bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_invert_space );
+            directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_invert_space );
+            angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_invert_space );      
+            periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_invert_space );
+            offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_invert_space );
+            scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_invert_space );
+            k_vs_fills_inv              = obj.k_vs_fills( :, indx_invert_space );
+            GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_invert_space );
+            
+            % for each bottom fill, pick the datapoint with the highest
+            % directivity
+            [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_inv, [], 2 );
+            % gotta use linear indexing
+            indxs                   = sub2ind( size(angles_vs_fills_inv), 1:size(angles_vs_fills_inv,1), indx_highest_dir_per_bot.' );
+            angles_high_dir         = angles_vs_fills_inv( indxs );
+            periods_high_dir        = periods_vs_fills_inv( indxs );
+            offsets_high_dir        = offsets_vs_fills_inv( indxs );
+            scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
+            k_high_dir              = k_vs_fills_inv( indxs );
+            topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
+            bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
+            GC_high_dir             = GC_vs_fills_inv( indxs );
+            
+            % DEBUG
+            scatter_strs_high_dir(1)  = -10;
+            
+            % now match these data points to the desired alpha
             % starting point
-            start_alpha_des     = 1e-2;
-            [~, indx_x]         = min(abs( alpha_des_norm - start_alpha_des ) );
+            start_alpha_des     = 1e-5;
+            [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
@@ -3788,27 +3821,37 @@ classdef c_synthGrating
             obj.k_synth                     = [];
             obj.GC_synth                    = {};
             obj.des_scatter_norm            = [];
+            
+            % flag for switching to using max scattering strength
+            saturate_scatter_str_to_max = false;
  
             ii = 1;
             while cur_x < xvec(end)
                 % build grating one cell at a time
-                % TEMP CURRENTLY ASSUMING 1:1 line
                 
                 % pick design with scattering strength closest to desired
                 % alpha
-                des_scatter                 = alpha_des_norm(indx_x);                                   % desired alpha
-                [~, indx_closest_scatter]   = min( abs(scatter_str_vs_fills_norm - des_scatter) );      % index of closest scatter design         
+                des_scatter                 = alpha_des(indx_x);                                        % desired alpha
+                if des_scatter  > max( scatter_strs_high_dir )
+                    % desired scattering strength too high, gotta saturate
+                    saturate_scatter_str_to_max = true;
+                end
+                if ~saturate_scatter_str_to_max
+                    [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+                else
+                    [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+                end
                 
                 % save parameters
-                obj.dir_synth(ii)                   = obj.directivities_vs_fills( indx_closest_scatter );
-                obj.bot_fill_synth(ii)              = obj.fill_bots( indx_closest_scatter );
-                obj.top_bot_fill_ratio_synth(ii)    = 1;    % TEMP?
-                obj.offset_synth(ii)                = obj.offsets_vs_fills( indx_closest_scatter );
-                obj.period_synth(ii)                = obj.periods_vs_fills( indx_closest_scatter );
-                obj.angles_synth(ii)                = obj.angles_vs_fills( indx_closest_scatter );
-                obj.scatter_str_synth(ii)           = obj.scatter_str_vs_fills( indx_closest_scatter );
-                obj.k_synth(ii)                     = obj.k_vs_fills( indx_closest_scatter );
-                obj.GC_synth{ii}                    = obj.GC_vs_fills{ indx_closest_scatter };
+                obj.dir_synth(ii)                   = highest_dir_per_bot( indx_closest_scatter );
+                obj.bot_fill_synth(ii)              = bot_fills_high_dir( indx_closest_scatter );
+                obj.top_bot_fill_ratio_synth(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
+                obj.offset_synth(ii)                = offsets_high_dir( indx_closest_scatter );
+                obj.period_synth(ii)                = periods_high_dir( indx_closest_scatter );
+                obj.angles_synth(ii)                = angles_high_dir( indx_closest_scatter );
+                obj.scatter_str_synth(ii)           = scatter_strs_high_dir( indx_closest_scatter );
+                obj.k_synth(ii)                     = k_high_dir( indx_closest_scatter );
+                obj.GC_synth{ii}                    = GC_high_dir{ indx_closest_scatter };
                 obj.des_scatter_norm(ii)            = des_scatter;
                 
                 % move onto next
@@ -3844,37 +3887,49 @@ classdef c_synthGrating
             %
             % also opens the EME UI
             
-             n_cells = length(obj.dir_synth);
+            % input waveguide length
+            in_wg_len   = obj.discretization * 50;                          % input waveguide length
+            
+            % number of cells
+            n_cells = length(obj.dir_synth);
+            
+            % FOR INVERTED DESIGN ONLY
+            % make input waveguide
+            input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                            in_wg_len, ...
+                                            0, ...
+                                            1, ...
+                                            0 );
             
             % lets stitch together the index distribution
             % i'm curious to see what it looks like
-            obj.final_index = obj.GC_synth{1}.N;
-            for ii = 2:n_cells
+            obj.final_index = input_waveguide.N;
+%             obj.final_index = obj.GC_synth{1}.N;
+            for ii = 1:n_cells
                
                 obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
                 
             end
 
+
             % Set Up Simulation
             % note that emeSim uses 'z' as propagation direction and 'x'
             % as transverse (synthGrating uses 'x' and 'y' respectively)
             % and units are in um
-            um          = 1e6;
-            disc_eme    = obj.discretization * obj.units.scale * um .* [ 1, 1 ];
-%             dx          = obj.discretization * obj.units.scale * um;                % in um
-%             dz          = 5e-3;                                                     % in um
-            pol         = 0;                                                        % 0 for TE, 1 for TM
-            xf          = obj.domain_size(1) * obj.units.scale * um;                % in um (transverse domain)
-            zf          = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
-            lambda_um   = obj.lambda * obj.units.scale * um;                        % wl in um
-            eme_obj     = emeSim(   'discretization', disc_eme, ...
-                                'pml', 0.2, ...
-                                'domain', [xf, zf], ...
-                                'backgroundIndex', obj.background_index, ...
-                                'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
-                                'debug', 'no',...                   
-                                'polarization', pol );
-            
+            um              = 1e6;
+            disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
+            pol             = 0;                                                            % 0 for TE, 1 for TM
+            xf              = obj.domain_size(1) * obj.units.scale * um;                    % in um (transverse domain)
+            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
+            lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
+            eme_obj         = emeSim(   'discretization', disc_eme, ...
+                                        'pml', 0.2, ...
+                                        'domain', [xf, zf], ...
+                                        'backgroundIndex', obj.background_index, ...
+                                        'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
+                                        'debug', 'no',...                   
+                                        'polarization', pol );
+                                        
             % replace the dielectric in the eme object
             eme_obj.diel = obj.final_index;
             

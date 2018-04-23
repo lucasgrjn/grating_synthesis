@@ -89,7 +89,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) vs. fill factors');
 savefig(['dir_v_ff_' Q.start_time '.fig']);
-saveas(gcf, ['dir_v_ff_' Q.start_time '.fig']);
+saveas(gcf, ['dir_v_ff_' Q.start_time '.png']);
 
 % directivity BEFORE sweeping periods vs. fill
 figure;

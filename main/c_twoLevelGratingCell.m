@@ -766,7 +766,7 @@ classdef c_twoLevelGratingCell
             f0  = 1/obj.lambda;     % spatial freq
             
             % generate field, without the exponential growth or decay
-            numcells        = 1000;                                                  % i'm purposefully setting my own number of cells here
+            numcells        = 2000;                                                  % i'm purposefully setting my own number of cells here
             nx              = round( numcells*obj.domain_size(2)/obj.dx );
             x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
             phase_all       = repmat( exp( 1i*real(obj.k)*x_coords_all ), size(obj.Phi,1), 1 );
