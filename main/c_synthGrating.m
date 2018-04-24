@@ -3714,7 +3714,7 @@ classdef c_synthGrating
         end     % end function optimizePeriodOffset()
         
         
-        function obj = generateFinalDesignGaussian(obj, MFD)
+        function obj = generateFinalDesignGaussian(obj, MFD, input_wg_type)
             % function for generating the final synthesized design
             % parameters
             %
@@ -3722,6 +3722,10 @@ classdef c_synthGrating
             %   MFD
             %       type: double, scalar
             %       desc: mode field diameter, in units 'units'
+            %   input_wg_type
+            %       type: string
+            %       desc: 'bottom' for cSi only or 'full' for both cSi and
+            %             pSi
             %
             % Sets these fields:
             %   obj.dir_synth                   = [];
@@ -3763,46 +3767,111 @@ classdef c_synthGrating
             makeFigureNice();
 %             
 
-            % lets try synthesizing an inverted design
-            % by taking only the subspace where the fill ratio is < 1?
-            
-            % first narrow down the space to take the datapoints with the
-            % maximum directivity per bottom fill factor (so for each row
-            % on my design space)
-            
+
             % meshgrid the fills
             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
+
+            if strcmp( input_wg_type, 'bottom' ) == true
+                % Inverted design
             
-            indx_invert_space   = obj.fill_top_bot_ratio < 1;
+                % first narrow down the space to take the datapoints with the
+                % maximum directivity per bottom fill factor (so for each row
+                % on my design space)
+
+                indx_bottom_space   = obj.fill_top_bot_ratio < 1;
+
+                % grab variables (remember dimensions are bot fill x top bot
+                % ratio)
+                topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_bottom_space );
+                bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_bottom_space );
+                directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_bottom_space );
+                angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_bottom_space );      
+                periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_bottom_space );
+                offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_bottom_space );
+                scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_bottom_space );
+                k_vs_fills_inv              = obj.k_vs_fills( :, indx_bottom_space );
+                GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
             
-            % grab variables (remember dimensions are bot fill x top bot
-            % ratio)
-            topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_invert_space );
-            bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_invert_space );
-            directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_invert_space );
-            angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_invert_space );      
-            periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_invert_space );
-            offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_invert_space );
-            scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_invert_space );
-            k_vs_fills_inv              = obj.k_vs_fills( :, indx_invert_space );
-            GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_invert_space );
+%             % for each bottom fill, pick the datapoint with the highest
+%             % directivity
+%             [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_inv, [], 2 );
+%             % gotta use linear indexing
+%             indxs                   = sub2ind( size(angles_vs_fills_inv), 1:size(angles_vs_fills_inv,1), indx_highest_dir_per_bot.' );
+%             angles_high_dir         = angles_vs_fills_inv( indxs );
+%             periods_high_dir        = periods_vs_fills_inv( indxs );
+%             offsets_high_dir        = offsets_vs_fills_inv( indxs );
+%             scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
+%             k_high_dir              = k_vs_fills_inv( indxs );
+%             topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
+%             bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
+%             GC_high_dir             = GC_vs_fills_inv( indxs );
             
-            % for each bottom fill, pick the datapoint with the highest
-            % directivity
-            [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_inv, [], 2 );
-            % gotta use linear indexing
-            indxs                   = sub2ind( size(angles_vs_fills_inv), 1:size(angles_vs_fills_inv,1), indx_highest_dir_per_bot.' );
-            angles_high_dir         = angles_vs_fills_inv( indxs );
-            periods_high_dir        = periods_vs_fills_inv( indxs );
-            offsets_high_dir        = offsets_vs_fills_inv( indxs );
-            scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
-            k_high_dir              = k_vs_fills_inv( indxs );
-            topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
-            bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
-            GC_high_dir             = GC_vs_fills_inv( indxs );
-            
-            % DEBUG
-            scatter_strs_high_dir(1)  = -10;
+%             % DEBUG
+%             scatter_strs_high_dir(1)  = -10;
+
+%             % DEBUG I want to try averaging the directivity
+%             directivities_vs_fills_inv_dB = 10*log10( directivities_vs_fills_inv );
+%             % nx vs ny pixel averaging filter
+%             x_px    = 2;
+%             y_px    = 2;
+%             avg_filt = ones( x_px, y_px )/( x_px * y_px );
+%             % apply filter
+%             directivities_vs_fills_inv_dB_avg = imfilter( directivities_vs_fills_inv_dB, avg_filt );
+%             directivities_vs_fills_inv        = 10.^( directivities_vs_fills_inv_dB_avg/10 );
+
+
+                % for each top/bottom ratio, pick bottom fill with highest
+                % directivity
+                [ highest_dir_per_ratio, indx_highest_dir_per_ratio ] = max( directivities_vs_fills_inv, [], 1 );
+                % gotta use linear indexing
+                indxs                   = sub2ind( size(angles_vs_fills_inv), indx_highest_dir_per_ratio, 1:size(angles_vs_fills_inv,2)  );
+                angles_high_dir         = angles_vs_fills_inv( indxs );
+                periods_high_dir        = periods_vs_fills_inv( indxs );
+                offsets_high_dir        = offsets_vs_fills_inv( indxs );
+                scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
+                k_high_dir              = k_vs_fills_inv( indxs );
+                topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
+                bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
+                GC_high_dir             = GC_vs_fills_inv( indxs );
+                dir_high                = highest_dir_per_ratio;
+                
+            elseif strcmp( input_wg_type, 'full' ) == true
+                % normal design
+                
+                % first narrow down the space to take the datapoints with the
+                % maximum directivity per bottom fill factor (so for each row
+                % on my design space)
+
+                indx_full_space   = obj.fill_top_bot_ratio > 0.99;
+
+                % grab variables (remember dimensions are bot fill x top bot
+                % ratio)
+                topbot_ratio_vs_fills_full   = topbot_ratio_mesh( :, indx_full_space );
+                bot_fills_vs_fills_full      = bot_fills_mesh( :, indx_full_space );
+                directivities_vs_fills_full  = obj.directivities_vs_fills( :, indx_full_space );
+                angles_vs_fills_full         = obj.angles_vs_fills( :, indx_full_space );      
+                periods_vs_fills_full        = obj.periods_vs_fills( :, indx_full_space );
+                offsets_vs_fills_full        = obj.offsets_vs_fills( :, indx_full_space );
+                scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
+                k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
+                GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
+                
+                % for each bottom fill, pick the datapoint with the highest
+                % directivity
+                [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_full, [], 2 );
+                % gotta use linear indexing
+                indxs                   = sub2ind( size(angles_vs_fills_full), 1:size(angles_vs_fills_full,1), indx_highest_dir_per_bot.' );
+                angles_high_dir         = angles_vs_fills_full( indxs );
+                periods_high_dir        = periods_vs_fills_full( indxs );
+                offsets_high_dir        = offsets_vs_fills_full( indxs );
+                scatter_strs_high_dir   = scatter_str_vs_fills_full( indxs );
+                k_high_dir              = k_vs_fills_full( indxs );
+                topbot_ratio_high_dir   = topbot_ratio_vs_fills_full( indxs );
+                bot_fills_high_dir      = bot_fills_vs_fills_full( indxs );
+                GC_high_dir             = GC_vs_fills_full( indxs );
+                dir_high                = highest_dir_per_bot;
+                
+            end     % end if strcmp( input_wg_type, 'bottom' )
             
             % now match these data points to the desired alpha
             % starting point
@@ -3843,7 +3912,7 @@ classdef c_synthGrating
                 end
                 
                 % save parameters
-                obj.dir_synth(ii)                   = highest_dir_per_bot( indx_closest_scatter );
+                obj.dir_synth(ii)                   = dir_high( indx_closest_scatter );
                 obj.bot_fill_synth(ii)              = bot_fills_high_dir( indx_closest_scatter );
                 obj.top_bot_fill_ratio_synth(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
                 obj.offset_synth(ii)                = offsets_high_dir( indx_closest_scatter );
@@ -3863,7 +3932,7 @@ classdef c_synthGrating
             end     % end for ii = 1:ncells
             
             
-        end
+        end     % end function generateFinalDesignGaussian()
         
         
         function obj = runFinalDesignEME(obj, MFD)

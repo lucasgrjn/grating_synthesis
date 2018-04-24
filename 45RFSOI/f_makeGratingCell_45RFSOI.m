@@ -127,6 +127,16 @@ if top_layer_length > 0
 else
     % just a waveguide
     GC = GC.addLayer( t_air + t_SiO2_bot + wg_thick(2), t_SiN, n_SiN );
+    
+    % sidewall2
+    if (top_layer_length <= period - t_SiN)
+        % only draw 2nd sidewall in scenario that there is enough space for it
+        GC = GC.addRect( period - t_SiN, ...
+                         t_air + t_SiO2_bot + wg_thick(2), ...
+                         t_SiN, ...
+                         t_SiN + wg_thick(1), ...
+                         n_SiN );
+    end
 end
              
 end

@@ -212,7 +212,7 @@ classdef c_twoLevelGratingCell
             y = obj.y_coords;
             
             % fill in the layer
-            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), : ) = index; 
+            obj.N( y >= (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), : ) = index; 
             
         end     % end function addLayer()
         
@@ -236,8 +236,8 @@ classdef c_twoLevelGratingCell
             y = obj.y_coords;
             
             % fill in the rect
-            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
-                    x > (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
+            obj.N( y >= (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
+                    x >= (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
             
         end     % end function addRect()
         

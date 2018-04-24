@@ -14,8 +14,9 @@ close all;
 addpath(genpath('..')); % ['..' filesep 'main']);     
 
 % run synthesis
-MFD = 10000;                                     % units nm
-Q   = Q.generateFinalDesignGaussian( MFD );
+MFD             = 10000;                                     % units nm
+input_wg_type   = 'full';
+Q               = Q.generateFinalDesignGaussian( MFD, input_wg_type );
 
 % run final design in eme
 Q = Q.runFinalDesignEME( MFD );
@@ -107,3 +108,47 @@ title('Final synthesized directivity');
 makeFigureNice();
 % savefig('final_dir.fig');
 % saveas(gcf, 'final_dir.png');
+
+
+
+% % DEBUG I want to try averaging the directivity
+% dir_vs_fills    = Q.directivities_vs_fills;
+% dir_vs_fills_dB = 10*log10( dir_vs_fills );
+% % nx vs ny pixel averaging filter
+% x_px    = 2;
+% y_px    = 2;
+% avg_filt = ones( x_px, y_px )/( x_px * y_px );
+% % apply filter
+% dir_vs_fills_avg_dB = imfilter( dir_vs_fills_dB, avg_filt );
+% 
+% 
+% % avg directivity vs. fill
+% figure;
+% imagesc( Q.fill_top_bot_ratio, Q.fill_bots, dir_vs_fills_avg_dB );
+% colorbar; set( gca, 'ydir', 'normal' );
+% xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
+% title('Directivity, averaged (dB) vs. fill factors');
+% savefig(['dir_v_ff_' Q.start_time '.fig']);
+% saveas(gcf, ['dir_v_ff_' Q.start_time '.png']);
+
+
+% TEMP debugging bug with drawing SiN sidewall 1
+GC20        = Q.GC_synth{20};
+period      = 600;
+fill_top    = Q.top_bot_fill_ratio_synth(20) * Q.bot_fill_synth(20);
+fill_bot    = Q.bot_fill_synth(20);
+offset_rat  = Q.offset_synth(20);
+BOX_thick   = 150;
+GC          = f_makeGratingCell_45RFSOI( Q.convertObjToStruct, period, fill_top, fill_bot, offset_rat, BOX_thick );
+
+
+
+
+
+
+
+
+
+
+
+
