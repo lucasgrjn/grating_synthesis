@@ -108,7 +108,6 @@ classdef c_synthGrating
         lambda;             % center wavelength
         background_index;   % background index
         domain_size;        % domain size, [ y size (height), x size (length) ]
-        optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
         inputs;             % saves input settings for user reference
 
         start_time;         % time when object was created, 'YEAR-month-day hour-min-sec'
@@ -133,6 +132,10 @@ classdef c_synthGrating
                             % as well as performance values
                             
         h_makeGratingCell;  % handle to the grating cell making function
+        
+        % parameters to optimize for
+        optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
+        input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
         
         % temporarily? saving the resulting variables from synthesis
         directivities_vs_fills 
@@ -160,6 +163,7 @@ classdef c_synthGrating
         GC_synth    
         des_scatter_norm
         final_index                 % final index distribution
+        
         
         % struct that holds debug field
         % currently has fields: final_index
@@ -3740,6 +3744,9 @@ classdef c_synthGrating
             %   obj.des_scatter_norm            = [];
             
 
+            % save input waveguide type
+            obj.input_wg_type = input_wg_type;
+            
             % generate x coordinates for the gaussian mode
             % must be large enough to fit mode
             xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
@@ -3962,13 +3969,23 @@ classdef c_synthGrating
             % number of cells
             n_cells = length(obj.dir_synth);
             
-            % FOR INVERTED DESIGN ONLY
+            
             % make input waveguide
-            input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                            in_wg_len, ...
-                                            0, ...
-                                            1, ...
-                                            0 );
+            if strcmp( obj.input_wg_type, 'bottom' )
+                % inverted design, bottom waveguide input only
+                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                in_wg_len, ...
+                                                0, ...
+                                                1, ...
+                                                0 );
+            elseif strcmp( obj.input_wg_type, 'full' )
+                % normal design, thick waveguide input
+                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                in_wg_len, ...
+                                                1, ...
+                                                1, ...
+                                                0 );
+            end
             
             % lets stitch together the index distribution
             % i'm curious to see what it looks like
@@ -4025,6 +4042,9 @@ classdef c_synthGrating
             final_design.eme_obj                = eme_obj;
             final_design.final_index            = obj.final_index;
             obj.final_design                    = final_design;
+            
+            % calculate final up/down directivity
+            obj = obj.calc_final_design_directivity();
             
         end     % end runFinalDesignEME()
         

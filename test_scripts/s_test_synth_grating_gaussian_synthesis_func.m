@@ -88,6 +88,14 @@ makeFigureNice();
 % savefig('final_scattering_str.fig');
 % saveas(gcf, 'final_scattering_str.png');
 
+% final synthesized scattering strength
+figure;
+plot( 1:length(Q.scatter_str_synth), Q.scatter_str_synth, '-o' );
+xlabel('cell #');
+legend(['scattering strength (units 1/' Q.units.name]);
+title('Final synthesized scattering strength');
+makeFigureNice();
+
 % % final synthesized scattering strength normalized comparison
 % figure;
 % plot( 1:length(Q.scatter_str_synth), Q.des_scatter_norm, '-o' ); hold on;
@@ -111,6 +119,8 @@ makeFigureNice();
 
 
 
+
+
 % % DEBUG I want to try averaging the directivity
 % dir_vs_fills    = Q.directivities_vs_fills;
 % dir_vs_fills_dB = 10*log10( dir_vs_fills );
@@ -131,15 +141,15 @@ makeFigureNice();
 % savefig(['dir_v_ff_' Q.start_time '.fig']);
 % saveas(gcf, ['dir_v_ff_' Q.start_time '.png']);
 
-
-% TEMP debugging bug with drawing SiN sidewall 1
-GC20        = Q.GC_synth{20};
-period      = 600;
-fill_top    = Q.top_bot_fill_ratio_synth(20) * Q.bot_fill_synth(20);
-fill_bot    = Q.bot_fill_synth(20);
-offset_rat  = Q.offset_synth(20);
-BOX_thick   = 150;
-GC          = f_makeGratingCell_45RFSOI( Q.convertObjToStruct, period, fill_top, fill_bot, offset_rat, BOX_thick );
+% 
+% % TEMP debugging bug with drawing SiN sidewall 1
+% GC20        = Q.GC_synth{20};
+% period      = 600;
+% fill_top    = Q.top_bot_fill_ratio_synth(20) * Q.bot_fill_synth(20);
+% fill_bot    = Q.bot_fill_synth(20);
+% offset_rat  = Q.offset_synth(20);
+% BOX_thick   = 150;
+% GC          = f_makeGratingCell_45RFSOI( Q.convertObjToStruct, period, fill_top, fill_bot, offset_rat, BOX_thick );
 
 
 
