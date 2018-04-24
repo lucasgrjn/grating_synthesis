@@ -11,7 +11,7 @@ addpath(genpath('..'));                                                     % al
 % addpath([ '..' filesep 'auxiliary_functions' ]);                            % gui
 
 % initial settings
-disc                = 10;
+disc                = 5;
 units               = 'nm';
 lambda              = 1200;
 index_clad          = 1.0; % 1.448;
@@ -57,7 +57,7 @@ GC = Q.h_makeGratingCell(  Q.convertObjToStruct(), ...
                             offset );
                         
 % simulation settings
-num_modes   = 5;
+num_modes   = 3;
 BC          = 0;
 pml_options = [ 1, 200, 20, 2 ];
 guessk      = 0.01084 + 1i * 0.0001073;

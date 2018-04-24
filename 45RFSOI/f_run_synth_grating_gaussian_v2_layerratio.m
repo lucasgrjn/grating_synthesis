@@ -30,7 +30,7 @@ domain              = [2500, 800];      % useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
 data_filename       = 'lol.mat';
-data_notes          = ['lambda ' num2str(lambda) ' optimal angle ' num2str(optimal_angle) ' BOX thickness ' num2str(BOX_thickness)];
+data_notes          = ['lambda ' num2str(lambda) ' optimal angle ' num2str(optimal_angle) ' BOX thickness ' num2str(BOX_thickness) ' INVERT/NORMAL THRESH of 0'];
 data_mode           = 'new';
 n_workers           = 1;
 

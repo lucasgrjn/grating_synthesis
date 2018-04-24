@@ -15,7 +15,7 @@ addpath(genpath('..')); % ['..' filesep 'main']);
 
 % run synthesis
 MFD             = 10000;                                     % units nm
-input_wg_type   = 'full';
+input_wg_type   = 'bottom';
 Q               = Q.generateFinalDesignGaussian( MFD, input_wg_type );
 
 % run final design in eme
@@ -88,11 +88,13 @@ makeFigureNice();
 % savefig('final_scattering_str.fig');
 % saveas(gcf, 'final_scattering_str.png');
 
-% final synthesized scattering strength
+% final synthesized scattering strength overlaid with desired scattering
+% strength
 figure;
-plot( 1:length(Q.scatter_str_synth), Q.scatter_str_synth, '-o' );
+plot( 1:length(Q.scatter_str_synth), Q.scatter_str_synth, '-o' ); hold on;
+plot( 1:length(Q.scatter_str_synth), Q.des_scatter_synth, '-o' );
 xlabel('cell #');
-legend(['scattering strength (units 1/' Q.units.name]);
+legend(['scattering strength (units 1/' Q.units.name ')'], 'desired scattering strength');
 title('Final synthesized scattering strength');
 makeFigureNice();
 

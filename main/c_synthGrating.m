@@ -161,7 +161,7 @@ classdef c_synthGrating
         scatter_str_synth
         k_synth
         GC_synth    
-        des_scatter_norm
+        des_scatter_synth
         final_index                 % final index distribution
         
         
@@ -2671,7 +2671,7 @@ classdef c_synthGrating
 %             obj.offsets             = offsets;
             
             % split domain into inverted and normal domains
-            inv_norm_thresh         = 0.79;
+            inv_norm_thresh         = -0.1;
             fill_top_bot_ratio_inv  = fliplr( fill_top_bot_ratio( fill_top_bot_ratio < inv_norm_thresh ) );         % inverted. NOTE this array is monotonically increasing
             fill_top_bot_ratio_norm = fill_top_bot_ratio( fill_top_bot_ratio >= inv_norm_thresh );                  % normal
             
@@ -3896,7 +3896,7 @@ classdef c_synthGrating
             obj.scatter_str_synth           = [];
             obj.k_synth                     = [];
             obj.GC_synth                    = {};
-            obj.des_scatter_norm            = [];
+            obj.des_scatter_synth           = [];
             
             % flag for switching to using max scattering strength
             saturate_scatter_str_to_max = false;
@@ -3928,7 +3928,7 @@ classdef c_synthGrating
                 obj.scatter_str_synth(ii)           = scatter_strs_high_dir( indx_closest_scatter );
                 obj.k_synth(ii)                     = k_high_dir( indx_closest_scatter );
                 obj.GC_synth{ii}                    = GC_high_dir{ indx_closest_scatter };
-                obj.des_scatter_norm(ii)            = des_scatter;
+                obj.des_scatter_synth(ii)           = des_scatter;
                 
                 % move onto next
                 cur_x       = cur_x + obj.period_synth(ii);
