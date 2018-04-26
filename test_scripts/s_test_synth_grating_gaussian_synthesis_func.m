@@ -37,6 +37,14 @@ makeFigureNice();
 % savefig('final_fill_ratios.fig');
 % saveas(gcf, 'final_fill_ratios.png');
 
+% DEBUG plot sum of synthesized fill factors
+figure;
+plot( 1:length(Q.bot_fill_synth), Q.bot_fill_synth +  Q.top_bot_fill_ratio_synth, '-o' );
+xlabel('cell #');
+title('Sum of final synthesized fill factors (bottom fill + top/bot ratio)');
+makeFigureNice();
+
+
 % final synthesized fills
 figure;
 plot( 1:length(Q.bot_fill_synth), Q.bot_fill_synth.*Q.period_synth, '-o' ); hold on;
@@ -47,6 +55,15 @@ title('Final synthesized fills (nm)');
 makeFigureNice();
 % savefig('final_fills.fig');
 % saveas(gcf, 'final_fills.png');
+
+
+% DEBUG plot sum of synthesized fills
+figure;
+plot( 1:length(Q.bot_fill_synth), Q.bot_fill_synth.*Q.period_synth + Q.top_bot_fill_ratio_synth.*Q.bot_fill_synth.*Q.period_synth, '-o' );
+xlabel('cell #');
+title('Sum of final synthesized fills (nm)');
+makeFigureNice();
+
 
 % final synthesized offset
 figure;
