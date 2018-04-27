@@ -3880,6 +3880,28 @@ classdef c_synthGrating
                 
             end     % end if strcmp( input_wg_type, 'bottom' )
             
+%             % DEBUG plot bot fills vs topbot ratio
+%             figure;
+%             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
+%             xlabel('top/bottom ratio'); ylabel('bottom fill');
+%             title('DEBUG bottom fill vs top/bottom ratio');
+%             makeFigureNice();
+%             
+%             % DEBUG plot bot fills vs top fills
+%             figure;
+%             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
+%             xlabel('bottom fill'); ylabel('top fill');
+%             title('DEBUG bottom fill vs top/bottom ratio');
+%             makeFigureNice();
+%             
+%             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
+%             
+%             x = 0:0.01:1;
+%             y = -(x.^3)/2 + x;
+%             figure;
+%             plot(x, y);
+%             xlabel('bot'); ylabel('top');
+            
             % now match these data points to the desired alpha
             % starting point
             start_alpha_des     = 1e-5;
@@ -4025,11 +4047,13 @@ classdef c_synthGrating
             % Runs simulation
             eme_obj = eme_obj.runSimulation('plotSource','yes');      
             % compute fiber overlap
-            eme_obj = eme_obj.fiberOverlap( 'zOffset', 0:.1:12,...
-                                            'angleVec', -45:1:45,...
-                                            'MFD', MFD * obj.units.scale * um,...
-                                            'overlapDir', obj.coupling_direction, ...
-                                            'nClad', obj.background_index );
+            z_offset    = 0 : 0.25 : zf;
+            angle_vec   = 0 : 0.25 : obj.optimal_angle + 15;
+            eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
+                                                'angleVec', angle_vec,...
+                                                'MFD', MFD * obj.units.scale * um,...
+                                                'overlapDir', obj.coupling_direction, ...
+                                                'nClad', obj.background_index );
                                         
             % DEBUG show results
             gratingUI(eme_obj);
@@ -4041,6 +4065,8 @@ classdef c_synthGrating
             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
             final_design.eme_obj                = eme_obj;
             final_design.final_index            = obj.final_index;
+            final_design.input_wg_type          = obj.input_wg_type;
+            final_design.MFD                    = MFD;
             obj.final_design                    = final_design;
             
             % calculate final up/down directivity
