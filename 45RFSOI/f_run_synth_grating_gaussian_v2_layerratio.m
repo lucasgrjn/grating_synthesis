@@ -79,7 +79,7 @@ Q       = Q.synthesizeGaussianGrating(MFD, DEBUG);
 toc;
 
 % save data
-save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q', '-v7.3' );
+save( [ 'synth_obj_' Q.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '.mat' ], 'Q', '-v7.3' );
 % save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q' );
 
 % directivity vs. fill
