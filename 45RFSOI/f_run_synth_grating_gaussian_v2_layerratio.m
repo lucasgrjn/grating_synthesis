@@ -88,8 +88,8 @@ imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.directivities_vs_fills) )
 colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) vs. fill factors');
-savefig(['dir_v_ff_' Q.start_time '.fig']);
-saveas(gcf, ['dir_v_ff_' Q.start_time '.png']);
+savefig(['dir_v_ff_' Q.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '.fig']);
+saveas(gcf, ['dir_v_ff_' Q.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '.png']);
 
 % directivity BEFORE sweeping periods vs. fill
 figure;
