@@ -1,19 +1,36 @@
 % authors: bohan zhang
 %
 % script for testing the new f_makeGratingCell_45RFSOI function
+% testing what happens when i circshift the index
+%
+% example geometry to try:
+%   % grating geometry
+%     period              = 660;
+%     fill_top_bot_ratio  = 0.35;
+%     fill_bot            = 0.85;
+%     fill_top            = fill_bot * fill_top_bot_ratio;
+%     offset              = 0.9419;
+%     lambda              = 1300;
+%     k                   = 0.01057 + 1i * 1.156e-4
+%
+%   % grating geometry
+%       period              = 690;
+%       fill_top_bot_ratio  = 0.0;
+%       fill_bot            = 0.7;
+%       fill_top            = fill_bot * fill_top_bot_ratio;
+%       offset              = 0.64;
+%       k                   = 0.01084 + 1i * 0.0001073;
+%       lambda              = 1200;
 
 clear; close all;
 
 % dependencies
 addpath(genpath('..'));                                                     % all repo codes
-% addpath(['..' filesep '45RFSOI']);                                          % 45rf
-% addpath([ '..' filesep 'main' ]);                                           % main
-% addpath([ '..' filesep 'auxiliary_functions' ]);                            % gui
 
 % initial settings
 disc                = 10;
 units               = 'nm';
-lambda              = 1200;
+lambda              = 1300;
 index_clad          = 1.0; % 1.448;
 domain              = [2500, 800];      % useful
 optimal_angle       = 20;             % still useful
@@ -42,11 +59,11 @@ Q = c_synthGrating( 'discretization',   disc,       ...
             );
 
 % grating geometry
-period              = 630;
+period              = 660;
 fill_top_bot_ratio  = 0.35;
-fill_bot            = 0.8;
+fill_bot            = 0.85;
 fill_top            = fill_bot * fill_top_bot_ratio;
-offset              = 0.92;
+offset              = 0.9419;
         
         
 % make grating cell
@@ -57,10 +74,10 @@ GC = Q.h_makeGratingCell(  Q.convertObjToStruct(), ...
                             offset );
                         
 % simulation settings
-num_modes   = 500;
+num_modes   = 3;
 BC          = 0;
 pml_options = [ 1, 200, 20, 2 ];
-guessk      = 0.01183 + 1i * 1.58e-4;
+guessk      = 0.01057 + 1i * 1.156e-4;
 
 % run sim
 tic;
@@ -71,12 +88,12 @@ toc;
 GC.plotIndex();
 
 
-% Plot the accepted mode
-figure;
-imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
-colorbar;
-set( gca, 'YDir', 'normal' );
-title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*period/(2*pi) ) ) );
+% % Plot the accepted mode
+% figure;
+% imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi ) );
+% colorbar;
+% set( gca, 'YDir', 'normal' );
+% title( sprintf( 'Field (abs) for accepted mode, ka/2pi real = %f', real( GC.k*period/(2*pi) ) ) );
 
 % display calculated k
 fprintf('\nComplex k = %f + %fi\n', real(GC.k), imag(GC.k) );
@@ -91,43 +108,90 @@ fprintf('\nAngle of maximum radiation up = %f deg\n', GC.max_angle_up);
 fprintf('\nAngle of maximum radiation down = %f deg\n', GC.max_angle_down);
 
 % plot full Ez with grating geometry overlaid
-GC.plotEz_w_edges();
-axis equal;
+% GC.plotEz_w_edges();
+% axis equal;
 %         
 % % plot all modes
 % f_plot_all_modes_gui( GC.debug.phi_all, GC.x_coords, GC.y_coords, GC.debug.k_all )
+GC = GC.plot_E_field_gui();
         
-% normalize k to within brillouin zone
-k_div_pi_a = GC.k_vs_mode/(pi/period);
-k_mod_pi_a = 
+% % normalize k to within brillouin zone
+% k_div_pi_a = GC.k_vs_mode/(pi/period);
 
 
-% plot k distribution
+% Circ shift the domain and see what happens
+shift_amounts   = GC.dx * (1:size( GC.N, 2 ));
+k_vs_shift      = zeros( size(shift_amounts) );
+tic;
+for ii = 1:length(shift_amounts)
+    % for each shift amount
+    
+    fprintf('loop %i of %i\n', ii, length(shift_amounts) );
+   
+    % shift index
+    GC_shifted = GC.shift_index_circ( shift_amounts(ii) );
+   
+    % run sim
+    GC_shifted = GC_shifted.runSimulation( num_modes, BC, pml_options, guessk );        
+    toc;
+    
+    % save k
+    k_vs_shift(ii) = GC_shifted.k;
+    
+end
+
+% plot k vs shift amount
 figure;
-plot( 1:num_modes, real(GC.k_vs_mode), 'o' );
-xlabel('mode number'); ylabel('real k');
-title('real k vs. mode num');
+plot( shift_amounts, real(k_vs_shift), '-o' );
+xlabel('shift amount'); ylabel('k');
+title('Real k vs. shift amount');
 makeFigureNice();
 
 figure;
-plot( 1:num_modes, imag(GC.k_vs_mode), 'o' );
-xlabel('mode number'); ylabel('imag k');
-title('imaginary k vs. mode num');
+plot( shift_amounts, imag(k_vs_shift), '-o' );
+xlabel('shift amount'); ylabel('k');
+title('Imaginary k vs. shift amount');
 makeFigureNice();
 
-% plot normalized k distribution
-figure;
-plot( 1:num_modes, real(k_div_pi_a), 'o' );
-xlabel('mode number'); ylabel('real k');
-title('real k, divided by pi/a vs. mode num');
-makeFigureNice();
+% % plot k distribution
+% figure;
+% plot( 1:num_modes, real(GC.k_vs_mode), 'o' );
+% xlabel('mode number'); ylabel('real k');
+% title('real k vs. mode num');
+% makeFigureNice();
+% 
+% figure;
+% plot( 1:num_modes, imag(GC.k_vs_mode), 'o' );
+% xlabel('mode number'); ylabel('imag k');
+% title('imaginary k vs. mode num');
+% makeFigureNice();
+% 
+% % plot normalized k distribution
+% figure;
+% plot( 1:num_modes, real(k_div_pi_a), 'o' );
+% xlabel('mode number'); ylabel('real k');
+% title('real k, divided by pi/a vs. mode num');
+% makeFigureNice();
+% 
+% figure;
+% plot( 1:num_modes, imag(k_div_pi_a), 'o' );
+% xlabel('mode number'); ylabel('imag k');
+% title('imaginary k, divided by pi/a vs. mode num');
+% makeFigureNice();
 
-figure;
-plot( 1:num_modes, imag(k_div_pi_a), 'o' );
-xlabel('mode number'); ylabel('imag k');
-title('imaginary k, divided by pi/a vs. mode num');
-makeFigureNice();
-
+% plot k wrapped up in brillouin zone
+% i THINK the way to do it is
+% mod pi/a
+% then, all values greater than pi/a/2, make them = to pi/a - their value
+% i'm not really sure what to do with the imaginary part tho....
+% k_wrapped_real = mod( real(GC.k_vs_mode), pi/period );
+% k_wrapped_real( k_wrapped_real > (pi/(2*period)) ) = pi/period - k_wrapped_real( k_wrapped_real > (pi/(2*period)) );
+% 
+% figure;
+% plot( 1:num_modes, real(k_wrapped_real), 'o' );
+% xlabel('mode number'); ylabel('real k');
+% title('real k, within brillouin zone vs. mode num');
+% makeFigureNice();
 
         
 % % -------------------------------------------------------------------------

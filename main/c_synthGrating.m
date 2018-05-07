@@ -3774,9 +3774,11 @@ classdef c_synthGrating
             makeFigureNice();
 %             
 
-
             % meshgrid the fills
             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
+            
+            % set invert/normal threshold
+            invert_normal_top_bot_ratio_thresh = 0.9;
 
             if strcmp( input_wg_type, 'bottom' ) == true
                 % Inverted design
@@ -3785,7 +3787,7 @@ classdef c_synthGrating
                 % maximum directivity per bottom fill factor (so for each row
                 % on my design space)
 
-                indx_bottom_space   = obj.fill_top_bot_ratio < 1;
+                indx_bottom_space   = obj.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
 
                 % grab variables (remember dimensions are bot fill x top bot
                 % ratio)
@@ -3798,33 +3800,11 @@ classdef c_synthGrating
                 scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_bottom_space );
                 k_vs_fills_inv              = obj.k_vs_fills( :, indx_bottom_space );
                 GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
-            
-%             % for each bottom fill, pick the datapoint with the highest
-%             % directivity
-%             [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_inv, [], 2 );
-%             % gotta use linear indexing
-%             indxs                   = sub2ind( size(angles_vs_fills_inv), 1:size(angles_vs_fills_inv,1), indx_highest_dir_per_bot.' );
-%             angles_high_dir         = angles_vs_fills_inv( indxs );
-%             periods_high_dir        = periods_vs_fills_inv( indxs );
-%             offsets_high_dir        = offsets_vs_fills_inv( indxs );
-%             scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
-%             k_high_dir              = k_vs_fills_inv( indxs );
-%             topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
-%             bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
-%             GC_high_dir             = GC_vs_fills_inv( indxs );
-            
-%             % DEBUG
-%             scatter_strs_high_dir(1)  = -10;
-
-%             % DEBUG I want to try averaging the directivity
-%             directivities_vs_fills_inv_dB = 10*log10( directivities_vs_fills_inv );
-%             % nx vs ny pixel averaging filter
-%             x_px    = 2;
-%             y_px    = 2;
-%             avg_filt = ones( x_px, y_px )/( x_px * y_px );
-%             % apply filter
-%             directivities_vs_fills_inv_dB_avg = imfilter( directivities_vs_fills_inv_dB, avg_filt );
-%             directivities_vs_fills_inv        = 10.^( directivities_vs_fills_inv_dB_avg/10 );
+                
+                % remove datapoints where the angle deviates beyond some
+                % angle, by artifically setting the directivity to be very
+                % low
+                directivities_vs_fills_inv( abs( angles_vs_fills_inv - obj.optimal_angle ) > 1 ) = 1e-6;
 
 
                 % for each top/bottom ratio, pick bottom fill with highest
@@ -3849,7 +3829,7 @@ classdef c_synthGrating
                 % maximum directivity per bottom fill factor (so for each row
                 % on my design space)
 
-                indx_full_space   = obj.fill_top_bot_ratio > 0.99;
+                indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
 
                 % grab variables (remember dimensions are bot fill x top bot
                 % ratio)
@@ -3862,6 +3842,11 @@ classdef c_synthGrating
                 scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
                 k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
                 GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
+                
+                % remove datapoints where the angle deviates beyond some
+                % angle, by artifically setting the directivity to be very
+                % low
+                directivities_vs_fills_full( abs( angles_vs_fills_full - obj.optimal_angle ) > 0.5 ) = 1e-6;
                 
                 % for each bottom fill, pick the datapoint with the highest
                 % directivity
@@ -3879,6 +3864,53 @@ classdef c_synthGrating
                 dir_high                = highest_dir_per_bot;
                 
             end     % end if strcmp( input_wg_type, 'bottom' )
+            
+            % DEBUG plot the resulting picked out datapoints
+            % angles
+            figure;
+            plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
+            title('chosen datapoints, angles');
+            makeFigureNice();
+            % periods
+            figure;
+            plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
+            title('chosen datapoints, periods');
+            makeFigureNice();
+            % offsets
+            figure;
+            plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
+            title('chosen datapoints, offsets');
+            makeFigureNice();
+            % scattering strengths
+            figure;
+            plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
+            title('chosen datapoints, scattering strengths');
+            makeFigureNice();
+            % k real
+            figure;
+            plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
+            title('chosen datapoints, k real');
+            makeFigureNice();
+            % k imag
+            figure;
+            plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
+            title('chosen datapoints, k imaginary');
+            makeFigureNice();
+            % top bottom ratio
+            figure;
+            plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
+            title('chosen datapoints, top/bottom ratio');
+            makeFigureNice();
+            % bottom fill
+            figure;
+            plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
+            title('chosen datapoints, bottom fill');
+            makeFigureNice();
+            % directivity
+            figure;
+            plot( 1:length(dir_high), 10*log10(dir_high), '-o' );
+            title('chosen datapoints, directivity (dB)');
+            makeFigureNice();
             
 %             % DEBUG plot bot fills vs topbot ratio
 %             figure;
