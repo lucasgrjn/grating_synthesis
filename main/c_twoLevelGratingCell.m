@@ -1114,6 +1114,24 @@ classdef c_twoLevelGratingCell
         end     % end function stitch_E_field()
         
         
+        function obj = shift_index_circ( obj, shift_length_x )
+            % Circularly shifts the index by the shift length
+            % Shift length can be positive or negative
+            % Ideally the shift length is an integer multiple of obj.dx
+            %
+            % Inputs:
+            %   shift_length_x
+            %       type: double, scalar
+            %       desc: length to shift by, can be either positive or
+            %             negative value
+            
+            % calc number of units to shift by
+            nx      = round( shift_length_x/obj.dx );
+            obj.N   = circshift( obj.N, nx, 2 );
+            
+        end     % end function shift_index_circ()
+        
+        
         function plotIndex(obj)
             % Plots the index distribution
             
