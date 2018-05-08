@@ -3778,7 +3778,7 @@ classdef c_synthGrating
             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
             
             % set invert/normal threshold
-            invert_normal_top_bot_ratio_thresh = 0.9;
+            invert_normal_top_bot_ratio_thresh = 0.6;
 
             if strcmp( input_wg_type, 'bottom' ) == true
                 % Inverted design
@@ -4080,7 +4080,7 @@ classdef c_synthGrating
             eme_obj = eme_obj.runSimulation('plotSource','yes');      
             % compute fiber overlap
             z_offset    = 0 : 0.25 : zf;
-            angle_vec   = 0 : 0.25 : obj.optimal_angle + 15;
+            angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
             eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
                                                 'angleVec', angle_vec,...
                                                 'MFD', MFD * obj.units.scale * um,...
