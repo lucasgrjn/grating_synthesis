@@ -1,4 +1,4 @@
-function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_modes, guess_k, BC, PML_options, DEBUG )
+function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML_v2_symmetric( N, disc, k0, num_modes, guess_k, BC, PML_options, DEBUG )
 % FDFD 2D complex-k mode solver
 % 
 % authors: bohan zhang
@@ -8,6 +8,7 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 % with 1D periodicity along propagation direction
 % Allows for PEC, PMC, PML boundary conditions
 % 
+% symmetric version
 %
 % INPUTS:
 %   N
@@ -297,8 +298,13 @@ A       = Dx2 + Dy2 + (k0^2) * n2;
 B       = 1i * ( Dx_b + Dx_f );
 I       = speye( n_elem, n_elem );
 Z       = sparse( n_elem, n_elem );                                 % zeros
-LH      = [ A, B; Z, I ];                                           % left hand side of eigeneq
-RH      = [ Z, I; I, Z ];                                           % right hand side of eigeneq
+% LH      = [ A, B; Z, I ];                                           % left hand side of eigeneq
+% RH      = [ Z, I; I, Z ];                                           % right hand side of eigeneq
+% LH      = [ B, A; A, Z ];                                           % left hand side of eigeneq
+% RH      = [ I, Z; Z, A ];                                           % right hand side of eigeneq
+LH      = [ 1i*B, A; A, Z ];                                        % left hand side of eigeneq
+RH      = [ I, Z; Z, A ];                                           % right hand side of eigeneq
+
 
 % DEBUG show these
 % n2_full = full(n2);
@@ -310,16 +316,18 @@ RH      = [ Z, I; I, Z ];                                           % right hand
 
 % solve eigs
 % Phi_out is ( Ey, Ex )(:)
-[Phi_all, k_all]    = eigs(LH, RH, num_modes, guess_k);
-k_all               = diag(k_all);
+% [Phi_all, k_all]    = eigs(LH, RH, num_modes, guess_k);
+% k_all               = diag(k_all);
+[Phi_all, k_all]    = eigs(LH, RH, num_modes, 1i*guess_k);
+k_all               = -1i*diag(k_all);
 
 % unwrap the field and stuff
 % reshape and sort the Phis
 % when they come out raw from the modesolver, Phi_all's columns are the
 % eigenvectors
 % The eigenvectors are wrapped by column, then row
-Phi_all     = Phi_all( 1:end/2, : );                              % first remove redundant bottom half
-Phi_all     = reshape( Phi_all, ny, nx, size(Phi_all, 2) );       % hopefully this is dimensions y vs. x vs. mode#
+Phi_all     = Phi_all( end/2+1:end, : );                              % first remove redundant top half
+Phi_all     = reshape( Phi_all, ny, nx, size(Phi_all, 2) );       % reshape to dimensions y vs. x vs. mode#
 
 
 end
