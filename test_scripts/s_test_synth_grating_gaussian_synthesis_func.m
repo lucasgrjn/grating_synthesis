@@ -15,7 +15,7 @@ addpath(genpath('..')); % ['..' filesep 'main']);
 
 % run synthesis
 MFD             = 10000;                                     % units nm
-input_wg_type   = 'full';
+input_wg_type   = 'bottom';
 Q               = Q.generateFinalDesignGaussian( MFD, input_wg_type );
 
 % run final design in eme

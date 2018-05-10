@@ -1477,6 +1477,130 @@ classdef c_twoLevelGratingCell
             end     % end function plot_field()
 
         end     % end function plot_E_field_gui()
+        
+        
+        function obj = runSimulation_v2_symm( obj, num_modes, BC, pml_options, guessk, OPTS )
+            % Runs new, NEW HERMITIAN mode solver
+            % exactly same as runSimulation but with new modesolver
+            %
+            % Description:
+            %   Runs complex-k mode solver. Stores the mode with the most
+            %   guided power. Calculates up/down power, directivity,
+            %   angle of maximum radiation, and scattering strength.
+            %
+            % Inputs:
+            %   num_modes
+            %       type: integer
+            %       desc: # of modes (max) to simulate
+            %   BC
+            %       type: integer
+            %       desc: 0 for PEC, 1 for PMC
+            %   pml_options
+            %       type: array, double
+            %       desc: 1x4 Array with the following elements:
+            %               PML_options(1): PML in y direction (yes=1 or no=0)
+            %               PML_options(2): length of PML layer in nm
+            %               PML_options(3): strength of PML in the complex plane
+            %               PML_options(4): PML polynomial order (1, 2, 3...)
+            %   guessk
+            %       type: scalar, double (can be complex)
+            %       desc: guess k value. Works best when closest to desired
+            %             mode. In units rad/'units'
+            %   OPTS
+            %       type: struct
+            %       desc: optional options with the following fields
+            %           'mode_to_overlap'
+            %               type: matrix, double
+            %               desc: mode to overlap
+            %
+            % Sets these properties:
+            %   obj.k
+            %       units rad/'units'
+            %   obj.Phi
+            %       dimensions y vs. x (x is dir. of propagation)
+            %   obj.E_z
+            %       field repeated, i can't remember why or if i use this
+            %   obj.directivity
+            %       up/down power ratio
+            %   calls obj.calc_output_angle()
+            %       this is a function, which probably figures out the
+            %       output angle
+            %   calls obj.calc_scattering_strength()
+            %
+
+            % default OPTS
+            if nargin < 6
+                OPTS = struct();
+            end
+            
+            % spatial variables, in units nm
+            nm          = 1e9;
+            a           = obj.domain_size(2) * obj.units.scale * nm;
+            lambda_nm   = obj.lambda * obj.units.scale * nm;
+            dx_nm       = obj.dx * obj.units.scale * nm;
+            guessk_nm   = guessk / ( obj.units.scale * nm );                % units rad/nm
+
+            % store options
+            obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options, 'OPTS', OPTS );
+
+            % set guessk if not entered
+            if nargin < 5
+                guessk = pi/(2*a);
+            end
+            
+            % run solver
+            k0_nm           = 2*pi/lambda_nm;
+            [Phi_all, k_nm] = complexk_mode_solver_2D_PML_v2_symmetric( obj.N, ...
+                                                       dx_nm, ...
+                                                       k0_nm, ...
+                                                       num_modes, ...
+                                                       guessk_nm, ...
+                                                       BC, ...
+                                                       pml_options );
+                                                   
+            % re-scale k to units 'units'
+            k_vs_mode = k_nm * nm * obj.units.scale;
+            
+            % save k and phi vs mode #
+            obj.k_vs_mode   = k_vs_mode;
+            obj.Phi_vs_mode = Phi_all;
+                     
+            % pick which mode to keep
+            if isfield( OPTS, 'mode_to_overlap' )
+                % pick mode with best overlap
+                obj = obj.choose_mode( OPTS.mode_to_overlap );
+            else
+                % pick mode guided mode
+                obj = obj.choose_mode(); 
+            end
+            
+            % stitch together full e field, with the request number of
+            % periods
+            [obj, E_z]  = obj.stitch_E_field( obj.Phi, obj.k, obj.numcells );
+            obj.E_z     = E_z;
+            
+            % for mode overlapping, stitch together single unit cell of E
+            % field, using only real(k)
+            [obj, E_z_for_overlap]  = obj.stitch_E_field( obj.Phi, real(obj.k), 1 );
+            obj.E_z_for_overlap     = E_z_for_overlap;
+            
+            % pick slices of field to compute directivity, angle, etc.
+            h_pml_d = round( pml_options(2)/obj.dy );                       % size of pml in discretizations
+            y_up    = size( obj.E_z, 1 ) - h_pml_d - 1;
+            y_down  = h_pml_d+2;
+            
+            % calculate output angle
+            obj = obj.calc_output_angle( y_up, y_down );
+            
+            % calculate up/down directivity
+            obj             = obj.calc_radiated_power();
+            obj.directivity = obj.P_rad_up/obj.P_rad_down;
+                    
+            % calculate power scattering strength
+            obj = obj.calc_scattering_strength();
+            
+            
+        end     % end function runSimulation()
    
         
     end     % end methods
