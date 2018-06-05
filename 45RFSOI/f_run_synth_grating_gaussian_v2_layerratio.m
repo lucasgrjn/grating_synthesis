@@ -82,6 +82,10 @@ toc;
 save( [ 'synth_obj_' Q.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '.mat' ], 'Q', '-v7.3' );
 % save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q' );
 
+% clear the GC from the data and save
+Q.GC_vs_fills = zeros( size(Q.GC_vs_fills) );
+save( [ 'synth_obj_' Q.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '_NO_GC' '.mat' ], 'Q', '-v7.3' );
+
 % directivity vs. fill
 figure;
 imagesc( Q.fill_top_bot_ratio, Q.fill_bots, 10*log10(Q.directivities_vs_fills) );

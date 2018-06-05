@@ -551,8 +551,7 @@ classdef c_synthGrating
             
         end
             
-
-        function [obj, u] = fiberModeGaussian(obj, w0, zvec, xvec, theta, d0, nclad)
+function [obj, u] = fiberModeGaussian(obj, w0, zvec, xvec, theta, d0, nclad)
         % somewhat adapted from Cale's code
         %
         % Generate Gaussian-beam mode profile at a plane through y = d0 at angle of
@@ -630,6 +629,7 @@ classdef c_synthGrating
             obj.u   = u;
 
         end     % end fiberModeGaussian()
+        
         
         
         function obj = synthesizeUniformGrating(obj, MFD, fill_factor_top, fill_factor_bot, input_wg_type, DEBUG)
