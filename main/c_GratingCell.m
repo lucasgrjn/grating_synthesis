@@ -1,4 +1,4 @@
-classdef c_GratingCell < c_bloch_cell
+classdef c_gratingCell < c_bloch_cell
 % Class for simulating a grating cell, using FDFD complex-k solver
 %
 % Authors: bohan zhang
@@ -45,6 +45,10 @@ classdef c_GratingCell < c_bloch_cell
     
     properties
         
+        % geometry properties
+        wg_min_y;       % bottom position of wg
+        wg_max_y;       % top position of wg
+        
         % radiation parameters
         directivity;        % ratio of power radiated up/power radiated down
         max_angle_up;       % Angle of maximum upwards output radiation
@@ -67,10 +71,10 @@ classdef c_GratingCell < c_bloch_cell
         % -----------------------------------------------------------------
         % Constructor
         
-        function obj = c_GratingCell( varargin )
+        function obj = c_gratingCell( varargin )
             
             % call bloch cell constructor
-            obj = obj@c_bloch_cell(varargin);
+            obj = obj@c_bloch_cell(varargin{:});
             
         end     % end constructor
         
@@ -124,8 +128,13 @@ classdef c_GratingCell < c_bloch_cell
             %       output angle
             %   calls obj.calc_scattering_strength()
             
+            % default OPTS
+            if nargin < 6
+                OPTS = struct();
+            end
+            
             % first run the bloch cell simulation function
-            obj = runSimulation@c_bloch_cell( num_modes, BC, pml_options, guessk, OPTS );
+            obj = runSimulation@c_bloch_cell( obj, num_modes, BC, pml_options, guessk, OPTS );
             
             % pick which mode to keep
             if isfield( OPTS, 'mode_to_overlap' )
@@ -365,6 +374,251 @@ classdef c_GratingCell < c_bloch_cell
         
             
         end     % end function calc_radiated_power()
+        
+        
+        function obj = calc_scattering_strength(obj)
+            % GOING TO REINSTATE THIS FUNCTION
+            % Calculates scattering strength in terms of decay rate alpha
+            % To be run only AFTER mode solver AND calc_radiated_power have
+            % been run
+            
+            % define constants
+            mu0     = 4*pi*1e-7;                % units of H/m
+            mu0     = mu0 * obj.units.scale;    % units of H/(units)
+            c       = 3e8;                      % units of m/s
+            c       = c/obj.units.scale;        % units of (units)/s
+            omega0 	= 2*pi*c/obj.lambda;        % units of rad*(Units/s)/units = rad/s
+            
+            % grab field
+            E_z = obj.E_z;
+            
+            % H x in
+            % gonna calculate input power at grid point 2
+            H_x_in1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, 2 ) - E_z( 1:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 1
+            H_x_in2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, 2 ) - E_z( 2:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 2
+            % interleave two arrays
+            H_x_in                                  = zeros( size( [H_x_in1, H_x_in2] ) );
+            H_x_in( ( 1:length(H_x_in1) )*2 - 1)    = H_x_in1;
+            H_x_in( ( 1:length(H_x_in2) )*2 )       = H_x_in2;
+            
+            % H y in (on the same grid as Hx in)
+%             H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
+            
+            % NEW: H y in , on SECOND step, using entire E_z slice
+            H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 3 ) - E_z( :, 1 ) )/(2*obj.dx);   % dy, term staggered 1
+            
+            % power in (at left edge)
+            Sx_in   = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );              % Sx = real( -Ez Hy* )
+            P_in    = sum( Sx_in(:) )*obj.dy;
+
+            
+            % DEBUG save Sx_in
+            obj.debug.Sx_in = Sx_in;
+
+            % save input power
+            obj.P_in = P_in;
+            
+            % calculate alpha efficiency (in 1/units)
+            period          = obj.domain_size(2);
+            obj.alpha_up    = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/P_in );
+            obj.alpha_down  = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_down/P_in );
+
+
+            % DEBUG calculate efficiency from one cell
+            
+                     
+%             % DEBUG let's calculate, numerically, the loss coefficient from
+%             % input to output and compare with imag(k)
+%             % H x out, at grid point end-1
+%             H_x_out1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, end-1 ) - E_z( 1:2:end-2, end-1 ) )/(2*obj.dy);   % dy, term staggered 1
+%             H_x_out2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, end-1 ) - E_z( 2:2:end-2, end-1 ) )/(2*obj.dy);   % dy, term staggered 2
+%             % interleave two arrays
+%             H_x_out                                 = zeros( size( [H_x_out1, H_x_out2] ) );
+%             H_x_out( ( 1:length(H_x_out1) )*2 - 1)  = H_x_out1;
+%             H_x_out( ( 1:length(H_x_out2) )*2 )     = H_x_out2;
+%             
+%             % H y out (on the same grid as Hx out)
+%             H_y_out = (1i/(omega0*mu0)) * ( E_z( 2:end-1, end ) - E_z( 2:end-1, end-2 ) )/(2*obj.dx);   % dy, term staggered 1
+%             
+%             % power in (at left edge)
+%             Sy_out = real( conj(H_x_out(:)) .* E_z( 2:end-1, end-1 ) );         % Sy = real( Ez Hx* )
+%             Sx_out = real( -1 * conj(H_y_out(:)) .* E_z( 2:end-1, end-1 ) );    % Sx = real( -Ez Hy* )
+%             P_out  = sum( sqrt( Sy_out.^2 + Sx_out.^2 ) )*obj.dy;                 % using both Sx and Sy compmonents
+%             
+%             % numerical calculation of loss coeff
+%             alpha_tot = ( -1/( 2*obj.numcells*period ) ) * log( P_out/P_in );
+            
+        end     % end function calc_scattering_strength()
+        
+        
+        function [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = ...
+                        calc_power_distribution_onecell(obj, mode_num)
+            % Calculates Sx and Sy, power distribution for a single unit
+            % cell
+            %
+            % Pre-requisite for running calc_radiated_power
+            %
+            % inputs:
+            %   mode_num
+            %       type: scalar, int
+            %       desc: OPTIONAL, mode number to calc Sx and Sy for
+            %
+            % outputs:
+            %   Sx
+            %       type: matrix, double
+            %       desc: x component (in dir. of waveguide prop) of poynting vector
+            %             dimensions y vs. x(2:end-1)
+            %   Sy
+            %       type: matrix, double
+            %       desc: y component (transverse dir, pos = up) of poynting vector
+            %             dimensions y(2:end-1) vs. x
+            %   P_per_x_slice
+            %       type: vector, double
+            %       desc: integral of Sx aka power propagating through each
+            %             x slice of the domain
+            %             dimensions power vs. x(2:end-1)
+            %   P_per_y_slice
+            %       type: vector, double
+            %       desc: integral of Sy aka power propagating through each
+            %             y slice of the domain
+            %             dimensions power vs. y(2:end-1)
+            
+            if nargin < 2
+                choose_mode = false;
+            else
+                choose_mode = true;
+            end
+            
+            % define constants
+            mu0     = 4*pi*1e-7;                % units of H/m
+            mu0     = mu0 * obj.units.scale;    % units of H/(units)
+            c       = 3e8;                      % units of m/s
+            c       = c/obj.units.scale;        % units of (units)/s
+            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+            
+            % Choose field to use
+            if ~choose_mode
+                % use the chosen "most guided" mode
+
+                % Stich field and phase together
+                phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
+                Ez_onecell      = obj.Phi .* phase_onecell;
+            else
+                % choose which mode to use
+                
+                k_chosen    = obj.k_vs_mode( mode_num );
+                phi_chosen  = obj.Phi_vs_mode( mode_num );
+                % Stich field and phase together
+                phase_onecell   = repmat( exp( 1i * k_chosen * obj.x_coords ), size( phi_chosen, 1 ), 1 );
+                Ez_onecell      = phi_chosen .* phase_onecell;
+                
+            end
+       
+            % Calc propagating power vs. x
+            
+            % H y in , on second to end-1 steps, using entire E_z
+            % dimensions are y (transverse) vs. x
+            H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+            
+            % poynting vector in, dimensions are y vs x(2:end-1)
+            Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+
+            % power per x slice
+            P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*omega0*mu0) .* ( Ez_onecell( 3:end,:) - Ez_onecell( 1:end-2,:) )/(2*obj.dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
+            P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
+
+            
+        end     % end function calc_power_distribution_onecell()
+        
+        
+        function obj = choose_mode( obj, mode_to_overlap )
+            % Function that chooses which mode becomes the accepted mode
+            %
+            % Inputs:
+            %   mode_to_overlap
+            %       type: matrix, double
+            %       desc: OPTIONAL. If passed in as argument, this function
+            %             will choose the mode with the closest overlap.
+            %             Otherwise, the function will choose the mode with
+            %             the mode guided power
+            %
+            % Sets these properties:
+            %   obj.k
+            %       prop. k of chosen mode
+            %   obj.Phi
+            %       field envelope of chosen mode
+            %   obj.chosen_mode_num
+            %       index of chosen mode (chosen mode k = obj.k_vs_mode(
+            %       obj.chosen_mode_num))
+            
+            if nargin < 2
+                % sort on guided power
+                
+                guided_power  = zeros( size(obj.k_vs_mode) );
+                total_power   = zeros( size(obj.k_vs_mode) );
+
+                % check to see if waveguide boundaries have been set yet
+                if isempty(obj.wg_min_y) || isempty(obj.wg_max_y)
+                    error(['Waveguide boundaries have not been set yet. You must set the waveguide boundaries by either calling' ...
+                            ' "twoLevelBuilder()" or by setting the "wg_min_y" AND "wg_max_y" object properties yourself.']);
+                end
+
+                y_bot   = obj.wg_min_y;
+                y_top   = obj.wg_max_y;
+                y       = obj.y_coords;
+
+                % Calculated guided power and fix backwards modes if option is
+                % selected
+                for ii = 1:length(obj.k_vs_mode)
+                    % for each mode
+
+                    % grab guided portion of field
+                    phi_guided  = obj.Phi_vs_mode( y >= y_bot & y <= y_top, :, ii );
+                    cur_phi     = obj.Phi_vs_mode( :, :, ii );
+
+                    % sum area of field
+                    guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
+                    total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
+
+                end     % end for
+
+                % DEBUG storing the guided power
+                obj.debug.guided_power          = guided_power;
+                obj.debug.guided_power_ratio    = guided_power./total_power;
+
+                % keep mode with LEAST unguided power OR MOST guided power
+                [~, indx_k]         = max( abs(guided_power./total_power) );        % most guided
+                obj.k               = obj.k_vs_mode(indx_k);
+                obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
+                obj.chosen_mode_num = indx_k;
+                
+            else
+                % sort on mode overlap
+                
+%                 % run overlaps
+%                 [obj, max_overlaps] = obj.calc_mode_overlaps( mode_to_overlap );
+%                 
+%                 % keep mode with highest overlap
+%                 [~, indx_k]         = max( max_overlaps );        
+%                 obj.k               = obj.k_vs_mode(indx_k);
+%                 obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
+%                 obj.chosen_mode_num = indx_k;
+                
+                obj = choose_mode@c_bloch_cell( obj, mode_to_overlap );
+                
+            end
+            
+        end     % end function choose_mode()
         
     end     % end methods
     
