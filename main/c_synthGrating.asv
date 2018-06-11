@@ -971,35 +971,34 @@ classdef c_synthGrating
                 k_vs_period         = [];
                 GC_vs_period        = {};
                 periods             = [];
-                
-                % update for next iteration
-                periods(1)              = GC.domain_size(2);
-                GC_vs_period{1}         = GC;
-                k_vs_period(1)          = GC.k;
-                guessk                  = GC.k;
-                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
+
+                % sweep periods
+                guessk = GC.k;
+                period = guess_period;
+%             fprintf('Sweeping periods...\n');
             
                 % set while loop exit flag
                 angle_err_sign_flip = false;
             
-                i_period = 2;
+%             for i_period = 1:length(periods)
+                i_period    = 0;
                 while ~angle_err_sign_flip
 
-                   
+                    i_period = i_period + 1;
 %                 fprintf('Iteration %i\n', i_period );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
-                    GC = obj.h_makeGratingCell( obj.discretization, ...
-                                                   obj.units.name, ...
-                                                   obj.lambda, ...
-                                                   obj.background_index, ...
-                                                   obj.y_domain_size, ...
-                                                   fill_ratios_to_sweep(ii), ...
-                                                   guess_period );
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               fill_ratios_to_sweep(ii), ...
+                                               guess_period );
 
-                    % run sim
-                    GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
 
                 % save angle
                 if strcmp( obj.coupling_direction, 'up' )
@@ -1016,7 +1015,6 @@ classdef c_synthGrating
                 k_vs_period(i_period)   = GC.k;
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-                i_period = i_period + 1;
                 
                 % update period
                 if decrease_periods == true
