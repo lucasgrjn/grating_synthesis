@@ -115,38 +115,13 @@ classdef c_synthGrating
         optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
 %         input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
         
-%         % temporarily? saving the resulting variables from synthesis
-%         directivities_vs_fills 
-%         angles_vs_fills       
-%         periods_vs_fills        
-%         offsets_vs_fills        
-%         scatter_str_vs_fills
-%         k_vs_fills     
-%         GC_vs_fills     % this variable should be temporary, because it takes up a ton of memory
-%         fill_tops
-%         fill_bots;
-%         offsets;
-%         fill_top_bot_ratio;
-%         dir_b4_period_vs_fills;
-        
-%         % final synth results
-%         dir_synth
-%         bot_fill_synth
-%         top_bot_fill_ratio_synth
-%         period_synth
-%         offset_synth
-%         angles_synth
-%         scatter_str_synth
-%         k_synth
-%         GC_synth    
-%         des_scatter_synth
-%         final_index                 % final index distribution
-        
-        
-        % struct that holds debug field
-        % currently has fields: final_index
-%         debug;
-
+        % resulting variables from sweep
+        directivities_vs_fill 
+        angles_vs_fill
+        scatter_str_vs_fill
+        periods_vs_fill
+        k_vs_fill
+        GC_vs_fill
                             
     end
     
@@ -377,6 +352,7 @@ classdef c_synthGrating
         
         function obj = synthesizeUniformGrating(obj, MFD, fill_factor_top, fill_factor_bot, input_wg_type, DEBUG)
             % Synthesizes a uniform grating at the desired angle
+            % not working
             %
             %   User supplies the waveguide fill/period ratio. The fill
             %   ratios determine the scattering strength/reflection of the
@@ -884,8 +860,6 @@ classdef c_synthGrating
        
         function obj = generate_design_space( obj )
             % sweep fills, optimize period for a single output angle
-
-            
             
             % make waveguide cell
             waveguide = obj.h_makeGratingCell( obj.discretization, ...
@@ -926,7 +900,7 @@ classdef c_synthGrating
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
             
             % pick fill ratios to sweep
-            fill_ratios_to_sweep = fliplr( 0:0.02:0.98 );
+            fill_ratios_to_sweep = fliplr( 0.9:0.02:0.98 );
             
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
@@ -942,9 +916,20 @@ classdef c_synthGrating
             pml_options = [1, 200, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
             
+            % initialize saving variables
+            obj.directivities_vs_fill   = zeros( size(fill_ratios_to_sweep) );
+            obj.angles_vs_fill          = zeros( size(fill_ratios_to_sweep) );
+            obj.scatter_str_vs_fill     = zeros( size(fill_ratios_to_sweep) );
+            obj.periods_vs_fill         = zeros( size(fill_ratios_to_sweep) );
+            obj.k_vs_fill               = zeros( size(fill_ratios_to_sweep) );
+            obj.GC_vs_fill              = cell( size(fill_ratios_to_sweep) );
+            
             % for each fill, optimize the period to achieve closest angle
+            tic;
             for ii = 1:length(fill_ratios_to_sweep)
                
+                fprintf('Sweeping fill ratio %i of %i\n', ii, length(fill_ratios_to_sweep));
+                
                 % simulate the grating, get the angle
                 GC = obj.h_makeGratingCell( obj.discretization, ...
                                                obj.units.name, ...
@@ -953,7 +938,7 @@ classdef c_synthGrating
                                                obj.y_domain_size, ...
                                                fill_ratios_to_sweep(ii), ...
                                                guess_period );
-                GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
+                GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
                 
                 % decide whether to sweep larger or smaller periods
                 % based on the angle
@@ -976,6 +961,7 @@ classdef c_synthGrating
                 periods(1)              = GC.domain_size(2);
                 GC_vs_period{1}         = GC;
                 k_vs_period(1)          = GC.k;
+                angles_vs_period(1)     = GC.max_angle_up;
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
             
@@ -986,7 +972,7 @@ classdef c_synthGrating
                 while ~angle_err_sign_flip
 
                    
-%                 fprintf('Iteration %i\n', i_period );
+                    fprintf('Period iteration %i\n', i_period );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
@@ -1001,98 +987,74 @@ classdef c_synthGrating
                     % run sim
                     GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
 
-                % save angle
-                if strcmp( obj.coupling_direction, 'up' )
-                    % coupling direction is upwards
-                    angles_vs_period( i_period ) = GC.max_angle_up;
-                else
-                    % coupling direction is downwards
-                    angles_vs_period( i_period ) = GC.max_angle_down;
-                end
+                    % save angle
+                    
+%                 if strcmp( obj.coupling_direction, 'up' )
+%                     % coupling direction is upwards
+%                     angles_vs_period( i_period ) = GC.max_angle_up;
+%                 else
+%                     % coupling direction is downwards
+%                     angles_vs_period( i_period ) = GC.max_angle_down;
+%                 end
 
-                % update for next iteration
-                periods(i_period)       = period;
-                GC_vs_period{i_period}  = GC;
-                k_vs_period(i_period)   = GC.k;
-                guessk                  = GC.k;
-                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-                i_period = i_period + 1;
-                
-                % update period
-                if decrease_periods == true
+                    % update for next iteration
+                    angles_vs_period(i_period)  = GC.max_angle_up;
+                    periods(i_period)           = guess_period;
+                    GC_vs_period{i_period}      = GC;
+                    k_vs_period(i_period)       = GC.k;
+                    guessk                      = GC.k;
+                    OPTS.mode_to_overlap        = GC.E_z_for_overlap;
                     
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) < obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % decrease the period
-                        period = period - obj.discretization;
-                    end
-                    
-                else
-                    
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) > obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % increase the period
-                        period = period + obj.discretization;
-                    end
-                    
-                end     % end updating period if else
-                
-%                 toc;
+                    % update period
+                    if decrease_periods == true
 
-            end     % end period sweep
+                        % check for exit condition (error of angle switches
+                        % sign)
+                        if angles_vs_period(i_period) < obj.optimal_angle
+                            angle_err_sign_flip = true;
+                        else
+                            % decrease the period
+                            guess_period = guess_period - obj.discretization;
+                        end
+
+                    else
+
+                        % check for exit condition (error of angle switches
+                        % sign)
+                        if angles_vs_period(i_period) > obj.optimal_angle
+                            angle_err_sign_flip = true;
+                        else
+                            % increase the period
+                            guess_period = guess_period + obj.discretization;
+                        end
+
+                    end     % end updating period if else
+                
+                    i_period = i_period + 1;
+                    
+                    toc;
+
+                end     % end period sweep
 %             fprintf('...done.\n');
 
-            % pick best period
-            [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
-            best_period_k                   = k_vs_period( indx_best_period );
+                % pick best period
+                [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
+                best_GC                         = GC_vs_period{ indx_best_period };
                 
-            end
-            
-             % Optimize period and offset
-                    fill_top = fill_top_bot_ratio_norm(1) * fill_bots(i_ff_bot);
-                    if fill_top < 1
-                        % Only run optimization if theres a perturbation 
-                        
-                        [ obj, best_period, best_offset, best_directivity, ...
-                          best_angle, best_scatter_str, best_GC, ...
-                          best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
-                                                                                      fill_top, ...
-                                                                                      fill_bots(i_ff_bot), ...
-                                                                                      guess_period,...
-                                                                                      guessk, ...
-                                                                                      sim_opts, ...
-                                                                                      guess_GC );
-
-                        % save data
-                        if strcmp( obj.coupling_direction, 'up' )
-                            % coupling direction is upwards
-                            directivities_vs_fills_norm( i_ff_bot, 1 )   = best_GC.directivity;
-                            angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_up;
-                            scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_up;
-                        else
-                            % coupling direction is downwards
-                            directivities_vs_fills_norm( i_ff_bot, 1 )   = 1./best_GC.directivity;
-                            angles_vs_fills_norm( i_ff_bot, 1 )          = best_GC.max_angle_down;
-                            scatter_str_vs_fills_norm( i_ff_bot, 1 )     = best_GC.alpha_down;
-                        end
-                        periods_vs_fills_norm( i_ff_bot, 1 )          = best_period;
-                        offsets_vs_fills_norm( i_ff_bot, 1 )          = best_offset/best_period;
-                        k_vs_fills_norm( i_ff_bot, 1 )                = best_GC.k;
-                        GC_vs_fills_norm{ i_ff_bot, 1 }               = best_GC;
-                        dir_b4_period_vs_fills_norm( i_ff_bot, 1 )    = dir_b4_period_vs_fill;
-
-
-                        % update the guess parameters, period, k, offset
-                        guessk              = best_GC.k;
-                        guess_period        = best_period;
-                        guess_GC            = best_GC;
-                        guess_offset        = best_offset;
+                % coupling direction is assumed to be upwards
+                obj.directivities_vs_fill( ii )    = best_GC.directivity;
+                obj.angles_vs_fill( ii )           = best_GC.max_angle_up;
+                obj.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
+                obj.periods_vs_fill( ii )          = best_GC.domain_size(2);
+                obj.k_vs_fill( ii )                = best_GC.k;
+                obj.GC_vs_fill{ ii }               = best_GC;
+                
+                % update guess period for next iteration
+                guess_period = best_GC.domain_size(2);
+                
+                toc;
+                
+            end     % end for ii = 1:length(fill_ratios_to_sweep)
             
         end     % end generateDesignSpace()
         
