@@ -174,13 +174,24 @@ classdef c_gratingCell < c_bloch_cell
         end     % end runSimulation
         
         
-        function obj = calc_output_angle(obj, y_up, y_down)
+        function obj = calc_output_angle(obj, y_up, y_down, plot_k_distribution )
             % Calculates output angle of radiation
             % To be run only AFTER mode solver has been run
             %
             % Inputs:
-            %   y_up    - location of top slice of E field to take
-            %   y_down  - location of bot slice of E field to take
+            %   y_up    
+            %       type: int, scalar
+            %       desc: index of row of top slice of E field to take
+            %   y_down
+            %       type: int, scalar
+            %       desc: index of row of bottom slice of E field to take
+            %   plot_k_distribution
+            %       type: bool
+            %       desc: OPTIONAL, set to true to plot k distributions
+            
+            if nargin < 4
+                plot_k_distribution = false;
+            end
             
             % load stuff
 %             E_z = obj.E_z;
@@ -221,46 +232,50 @@ classdef c_gratingCell < c_bloch_cell
             E_z_fx_up       = fftshift( fft( ifftshift( E_z_up ) ) );
             E_z_fx_down     = fftshift( fft( ifftshift( E_z_down ) ) );
             
-%             % DEBUG plot E_fz
-%             % first normalize E fields
-%             E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-%             E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-%             
-%             % DEBUG plot E_fz down
-%             figure;
-%             plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-%             xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%             title('DEBUG abs(E(f_x)) down, within radiation window');
-%             makeFigureNice();
-%             
-%             % DEBUG plot E_fz down
-%             fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-%             fy_down     = fy_down./max(abs(fy_down));
-%             figure;
-%             plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-%             plot( fx_vec, fy_down, '--' );
-%             xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%             legend('E_z', 'rad. circle');
-%             title('DEBUG abs(E(f_x)) down, ALL');
-%             makeFigureNice();
-%             
-%             % DEBUG plot E_fz up
-%             figure;
-%             plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-%             xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%             title('DEBUG abs(E(f_x)) up, within radiation window');
-%             makeFigureNice();
-%             
-%             % DEBUG plot E_fz up
-%             fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-%             fy_up     = fy_up./max(abs(fy_up));
-%             figure;
-%             plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-%             plot( fx_vec, fy_up, '--' );
-%             xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%             legend('E_z', 'rad. circle');
-%             title('DEBUG abs(E(f_x)) up, ALL');
-%             makeFigureNice();
+            % DEBUG plot E_fz if desired
+            if plot_k_distribution
+                
+                % first normalize E fields
+                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
+                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
+
+                % DEBUG plot E_fz down
+                figure;
+                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) down, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz down
+                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
+                fy_down     = fy_down./max(abs(fy_down));
+                figure;
+                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
+                plot( fx_vec, fy_down, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) down, ALL');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                figure;
+                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) up, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
+                fy_up     = fy_up./max(abs(fy_up));
+                figure;
+                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
+                plot( fx_vec, fy_up, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) up, ALL');
+                makeFigureNice();
+                
+            end     % end plotting k distribution
             
             % calc and save max output angle
             % going up

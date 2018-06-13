@@ -116,6 +116,7 @@ classdef c_synthGrating
 %         input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
         
         % resulting variables from sweep
+        fill_ratios_to_sweep
         directivities_vs_fill 
         angles_vs_fill
         scatter_str_vs_fill
@@ -900,7 +901,8 @@ classdef c_synthGrating
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
             
             % pick fill ratios to sweep
-            fill_ratios_to_sweep = fliplr( 0.9:0.02:0.98 );
+            fill_ratios_to_sweep        = fliplr( 0.2:0.02:0.98 );
+            obj.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
@@ -913,7 +915,7 @@ classdef c_synthGrating
             % set grating solver settings
             num_modes   = 5;
             BC          = 0;                                                % 0 = PEC
-            pml_options = [1, 200, 20, 2]; 
+            pml_options = [1, 100, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
             
             % initialize saving variables
