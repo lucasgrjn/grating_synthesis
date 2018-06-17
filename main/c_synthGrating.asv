@@ -116,13 +116,19 @@ classdef c_synthGrating
 %         input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
         
         % resulting variables from sweep
+        fill_ratios_to_sweep
         directivities_vs_fill 
         angles_vs_fill
         scatter_str_vs_fill
         periods_vs_fill
-        offsets_vs_fill
         k_vs_fill
         GC_vs_fill
+        
+        % resulting variables from synthesis
+        GC_synth
+        scatter_str_synth
+        fill_synth
+        
                             
     end
     
@@ -901,7 +907,8 @@ classdef c_synthGrating
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
             
             % pick fill ratios to sweep
-            fill_ratios_to_sweep = fliplr( 0:0.02:0.98 );
+            fill_ratios_to_sweep        = fliplr( 0.2:0.02:0.98 );
+            obj.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
@@ -914,7 +921,7 @@ classdef c_synthGrating
             % set grating solver settings
             num_modes   = 5;
             BC          = 0;                                                % 0 = PEC
-            pml_options = [1, 200, 20, 2]; 
+            pml_options = [1, 100, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
             
             % initialize saving variables
@@ -922,14 +929,14 @@ classdef c_synthGrating
             obj.angles_vs_fill          = zeros( size(fill_ratios_to_sweep) );
             obj.scatter_str_vs_fill     = zeros( size(fill_ratios_to_sweep) );
             obj.periods_vs_fill         = zeros( size(fill_ratios_to_sweep) );
-            obj.offsets_vs_fill         = zeros( size(fill_ratios_to_sweep) );
             obj.k_vs_fill               = zeros( size(fill_ratios_to_sweep) );
             obj.GC_vs_fill              = cell( size(fill_ratios_to_sweep) );
             
             % for each fill, optimize the period to achieve closest angle
+            tic;
             for ii = 1:length(fill_ratios_to_sweep)
                
-                fprintf('Sweeping fill 
+                fprintf('Sweeping fill ratio %i of %i\n', ii, length(fill_ratios_to_sweep));
                 
                 % simulate the grating, get the angle
                 GC = obj.h_makeGratingCell( obj.discretization, ...
@@ -939,7 +946,7 @@ classdef c_synthGrating
                                                obj.y_domain_size, ...
                                                fill_ratios_to_sweep(ii), ...
                                                guess_period );
-                GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
+                GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
                 
                 % decide whether to sweep larger or smaller periods
                 % based on the angle
@@ -973,7 +980,7 @@ classdef c_synthGrating
                 while ~angle_err_sign_flip
 
                    
-%                 fprintf('Iteration %i\n', i_period );
+                    fprintf('Period iteration %i\n', i_period );
 
                 % make grating cell
 %                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
@@ -1000,13 +1007,12 @@ classdef c_synthGrating
 
                     % update for next iteration
                     angles_vs_period(i_period)  = GC.max_angle_up;
-                    periods(i_period)           = period;
+                    periods(i_period)           = guess_period;
                     GC_vs_period{i_period}      = GC;
                     k_vs_period(i_period)       = GC.k;
                     guessk                      = GC.k;
                     OPTS.mode_to_overlap        = GC.E_z_for_overlap;
-                    i_period = i_period + 1;
-                
+                    
                     % update period
                     if decrease_periods == true
 
@@ -1016,7 +1022,7 @@ classdef c_synthGrating
                             angle_err_sign_flip = true;
                         else
                             % decrease the period
-                            period = period - obj.discretization;
+                            guess_period = guess_period - obj.discretization;
                         end
 
                     else
@@ -1027,12 +1033,14 @@ classdef c_synthGrating
                             angle_err_sign_flip = true;
                         else
                             % increase the period
-                            period = period + obj.discretization;
+                            guess_period = guess_period + obj.discretization;
                         end
 
                     end     % end updating period if else
                 
-%                 toc;
+                    i_period = i_period + 1;
+                    
+                    toc;
 
                 end     % end period sweep
 %             fprintf('...done.\n');
@@ -1045,14 +1053,57 @@ classdef c_synthGrating
                 obj.directivities_vs_fill( ii )    = best_GC.directivity;
                 obj.angles_vs_fill( ii )           = best_GC.max_angle_up;
                 obj.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
-                obj.periods_vs_fill( ii )          = best_GC.domain(2);
-                obj.offsets_vs_fill( ii )          = best_offset/best_GC.domain(2);
+                obj.periods_vs_fill( ii )          = best_GC.domain_size(2);
                 obj.k_vs_fill( ii )                = best_GC.k;
                 obj.GC_vs_fill{ ii }               = best_GC;
+                
+                % update guess period for next iteration
+                guess_period = best_GC.domain_size(2);
+                
+                toc;
                 
             end     % end for ii = 1:length(fill_ratios_to_sweep)
             
         end     % end generateDesignSpace()
+        
+        
+        
+        function obj = synthesize_grating( obj, field_profile )
+            % Synthesizes grating that has amplitude matching field_profile
+            %
+            % inputs:
+            %   field_profile
+            %       type: double, array
+            %       desc: field profile to amplitude match to. dimensions
+            %             are amplitude vs. x coordinates
+            
+            % coordinates
+            x = obj.discretization * ( 0:(length(field_profile)-1) );
+            
+            % first normalize field integral
+            field_int       = sum( abs( field_profile ).^2 ) * obj.discretization * obj.units.scale;
+            field_profile   = field_profile./sqrt( field_int );
+            
+            % calculate desired scattering strength vs. x
+            field_int   = cumsum( abs(field_profile).^2 ) * obj.discretization * obj.units.scale;
+            alpha_des   = (1/2)*( abs(field_profile).^2 ) ./ ( 1 + 1e-5 - field_int );                  % in units 1/m
+            alpha_des   = alpha_des * obj.units.scale;                                                  % in units 1/units
+            
+            % initialize final design saving variables
+            obj.GC_synth            = {};
+            obj.scatter_str_synth   = [];
+            obj.fill_synth          = [];
+
+            % pick design points
+            cur_x = x(1);
+            while cur_x < x(end)
+                
+                % grab datapoint closest to desired alpha
+                
+                
+            end     % end while cur_x < x(end)
+            
+        end     % end synthesize_grating()
         
         
         

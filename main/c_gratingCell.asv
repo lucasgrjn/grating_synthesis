@@ -203,7 +203,7 @@ classdef c_gratingCell < c_bloch_cell
 %             x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
 %             phase_all       = repmat( exp( 1i*real(obj.k)*x_coords_all ), size(obj.Phi,1), 1 );
 %             E_z_no_decay    = repmat( obj.Phi, 1, numcells ).*phase_all;
-            [obj, E_z_no_decay]    = obj.stitch_E_field( obj.Phi, real(obj.k), numcells );
+            E_z_no_decay    = obj.stitch_E_field( obj.Phi, real(obj.k), numcells );
             
             % grab slices
             E_z_up          = E_z_no_decay( y_up, : );
@@ -233,99 +233,6 @@ classdef c_gratingCell < c_bloch_cell
             E_z_fx_up       = fftshift( fft( ifftshift( E_z_up ) ) );
             E_z_fx_down     = fftshift( fft( ifftshift( E_z_down ) ) );
             
-            % DEBUG plot E_fz if desired
-            if plot_k_distribution
-                
-                % first normalize E fields
-                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-
-                % DEBUG plot E_fz down
-                figure;
-                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) down, no decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz down
-                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-                fy_down     = fy_down./max(abs(fy_down));
-                figure;
-                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-                plot( fx_vec, fy_down, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) down, no decay, ALL');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                figure;
-                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) up, no decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-                fy_up     = fy_up./max(abs(fy_up));
-                figure;
-                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-                plot( fx_vec, fy_up, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) up, no decay, ALL');
-                makeFigureNice();
-                
-                % now do the same but with decay
-                [obj, E_z_w_decay] = obj.stitch_E_field( obj.Phi, obj.k, numcells );
-                % grab slices
-                E_z_up      = E_z_w_decay( y_up, : );
-                E_z_down    = E_z_w_decay( y_down, : );
-                % take FFT
-                E_z_fx_up   = fftshift( fft( ifftshift( E_z_up ) ) );
-                E_z_fx_down = fftshift( fft( ifftshift( E_z_down ) ) );
-                % normalize E fields
-                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-                
-                % DEBUG plot E_fz down
-                figure;
-                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) down, with decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz down
-                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-                fy_down     = fy_down./max(abs(fy_down));
-                figure;
-                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-                plot( fx_vec, fy_down, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) down, with decay, ALL');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                figure;
-                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) up, with decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-                fy_up     = fy_up./max(abs(fy_up));
-                figure;
-                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-                plot( fx_vec, fy_up, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) up, with decay, ALL');
-                makeFigureNice();
-                
-            end     % end plotting k distribution
-            
             % calc and save max output angle
             % going up
             E_z_fx_up           = E_z_fx_up(real_a_indices_top);
@@ -337,6 +244,57 @@ classdef c_gratingCell < c_bloch_cell
             angle_vec_bot       = angle_vec_bot(real_a_indices_bot);
             [~, indx_max_down]  = max( abs( E_z_fx_down ) );
             obj.max_angle_down  = angle_vec_bot(indx_max_down);   
+            
+            % DEBUG plot E_fz if desired
+            if plot_k_distribution
+                
+                % first normalize E fields
+                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
+                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
+
+                % DEBUG plot E_fz down
+                figure;
+                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) down, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz down
+                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
+                fy_down     = fy_down./max(abs(fy_down));
+                figure;
+                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
+                plot( fx_vec, fy_down, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) down, ALL');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                figure;
+                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) up, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
+                fy_up     = fy_up./max(abs(fy_up));
+                figure;
+                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
+                plot( fx_vec, fy_up, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) up, ALL');
+                makeFigureNice();
+                
+                % now do the same but with decay
+                E_z_w_decay = obj.stitch_E_field( obj.Phi, obj.k, numcells );
+                % grab slices
+                    E_z_up          = E_z_no_decay( y_up, : );
+                    E_z_down        = E_z_no_decay( y_down, : );
+                
+            end     % end plotting k distribution
             
         end     % end function calc_output_angle()
         
