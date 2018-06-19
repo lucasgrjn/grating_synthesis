@@ -128,6 +128,7 @@ classdef c_synthGrating
         GC_synth
         scatter_str_synth
         fill_synth
+        final_index
         
                             
     end
@@ -623,7 +624,104 @@ classdef c_synthGrating
         end     % end synthesize_grating()
         
 
-        
+        function obj = runFinalDesignEME(obj)
+            % runs the final design's index distribution in EME and saves
+            % some coupling parameters
+            %
+            % Inputs:
+            %   obj
+            %       takes the synthesized params as input (meaning this function
+            %       can only be run after a synthesis run)
+            %
+            % sets these object fields: (OLD)
+            %   final_index
+            %   obj.final_design.max_coupling_angle
+            %   obj.final_design.max_coupling_offset    
+            %   obj.final_design.power_reflection  
+            %   obj.final_design.eme_obj 
+            %   obj.final_design.final_index
+            %
+            % also opens the EME UI
+            
+            % input waveguide length
+            in_wg_len   = obj.discretization * 50;                          % input waveguide length
+            
+            % number of cells
+            n_cells = length(obj.GC_synth);
+            
+            % make input waveguide
+            input_waveguide = obj.h_makeGratingCell(    obj.discretization, ...
+                                                        obj.units.name, ...
+                                                        obj.lambda, ...
+                                                        obj.background_index, ...
+                                                        obj.y_domain_size, ...
+                                                        1.0, ...
+                                                        in_wg_len );
+            
+            % lets stitch together the index distribution
+            % i'm curious to see what it looks like
+            obj.final_index = input_waveguide.N;
+%             obj.final_index = obj.GC_synth{1}.N;
+            for ii = 1:n_cells
+               
+                obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
+                
+            end
+
+
+            % Set Up Simulation
+            % note that emeSim uses 'z' as propagation direction and 'x'
+            % as transverse (synthGrating uses 'x' and 'y' respectively)
+            % and units are in um
+            um              = 1e6;
+            disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
+            pol             = 0;                                                            % 0 for TE, 1 for TM
+            xf              = obj.y_domain_size * obj.units.scale * um;                      % in um (transverse domain)
+            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
+            lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
+            eme_obj         = emeSim(   'discretization', disc_eme, ...
+                                        'pml', 0.2, ...
+                                        'domain', [xf, zf], ...
+                                        'backgroundIndex', obj.background_index, ...
+                                        'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
+                                        'debug', 'no',...                   
+                                        'polarization', pol );
+                                        
+            % replace the dielectric in the eme object
+            eme_obj.diel = obj.final_index;
+            
+            % run EME sim
+            % Converts the dielectric distribution into layers for eigen mode expansion
+            eme_obj = eme_obj.convertDiel();   
+            % Runs simulation
+            eme_obj = eme_obj.runSimulation('plotSource','yes');      
+%             % compute fiber overlap
+%             z_offset    = 0 : 0.25 : zf;
+%             angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
+%             eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
+%                                                 'angleVec', angle_vec,...
+%                                                 'MFD', MFD * obj.units.scale * um,...
+%                                                 'overlapDir', obj.coupling_direction, ...
+%                                                 'nClad', obj.background_index );
+                                        
+            % DEBUG show results
+            gratingUI(eme_obj);
+            
+            % save final results
+%             final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
+%             final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
+%             final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
+%             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
+%             final_design.eme_obj                = eme_obj;
+%             final_design.final_index            = obj.final_index;
+%             final_design.input_wg_type          = obj.input_wg_type;
+%             final_design.MFD                    = MFD;
+%             obj.final_design                    = final_design;
+            
+            % calculate final up/down directivity
+%             obj = obj.calc_final_design_directivity();
+            
+        end     % end runFinalDesignEME()
         
 %         function obj = synthesizeUniformGrating(obj, MFD, fill_factor_top, fill_factor_bot, input_wg_type, DEBUG)
 %             % Synthesizes a uniform grating at the desired angle
@@ -2563,115 +2661,7 @@ classdef c_synthGrating
 %         end     % end function generateFinalDesignGaussian()
         
         
-        function obj = runFinalDesignEME(obj, MFD)
-            % runs the final design's index distribution in EME and saves
-            % some coupling parameters
-            %
-            % Inputs:
-            %   obj
-            %       takes the synthesized params as input (meaning this function
-            %       can only be run after a synthesis run)
-            %   MFD
-            %       mode field diameter of fiber, in units 'units'
-            %
-            % sets these object fields:
-            %   final_index
-            %   obj.final_design.max_coupling_angle
-            %   obj.final_design.max_coupling_offset    
-            %   obj.final_design.power_reflection  
-            %   obj.final_design.eme_obj 
-            %   obj.final_design.final_index
-            %
-            % also opens the EME UI
-            
-            % input waveguide length
-            in_wg_len   = obj.discretization * 50;                          % input waveguide length
-            
-            % number of cells
-            n_cells = length(obj.dir_synth);
-            
-            
-            % make input waveguide
-            if strcmp( obj.input_wg_type, 'bottom' )
-                % inverted design, bottom waveguide input only
-                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                                in_wg_len, ...
-                                                0, ...
-                                                1, ...
-                                                0 );
-            elseif strcmp( obj.input_wg_type, 'full' )
-                % normal design, thick waveguide input
-                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                                in_wg_len, ...
-                                                1, ...
-                                                1, ...
-                                                0 );
-            end
-            
-            % lets stitch together the index distribution
-            % i'm curious to see what it looks like
-            obj.final_index = input_waveguide.N;
-%             obj.final_index = obj.GC_synth{1}.N;
-            for ii = 1:n_cells
-               
-                obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
-                
-            end
-
-
-            % Set Up Simulation
-            % note that emeSim uses 'z' as propagation direction and 'x'
-            % as transverse (synthGrating uses 'x' and 'y' respectively)
-            % and units are in um
-            um              = 1e6;
-            disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
-            pol             = 0;                                                            % 0 for TE, 1 for TM
-            xf              = obj.domain_size(1) * obj.units.scale * um;                    % in um (transverse domain)
-            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
-            lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
-            eme_obj         = emeSim(   'discretization', disc_eme, ...
-                                        'pml', 0.2, ...
-                                        'domain', [xf, zf], ...
-                                        'backgroundIndex', obj.background_index, ...
-                                        'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
-                                        'debug', 'no',...                   
-                                        'polarization', pol );
-                                        
-            % replace the dielectric in the eme object
-            eme_obj.diel = obj.final_index;
-            
-            % run EME sim
-            % Converts the dielectric distribution into layers for eigen mode expansion
-            eme_obj = eme_obj.convertDiel();   
-            % Runs simulation
-            eme_obj = eme_obj.runSimulation('plotSource','yes');      
-            % compute fiber overlap
-            z_offset    = 0 : 0.25 : zf;
-            angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
-            eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
-                                                'angleVec', angle_vec,...
-                                                'MFD', MFD * obj.units.scale * um,...
-                                                'overlapDir', obj.coupling_direction, ...
-                                                'nClad', obj.background_index );
-                                        
-            % DEBUG show results
-            gratingUI(eme_obj);
-            
-            % save final results
-            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
-            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
-            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
-            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-            final_design.eme_obj                = eme_obj;
-            final_design.final_index            = obj.final_index;
-            final_design.input_wg_type          = obj.input_wg_type;
-            final_design.MFD                    = MFD;
-            obj.final_design                    = final_design;
-            
-            % calculate final up/down directivity
-            obj = obj.calc_final_design_directivity();
-            
-        end     % end runFinalDesignEME()
+        
         
         
         function obj = runFinalDesignEME_fiber_overlap(obj, MFD, fiber_offsets, angles)
