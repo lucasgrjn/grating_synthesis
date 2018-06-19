@@ -130,6 +130,7 @@ classdef c_synthGrating
         fill_synth
         final_index
         
+        
                             
     end
     
@@ -712,11 +713,11 @@ classdef c_synthGrating
 %             final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
 %             final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
 %             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-%             final_design.eme_obj                = eme_obj;
+            final_design.eme_obj                = eme_obj;
 %             final_design.final_index            = obj.final_index;
 %             final_design.input_wg_type          = obj.input_wg_type;
 %             final_design.MFD                    = MFD;
-%             obj.final_design                    = final_design;
+            obj.final_design                    = final_design;
             
             % calculate final up/down directivity
 %             obj = obj.calc_final_design_directivity();
