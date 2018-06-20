@@ -90,24 +90,10 @@ classdef c_synthGrating
         background_index;   % background index
         y_domain_size;      % transverse domain size (y coordinate aka vertical dimension)
         inputs;             % saves input settings for user reference
-
         start_time;         % time when object was created, 'YEAR-month-day hour-min-sec'
-                            
-%         data_directory;     % path of data directory
-%         data_filename;      % name of data file
         data_notes;         % verbose notes of what current sweep is doing
-%         data_mode;          % flag telling whether grating is run from scratch or run from previous data
-%                             % either 'new' or 'load'
-        
-%         u;                  % gaussian profile, not sure if this will stay a property tho
-        
-%         num_par_workers;    % number of parallel workers to use THIS IS DEPRECATED
-        
-%         modesolver_opts;    % STRUCT that stores the modesolver options
-                            % CURRENTLY hardcoded.
                             
-        final_design;       % STRUCT that stores the final design parameters
-                            % as well as performance values
+        
                             
         h_makeGratingCell;  % handle to the grating cell making function
         
@@ -124,14 +110,17 @@ classdef c_synthGrating
         % periods_vs_fill
         % k_vs_fill
         % GC_vs_fill
-        sweep_variables = struct();
-
+        sweep_variables;
         
-        % resulting variables from synthesis
-        GC_synth
-        scatter_str_synth
-        fill_synth
-        final_index
+        % struct that stores final design parameters
+        % currently stores the following:
+        % GC_synth
+        % scatter_str_synth
+        % fill_synth
+        % final_index
+        % 
+        synthesized_design;
+
         
         
                             
@@ -403,7 +392,7 @@ classdef c_synthGrating
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
             
             % pick fill ratios to sweep
-            fill_ratios_to_sweep                        = fliplr( 0.94:0.02:0.98 );
+            fill_ratios_to_sweep                        = fliplr( 0.20:0.02:0.98 );
             obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             
             % ugh this is really annoying but i have to extend the
@@ -584,11 +573,12 @@ classdef c_synthGrating
             field_int   = cumsum( abs(field_profile).^2 ) * obj.discretization * obj.units.scale;
             alpha_des   = (1/2)*( abs(field_profile).^2 ) ./ ( 1 + 1e-5 - field_int );                  % in units 1/m
             alpha_des   = alpha_des * obj.units.scale;                                                  % in units 1/units
+            obj.synthesized_design.alpha_des = alpha_des;
             
             % initialize final design saving variables
-            obj.GC_synth            = {};
-            obj.scatter_str_synth   = [];
-            obj.fill_synth          = [];
+            obj.synthesized_design.GC_synth            = {};
+            obj.synthesized_design.scatter_str_synth   = [];
+            obj.synthesized_design.fill_synth          = [];
             x_cell_positions        = [];                                   % for saving where each loop starts
             
             % pick design points
@@ -601,22 +591,22 @@ classdef c_synthGrating
                 [~, cur_indx] = min( abs(x - cur_x) );
                 
                 % grab datapoint closest to desired alpha
-                [~, indx_closest_alpha] = min( abs( alpha_des(cur_indx) - obj.scatter_str_vs_fill ) );
+                [~, indx_closest_alpha] = min( abs( alpha_des(cur_indx) - obj.sweep_variables.scatter_str_vs_fill ) );
                 
                 % save
-                obj.GC_synth{end+1}             = obj.GC_vs_fill{ indx_closest_alpha };
-                obj.scatter_str_synth(end+1)    = obj.scatter_str_vs_fill( indx_closest_alpha );
-                obj.fill_synth(end+1)           = obj.sweep_variables.fill_ratios_to_sweep( indx_closest_alpha );
+                obj.synthesized_design.GC_synth{end+1}             = obj.sweep_variables.GC_vs_fill{ indx_closest_alpha };
+                obj.synthesized_design.scatter_str_synth(end+1)    = obj.sweep_variables.scatter_str_vs_fill( indx_closest_alpha );
+                obj.synthesized_design.fill_synth(end+1)           = obj.sweep_variables.fill_ratios_to_sweep( indx_closest_alpha );
                 
                 % move to next position
-                cur_x = cur_x + obj.GC_synth{end}.domain_size(2);
+                cur_x = cur_x + obj.synthesized_design.GC_synth{end}.domain_size(2);
                 
             end     % end while cur_x < x(end)
             
             % DEBUG plot desired alpha and synthesized
             figure;
             plot( x, alpha_des ); hold on;
-            plot( x_cell_positions, obj.scatter_str_synth, '-o' );
+            plot( x_cell_positions, obj.synthesized_design.scatter_str_synth, '-o' );
             xlabel('position'); ylabel('scatter str');
             title('DEBUG scatter str vs x');
             makeFigureNice();
@@ -651,7 +641,7 @@ classdef c_synthGrating
             in_wg_len   = obj.discretization * 50;                          % input waveguide length
             
             % number of cells
-            n_cells = length(obj.GC_synth);
+            n_cells = length(obj.synthesized_design.GC_synth);
             
             % make input waveguide
             input_waveguide = obj.h_makeGratingCell(    obj.discretization, ...
@@ -664,11 +654,11 @@ classdef c_synthGrating
             
             % lets stitch together the index distribution
             % i'm curious to see what it looks like
-            obj.final_index = input_waveguide.N;
+            obj.synthesized_design.final_index = input_waveguide.N;
 %             obj.final_index = obj.GC_synth{1}.N;
             for ii = 1:n_cells
                
-                obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
+                obj.synthesized_design.final_index = [ obj.synthesized_design.final_index, obj.synthesized_design.GC_synth{ii}.N ];
                 
             end
 
@@ -680,8 +670,8 @@ classdef c_synthGrating
             um              = 1e6;
             disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
             pol             = 0;                                                            % 0 for TE, 1 for TM
-            xf              = obj.y_domain_size * obj.units.scale * um;                      % in um (transverse domain)
-            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
+            xf              = obj.y_domain_size * obj.units.scale * um;                     % in um (transverse domain)
+            zf              = size(obj.synthesized_design.final_index,2) * disc_eme(2);     % in um (longitudinal domain)
             lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
             eme_obj         = emeSim(   'discretization', disc_eme, ...
                                         'pml', 0.1, ...
@@ -692,7 +682,7 @@ classdef c_synthGrating
                                         'polarization', pol );
                                         
             % replace the dielectric in the eme object
-            eme_obj.diel = obj.final_index;
+            eme_obj.diel = obj.synthesized_design.final_index;
             
             % run EME sim
             % Converts the dielectric distribution into layers for eigen mode expansion
@@ -716,11 +706,11 @@ classdef c_synthGrating
 %             final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
 %             final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
 %             final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-            final_design.eme_obj                = eme_obj;
+%             synthesized_design.eme_obj                = eme_obj;
 %             final_design.final_index            = obj.final_index;
 %             final_design.input_wg_type          = obj.input_wg_type;
 %             final_design.MFD                    = MFD;
-            obj.final_design                    = final_design;
+            obj.synthesized_design.eme_obj        = eme_obj;
             
             % calculate final up/down directivity
 %             obj = obj.calc_final_design_directivity();
