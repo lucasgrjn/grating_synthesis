@@ -358,7 +358,7 @@ classdef c_synthGrating
         end     % end fiberModeGaussian()
         
         
-                function obj = generate_design_space( obj )
+        function obj = generate_design_space( obj )
             % sweep fills, optimize period for a single output angle
             
             % make waveguide cell
