@@ -115,14 +115,17 @@ classdef c_synthGrating
         optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
 %         input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
         
-        % resulting variables from sweep
-        fill_ratios_to_sweep
-        directivities_vs_fill 
-        angles_vs_fill
-        scatter_str_vs_fill
-        periods_vs_fill
-        k_vs_fill
-        GC_vs_fill
+        % struct that holds resulting variables from sweep
+        % has the following fields:
+        % fill_ratios_to_sweep
+        % directivities_vs_fill 
+        % angles_vs_fill
+        % scatter_str_vs_fill
+        % periods_vs_fill
+        % k_vs_fill
+        % GC_vs_fill
+        sweep_variables = struct();
+
         
         % resulting variables from synthesis
         GC_synth
@@ -400,8 +403,8 @@ classdef c_synthGrating
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
             
             % pick fill ratios to sweep
-            fill_ratios_to_sweep        = fliplr( 0.2:0.02:0.98 );
-            obj.fill_ratios_to_sweep    = fill_ratios_to_sweep;
+            fill_ratios_to_sweep                        = fliplr( 0.94:0.02:0.98 );
+            obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
@@ -418,12 +421,12 @@ classdef c_synthGrating
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
             
             % initialize saving variables
-            obj.directivities_vs_fill   = zeros( size(fill_ratios_to_sweep) );
-            obj.angles_vs_fill          = zeros( size(fill_ratios_to_sweep) );
-            obj.scatter_str_vs_fill     = zeros( size(fill_ratios_to_sweep) );
-            obj.periods_vs_fill         = zeros( size(fill_ratios_to_sweep) );
-            obj.k_vs_fill               = zeros( size(fill_ratios_to_sweep) );
-            obj.GC_vs_fill              = cell( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.directivities_vs_fill   = zeros( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.angles_vs_fill          = zeros( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.scatter_str_vs_fill     = zeros( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.periods_vs_fill         = zeros( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.k_vs_fill               = zeros( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.GC_vs_fill              = cell( size(fill_ratios_to_sweep) );
             
             % for each fill, optimize the period to achieve closest angle
             tic;
@@ -543,12 +546,12 @@ classdef c_synthGrating
                 best_GC                         = GC_vs_period{ indx_best_period };
                 
                 % coupling direction is assumed to be upwards
-                obj.directivities_vs_fill( ii )    = best_GC.directivity;
-                obj.angles_vs_fill( ii )           = best_GC.max_angle_up;
-                obj.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
-                obj.periods_vs_fill( ii )          = best_GC.domain_size(2);
-                obj.k_vs_fill( ii )                = best_GC.k;
-                obj.GC_vs_fill{ ii }               = best_GC;
+                obj.sweep_variables.directivities_vs_fill( ii )    = best_GC.directivity;
+                obj.sweep_variables.angles_vs_fill( ii )           = best_GC.max_angle_up;
+                obj.sweep_variables.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
+                obj.sweep_variables.periods_vs_fill( ii )          = best_GC.domain_size(2);
+                obj.sweep_variables.k_vs_fill( ii )                = best_GC.k;
+                obj.sweep_variables.GC_vs_fill{ ii }               = best_GC;
                 
                 % update guess period for next iteration
                 guess_period = best_GC.domain_size(2);
@@ -603,7 +606,7 @@ classdef c_synthGrating
                 % save
                 obj.GC_synth{end+1}             = obj.GC_vs_fill{ indx_closest_alpha };
                 obj.scatter_str_synth(end+1)    = obj.scatter_str_vs_fill( indx_closest_alpha );
-                obj.fill_synth(end+1)           = obj.fill_ratios_to_sweep( indx_closest_alpha );
+                obj.fill_synth(end+1)           = obj.sweep_variables.fill_ratios_to_sweep( indx_closest_alpha );
                 
                 % move to next position
                 cur_x = cur_x + obj.GC_synth{end}.domain_size(2);
@@ -681,7 +684,7 @@ classdef c_synthGrating
             zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
             lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
             eme_obj         = emeSim(   'discretization', disc_eme, ...
-                                        'pml', 0.2, ...
+                                        'pml', 0.1, ...
                                         'domain', [xf, zf], ...
                                         'backgroundIndex', obj.background_index, ...
                                         'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
@@ -705,8 +708,8 @@ classdef c_synthGrating
 %                                                 'overlapDir', obj.coupling_direction, ...
 %                                                 'nClad', obj.background_index );
                                         
-            % DEBUG show results
-            gratingUI(eme_obj);
+%             % DEBUG show results
+%             gratingUI(eme_obj);
             
             % save final results
 %             final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
