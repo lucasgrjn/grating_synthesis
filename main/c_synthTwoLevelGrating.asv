@@ -131,11 +131,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end constructor()
 
         
-        function obj = generate_design_space( obj )
-            
-        end     % end generate_design_space()
-        
-        
         function obj = synthesizeGaussianGrating(obj, MFD, DEBUG)
             % Synthesizes a grating that is mode-matched to fiber gaussian
             % mode
