@@ -1,10 +1,7 @@
-classdef c_synthHighDirectivityGrating
-% Synthesizes a 2-level grating in an arbitrary process
+classdef c_synthHighDirectivityGrating < c_synthGrating
+% Synthesizes a high directivity 2-level grating in an arbitrary process
 %
 % Authors: bohan zhang
-%
-%
-% Based on Mark/Jelena's synthesis suite/pipeline
 %
 %
 % Prerequisites/dependencies
