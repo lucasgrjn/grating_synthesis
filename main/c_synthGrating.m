@@ -98,8 +98,9 @@ classdef c_synthGrating
         h_makeGratingCell;  % handle to the grating cell making function
         
         % parameters to optimize for
-        optimal_angle;      % angle to optimize for, deviation from the normal, in deg.
-%         input_wg_type;      % type of input waveguide, currently supports 'bottom', 'full'
+        coupling_direction;     % either 'up' or 'down
+        optimal_angle;          % angle to optimize for, deviation from the normal, in deg.
+%         input_wg_type;       type of input waveguide, currently supports 'bottom', 'full'
         
         % struct that holds resulting variables from sweep
         % has the following fields:
@@ -154,95 +155,49 @@ classdef c_synthGrating
                      }; 
             obj.inputs = inputs;
             
-%             % first check whether to run code from fresh data or to load
-%             % previous results
-%             load_prev_result = false;   % defaults to starting fresh
-%             for ii = 1:2:length(varargin)
-%                 if strcmp( varargin{ii}, 'data_mode' )
-%                     if strcmp( varargin{ii+1}, 'load' )
-%                         load_prev_result = true;
-%                     end
-%                 end 
-%             end
-            
-%             if ~load_prev_result
-                % Starting a synth grating object from scratch
-%                 fprintf('Starting a synth grating object from scratch\n\n');
+            % parse inputs
+            p = f_parse_varargin( inputs, varargin{:} );
 
-                % parse inputs
-                p = f_parse_varargin( inputs, varargin{:} );
+            % save starting time
+            obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS_' );
 
-                % save starting time
-                obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS_' );
+            % set units
+            obj.units.name  = p.units;
+            switch( obj.units.name )
+                case 'm'
+                    obj.units.scale = 1;
+                case 'mm'
+                    obj.units.scale = 1e-3;
+                case 'um'
+                    obj.units.scale = 1e-6;
+                case 'nm'
+                    obj.units.scale = 1e-9;
+            end
 
-                % set units
-                obj.units.name  = p.units;
-                switch( obj.units.name )
-                    case 'm'
-                        obj.units.scale = 1;
-                    case 'mm'
-                        obj.units.scale = 1e-3;
-                    case 'um'
-                        obj.units.scale = 1e-6;
-                    case 'nm'
-                        obj.units.scale = 1e-9;
-                end
+            % set other properties
+            obj.discretization      = p.discretization;
+            obj.lambda              = p.lambda;
+            obj.background_index    = p.background_index;
+            obj.y_domain_size       = p.y_domain_size;
+            obj.optimal_angle       = p.optimal_angle;
 
-                % set other properties
-                obj.discretization      = p.discretization;
-                obj.lambda              = p.lambda;
-                obj.background_index    = p.background_index;
-                obj.y_domain_size       = p.y_domain_size;
-                obj.optimal_angle       = p.optimal_angle;
+            if strcmp( p.coupling_direction, 'up') || strcmp( p.coupling_direction, 'down') 
+                % set coupling direction
+                obj.coupling_direction = p.coupling_direction;
+            else
+                error('Error: input ''coupling_direction'' is not valid. Valid entries are ''up'' or ''down''. You entered ''%s''', p.coupling_direction);
+            end
 
-%                 if strcmp( p.coupling_direction, 'up') || strcmp( p.coupling_direction, 'down') 
-%                     % set coupling direction
-%                     obj.coupling_direction = p.coupling_direction;
-%                 else
-%                     error('Error: input ''coupling_direction'' is not valid. Valid entries are ''up'' or ''down''. You entered ''%s''', p.coupling_direction);
-%                 end
-
-                % set file saving/loading properties
-%                 obj.data_directory  = p.data_directory;
-%                 obj.data_filename   = p.data_filename;
-                obj.data_notes      = p.data_notes;
-%                 obj.data_mode       = p.data_mode;
+            % user notes/documentation
+            obj.data_notes      = p.data_notes;
                 
-                % number of parallel workers
-%                 obj.num_par_workers = p.num_par_workers;
-                
-%                 % default modesolver options (currently hardcoded)
-%                 num_modes   = 20;
-%                 BC          = 0;                    % 0 for PEC, 1 for PMC
-%                 pml_options = [ 1, 200, 500, 2 ];   % [ yes/no, length in nm, strength, pml poly order ]
-%                 obj.modesolver_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options );
-                
-                % set handle to grating cell making function
-                obj.h_makeGratingCell = p.h_makeGratingCell;
-                
-                
-%             else
-%                 % load previously run synth grating object
-%                 fprintf('Loading a previously run synth grating object\n\n');
-%                 
-%                 % grab data directory and filename
-%                 for ii = 1:2:length(varargin)
-%                     if strcmp( varargin{ii}, 'data_directory' )
-%                         data_directory = varargin{ii+1};
-%                     elseif strcmp( varargin{ii}, 'data_filename' )
-%                         data_filename = varargin{ii+1};
-%                     end 
-%                 end
-%                 
-%                 obj             = obj.loadPreviousSweep(data_directory, data_filename);
-%                 obj.data_mode   = 'load';
-%                 
-%             end     % end if load previous result
+            % set handle to grating cell making function
+            obj.h_makeGratingCell = p.h_makeGratingCell;
 
         end     % end constructor()
                
         
-        function saveToStruct(obj, filename)
+        function save_to_struct(obj, filename)
             % Saves all current properties of this object to a structure,
             % and then to a .mat file
             
@@ -252,7 +207,7 @@ classdef c_synthGrating
         end
         
         
-        function obj_as_struct = convertObjToStruct(obj)
+        function obj_as_struct = convert_obj_to_struct(obj)
             % converts the current object to a struct that holds the
             % object's properties
             
@@ -270,7 +225,7 @@ classdef c_synthGrating
             
         end
             
-        function [obj, u] = fiberModeGaussian(obj, w0, zvec, xvec, theta, d0, nclad)
+        function [obj, u] = fiber_mode_gaussian(obj, w0, zvec, xvec, theta, d0, nclad)
             % somewhat adapted from Cale's code
             %
             % Generate Gaussian-beam mode profile at a plane through y = d0 at angle of
@@ -454,7 +409,13 @@ classdef c_synthGrating
                 periods(1)              = GC.domain_size(2);
                 GC_vs_period{1}         = GC;
                 k_vs_period(1)          = GC.k;
-                angles_vs_period(1)     = GC.max_angle_up;
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    angles_vs_period( 1 ) = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    angles_vs_period( 1 ) = GC.max_angle_down;
+                end
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
             
@@ -467,8 +428,7 @@ classdef c_synthGrating
                    
                     fprintf('Period iteration %i\n', i_period );
 
-                % make grating cell
-%                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
+                    % make grating cell
                     GC = obj.h_makeGratingCell( obj.discretization, ...
                                                    obj.units.name, ...
                                                    obj.lambda, ...
@@ -480,18 +440,15 @@ classdef c_synthGrating
                     % run sim
                     GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
 
-                    % save angle
-                    
-%                 if strcmp( obj.coupling_direction, 'up' )
-%                     % coupling direction is upwards
-%                     angles_vs_period( i_period ) = GC.max_angle_up;
-%                 else
-%                     % coupling direction is downwards
-%                     angles_vs_period( i_period ) = GC.max_angle_down;
-%                 end
+                    if strcmp( obj.coupling_direction, 'up' )
+                        % coupling direction is upwards
+                        angles_vs_period( i_period ) = GC.max_angle_up;
+                    else
+                        % coupling direction is downwards
+                        angles_vs_period( i_period ) = GC.max_angle_down;
+                    end
 
                     % update for next iteration
-                    angles_vs_period(i_period)  = GC.max_angle_up;
                     periods(i_period)           = guess_period;
                     GC_vs_period{i_period}      = GC;
                     k_vs_period(i_period)       = GC.k;
@@ -528,16 +485,23 @@ classdef c_synthGrating
                     toc;
 
                 end     % end period sweep
-%             fprintf('...done.\n');
 
                 % pick best period
                 [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
                 best_GC                         = GC_vs_period{ indx_best_period };
                 
                 % coupling direction is assumed to be upwards
-                obj.sweep_variables.directivities_vs_fill( ii )    = best_GC.directivity;
-                obj.sweep_variables.angles_vs_fill( ii )           = best_GC.max_angle_up;
-                obj.sweep_variables.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    obj.sweep_variables.directivities_vs_fill( ii )    = best_GC.directivity;
+                    obj.sweep_variables.angles_vs_fill( ii )           = best_GC.max_angle_up;
+                    obj.sweep_variables.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
+                else
+                    % coupling direction is downwards
+                    obj.sweep_variables.directivities_vs_fill( ii )    = 1./best_GC.directivity;
+                    obj.sweep_variables.angles_vs_fill( ii )           = best_GC.max_angle_down;
+                    obj.sweep_variables.scatter_str_vs_fill( ii )      = best_GC.alpha_down;
+                end
                 obj.sweep_variables.periods_vs_fill( ii )          = best_GC.domain_size(2);
                 obj.sweep_variables.k_vs_fill( ii )                = best_GC.k;
                 obj.sweep_variables.GC_vs_fill{ ii }               = best_GC;
