@@ -567,22 +567,19 @@ classdef c_synthGrating
                 
             end     % end while cur_x < x(end)
             
-            % DEBUG plot desired alpha and synthesized
-            figure;
-            plot( x, alpha_des ); hold on;
-            plot( x_cell_positions, obj.synthesized_design.scatter_str_synth, '-o' );
-            xlabel('position'); ylabel('scatter str');
-            title('DEBUG scatter str vs x');
-            makeFigureNice();
-            
-%             % put together the final index distribution
-%             obj.final_index = 
+%             % DEBUG plot desired alpha and synthesized
+%             figure;
+%             plot( x, alpha_des ); hold on;
+%             plot( x_cell_positions, obj.synthesized_design.scatter_str_synth, '-o' );
+%             xlabel('position'); ylabel('scatter str');
+%             title('DEBUG scatter str vs x');
+%             makeFigureNice(); 
             
             
         end     % end synthesize_grating()
         
 
-        function obj = runFinalDesignEME(obj)
+        function obj = run_final_design_eme(obj)
             % runs the final design's index distribution in EME and saves
             % some coupling parameters
             %
@@ -616,10 +613,8 @@ classdef c_synthGrating
                                                         1.0, ...
                                                         in_wg_len );
             
-            % lets stitch together the index distribution
-            % i'm curious to see what it looks like
+            % stitch together the index distribution
             obj.synthesized_design.final_index = input_waveguide.N;
-%             obj.final_index = obj.GC_synth{1}.N;
             for ii = 1:n_cells
                
                 obj.synthesized_design.final_index = [ obj.synthesized_design.final_index, obj.synthesized_design.GC_synth{ii}.N ];
@@ -653,17 +648,6 @@ classdef c_synthGrating
             eme_obj = eme_obj.convertDiel();   
             % Runs simulation
             eme_obj = eme_obj.runSimulation('plotSource','yes');      
-%             % compute fiber overlap
-%             z_offset    = 0 : 0.25 : zf;
-%             angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
-%             eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
-%                                                 'angleVec', angle_vec,...
-%                                                 'MFD', MFD * obj.units.scale * um,...
-%                                                 'overlapDir', obj.coupling_direction, ...
-%                                                 'nClad', obj.background_index );
-                                        
-%             % DEBUG show results
-%             gratingUI(eme_obj);
             
             % save final results
 %             final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
@@ -679,7 +663,7 @@ classdef c_synthGrating
             % calculate final up/down directivity
 %             obj = obj.calc_final_design_directivity();
             
-        end     % end runFinalDesignEME()
+        end     % end run_final_design_eme()
         
 %         function obj = synthesizeUniformGrating(obj, MFD, fill_factor_top, fill_factor_bot, input_wg_type, DEBUG)
 %             % Synthesizes a uniform grating at the desired angle
@@ -2783,250 +2767,6 @@ classdef c_synthGrating
             
             
         end     % end calc_eff_vs_wavelength()
-        
-        
-        function obj  = sweepPeriodFill(obj)
-            % DEPRECATED
-            % Sweeps extrema of period and fill to get sense of possible
-            % angular distribution of these grating cell dimensions
-            %
-            % 4 cases: min period, one layer
-            %          max period, one layer
-            %          min period, two layers
-            %          max period, two layers
-            
-            tic;
-            
-            % grab parameters
-            min_period  = min( obj.period_vec(:) );
-            max_period  = max( obj.period_vec(:) );
-%             fills       = obj.fill_vec;             % maybe change this
-            fills = linspace(0.1, 0.9, 18);
-%             fills = 0.5;
-            
-%             % sweep min period, two layers
-%             fprintf('Sweep 1 of 4\n\n');
-%             dir_min_two     = zeros( size(fills) );     % directivities
-%             scatter_min_two = zeros( size(fills) );     % scatter strengths
-%             angles_min_two  = zeros( size(fills) );     % angles
-%             for ii = 1:length(fills)
-%                
-%                 % make grating cell
-%                 GC = makeGratingCell( obj, min_period, fills(ii), 1.0, 0 );
-%                 
-%                 % run simulation
-%                 GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-%                 
-%                 % save parameters
-%                 if strcmp(obj.coupling_direction, 'up')
-%                     % coupling direction is up
-%                     dir_min_two(ii)     = GC.directivity;
-%                     scatter_min_two(ii) = GC.alpha_up;
-%                     angles_min_two(ii)  = GC.max_angle_up;
-%                 else
-%                     % coupling direction is down
-%                     dir_min_two(ii)     = 1/GC.directivity;
-%                     scatter_min_two(ii) = GC.alpha_down;
-%                     angles_min_two(ii)  = GC.max_angle_down;
-%                 end
-%                 
-%                 toc;
-%             end
-%             
-%             % DEBUG
-%             GC.plotIndex();
-%             GC.k
-%             
-%             % sweep max period, two layers
-%             fprintf('Sweep 2 of 4\n\n');
-%             dir_max_two     = zeros( size(fills) );     % directivities
-%             scatter_max_two = zeros( size(fills) );     % scatter strengths
-%             angles_max_two  = zeros( size(fills) );     % angles
-%             for ii = 1:length(fills)
-%                
-%                 % make grating cell
-%                 GC = makeGratingCell( obj, max_period, fills(ii), 1.0, 0 );
-%                 
-%                 % run simulation
-%                 GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-%                 
-%                 % save parameters
-%                 if strcmp(obj.coupling_direction, 'up')
-%                     % coupling direction is up
-%                     dir_max_two(ii)     = GC.directivity;
-%                     scatter_max_two(ii) = GC.alpha_up;
-%                     angles_max_two(ii)  = GC.max_angle_up;
-%                 else
-%                     % coupling direction is down
-%                     dir_max_two(ii)     = 1/GC.directivity;
-%                     scatter_max_two(ii) = GC.alpha_down;
-%                     angles_max_two(ii)  = GC.max_angle_down;
-%                 end
-%                 
-%                 toc;
-%             end
-% %             
-%             % sweep min period, one layers
-%             fprintf('Sweep 3 of 4\n\n');
-%             dir_min_one     = zeros( size(fills) );     % directivities
-%             scatter_min_one = zeros( size(fills) );     % scatter strengths
-%             angles_min_one  = zeros( size(fills) );     % angles
-%             for ii = 1:length(fills)
-%                
-%                 % make grating cell
-%                 GC = makeGratingCell( obj, min_period, fills(ii), 0, 0 );
-%                 
-%                 % run simulation
-%                 GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-%                 
-%                 % save parameters
-%                 if strcmp(obj.coupling_direction, 'up')
-%                     % coupling direction is up
-%                     dir_min_one(ii)     = GC.directivity;
-%                     scatter_min_one(ii) = GC.alpha_up;
-%                     angles_min_one(ii)  = GC.max_angle_up;
-%                 else
-%                     % coupling direction is down
-%                     dir_min_one(ii)     = 1/GC.directivity;
-%                     scatter_min_one(ii) = GC.alpha_down;
-%                     angles_min_one(ii)  = GC.max_angle_down;
-%                 end
-%                
-%                 toc;
-%             end
-%             
-%             % DEBUG
-%             GC.plotIndex();
-%             GC.k
-%             
-%             % sweep max period, one layers
-%             fprintf('Sweep 4 of 4\n\n');
-%             dir_max_one     = zeros( size(fills) );     % directivities
-%             scatter_max_one = zeros( size(fills) );     % scatter strengths
-%             angles_max_one  = zeros( size(fills) );     % angles
-%             for ii = 1:length(fills)
-%                
-%                 % make grating cell
-%                 GC = makeGratingCell( obj, max_period, fills(ii), 0, 0 );
-%                 
-%                 % run simulation
-%                 GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-%                 
-%                 % save parameters
-%                 if strcmp(obj.coupling_direction, 'up')
-%                     % coupling direction is up
-%                     dir_max_one(ii)     = GC.directivity;
-%                     scatter_max_one(ii) = GC.alpha_up;
-%                     angles_max_one(ii)  = GC.max_angle_up;
-%                 else
-%                     % coupling direction is down
-%                     dir_max_one(ii)     = 1/GC.directivity;
-%                     scatter_max_one(ii) = GC.alpha_down;
-%                     angles_max_one(ii)  = GC.max_angle_down;
-%                 end
-%                 
-%                 toc;
-%             end
-%             
-%             % plot angles for min period, two layers
-%             figure;
-%             plot( fills, angles_min_two, '-o' );
-%             xlabel('fill'); ylabel('angle (deg)');
-%             title(['Angles vs. fill, min period ', num2str(min_period), ' two levels']);
-%             makeFigureNice();
-%             
-%             % plot angles for max period, two layers
-%             figure;
-%             plot( fills, angles_max_two, '-o' );
-%             xlabel('fill'); ylabel('angle (deg)');
-%             title(['Angles vs. fill, max period ', num2str(max_period), ' two levels']);
-%             makeFigureNice();
-%             
-%             % plot angles for min period, one layers
-%             figure;
-%             plot( fills, angles_min_one, '-o' );
-%             xlabel('fill'); ylabel('angle (deg)');
-%             title(['Angles vs. fill, min period ', num2str(min_period), ' one level']);
-%             makeFigureNice();
-%             
-%             % plot angles for max period, one layers
-%             figure;
-%             plot( fills, angles_max_one, '-o' );
-%             xlabel('fill'); ylabel('angle (deg)');
-%             title(['Angles vs. fill, max period ', num2str(max_period), ' one levels']);
-%             makeFigureNice();
-            
-            % Sweep periods instead
-            fprintf('Sweep period\n\n');
-            fill                = 0.2;
-            periods             = 500:20:1300;
-            dir_v_period        = zeros( size(periods) );     % directivities
-            scatter_v_period    = zeros( size(periods) );     % scatter strengths
-            angles_v_period     = zeros( size(periods) );     % angles
-            for ii = 1:length(periods)
-               
-                fprintf('loop %i of %i\n', ii, length(periods));
-                
-                % make grating cell
-                GC = makeGratingCell( obj, periods(ii), fill, 1.0, 0 );
-                
-                % run simulation
-                GC = GC.runSimulation( obj.modesolver_opts.num_modes, obj.modesolver_opts.BC, obj.modesolver_opts.pml_options );
-                
-                % save parameters
-                if strcmp(obj.coupling_direction, 'up')
-                    % coupling direction is up
-                    dir_v_period(ii)        = GC.directivity;
-                    scatter_v_period(ii)    = GC.alpha_up;
-                    angles_v_period(ii)     = GC.max_angle_up;
-                else
-                    % coupling direction is down
-                    dir_v_period(ii)        = 1/GC.directivity;
-                    scatter_v_period(ii)    = GC.alpha_down;
-                    angles_v_period(ii)     = GC.max_angle_down;
-                end
-                
-                toc;
-            end
-            
-            % plot angles vs. period
-            figure;
-            plot( periods, angles_v_period, '-o' );
-            xlabel('period'); ylabel('angle (deg)');
-            title(['Angles vs. period, two levels, fill ' num2str(fill)]);
-            makeFigureNice();
-            % plot scatter vs. period
-            figure;
-            plot( periods, scatter_v_period, '-o' );
-            xlabel('period'); ylabel('scatter strength');
-            title(['Scatter strength vs. period, two levels, fill ' num2str(fill)]);
-            makeFigureNice();
-            
-        end     % end sweepPeriodFill()
-        
-        
-        function [obj, GC] = testMakeGratingCell( obj, period, fill, ratio, offset_ratio )
-            % TEST/DEBUGGING function for testing the drawing of a grating cell 
-            % also runs the simulation lol
-            %
-            % this function is somewhat deprecated as of 12/7/17
-            
-            % make grating cell
-            GC = makeGratingCell( obj, period, fill, ratio, offset_ratio );
-            
-            % run bloch complex k modesolver and return values
-            num_modes   = 20;
-            BC          = 0;                    % 0 for PEC, 1 for PMC
-            pml_options = [ 1, 200, 500, 2 ];   %  [ yes/no, length in nm, strength, pml poly order ]
-            
-            % run simulation
-            GC = GC.runSimulation( num_modes, BC, pml_options );
-            
-%             % plot stuff
-%             GC.plotIndex();
-%             GC.plotEz();
-        end
-        
 
     end     % End methods section
     
