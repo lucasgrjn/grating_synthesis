@@ -135,16 +135,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % Generates the design space vs. fill factors
             % picking optimum offset and period for highest directivity and
             % closest angle to desired
-            %
-            % based on synthesizeGaussianGrating
             
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:1.0 );
+            fill_bots           = fliplr( 0.4:0.025:1.0 );;
             fill_top_bot_ratio  = fliplr( 0.0:0.025:1.2 );
-            fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
-            guess_offset        = 0;
+            fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
+            guess_offset          = 0;
             
             
         end     % end generate_design_space()
