@@ -6,6 +6,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 % this documentation needs to be updated
 %
 % Prerequisites/dependencies
+%   - c_synthGrating.m
 %   - c_twoLevelGratingCell.m
 %   - the utility folder
 %
@@ -13,10 +14,11 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %   drawing function.
 %   HOWEVER, this function MUST have the following inputs and outputs, IN
 %   ORDER:
-%       function GC = your_makeGratingCell_function( synth_obj, period, fill_top, fill_bot, offset_ratio )
+%       function GC = your_makeGratingCell_function( dxy, units, lambda, background_index, y_domain_size, ...
+%                                          period, fill_top, fill_bot,
+%                                          offset_ratio );
 %           % makes and returns a c_twoLevelGratingCell object
-% 
-%           inputs:
+%           inputs(outdated):
 %               synth_obj
 %               type: c_synthGrating object AS STRUCT
 %               desc: c_synthGrating object AS STRUCT
@@ -135,17 +137,271 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % Generates the design space vs. fill factors
             % picking optimum offset and period for highest directivity and
             % closest angle to desired
+            %
+            % based on synthesizeGaussianGrating
+            %
+            % would be good to implement: option to save GC data or not
             
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:1.0 );;
+            fill_bots           = fliplr( 0.4:0.025:1.0 );
             fill_top_bot_ratio  = fliplr( 0.0:0.025:1.2 );
-            fill_tops           = []; %fill_bots .* fill_top_bot_ratio;
-            guess_offset          = 0;
+            fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
+            guess_offset        = 0;
+            
+            % save fills and offsets
+            obj.sweep_variables.fill_tops           = fill_tops;
+            obj.sweep_variables.fill_bots           = fill_bots;
+            obj.sweep_variables.fill_top_bot_ratio  = fill_top_bot_ratio;
+            
+            % initialize saving variables
+            directivities_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            angles_vs_fills         = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            periods_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            offsets_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
+            scatter_str_vs_fills    = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            k_vs_fills              = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            GC_vs_fills             = cell( length( fill_bots ), length( fill_top_bot_ratio_norm ) );      % dimensions bot fill vs. top/bot ratio
+            dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            
+            % make grating cell, assuming both layers are filled
+            waveguide = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               2*obj.discretization, ...
+                                               1.0, 1.0, 0.0 );
+            
+            % run waveguide simulation
+            % sim settings
+            guess_n             = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
+            guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
+            num_wg_modes        = 5;
+            BC                  = 0;                                                                % 0 = PEC
+            pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
+            % run sim
+            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, guessk );
+            
+            % update guessk (units rad/'units')
+            guessk = waveguide.k;
+            
+            % grab waveguide k
+            waveguide_k = waveguide.k;                                                              % units of rad/'units'
+            
+            % calculate analytical period which would approximately phase
+            % match to desired output angle
+            k0              = obj.background_index * ( 2*pi/obj.lambda );
+            kx              = k0 * sin( (pi/180) * obj.optimal_angle );
+            guess_period    = 2*pi/(waveguide_k- kx);                                               % units of 'units'
+            
+            % snap period to discretization
+            guess_period = obj.discretization * round(guess_period/obj.discretization);
+            
+            % ugh this is really annoying but i have to - extend the
+            % waveguide's e z overlap
+            [ waveguide, e_z_overlap_ext ]  = ...
+                waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
+            waveguide.E_z_for_overlap       = e_z_overlap_ext;
+            
+            % set grating solver settings
+            num_modes   = 5;
+            BC          = 0;                                                % 0 = PEC
+            pml_options = [1, 100, 20, 2]; 
+            OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
+            
+            
+            % initially start with waveguide GC
+            guess_GC = waveguide;
+                
+            % first fill in the right side of the domain
+            for i_ff_bot = 1:length( fill_bots )
+
+                % print iteration
+                fprintf('Right side of domain, fill iteration %i of %i\n', i_ff_bot, length(fill_bots) );
+
+                % Optimize period and offset
+                fill_top = fill_top_bot_ratio(1) * fill_bots(i_ff_bot);
+                if fill_top < 1
+                    % Only run optimization if theres a perturbation 
+
+                    % run optimization loop and save data
+                    [ obj, ...
+                      periods_vs_fills( i_ff_bot, 1 ), ...
+                      offsets_vs_fills( i_ff_bot, 1 ), ...
+                      directivities_vs_fills( i_ff_bot, 1 ), ...
+                      angles_vs_fills( i_ff_bot, 1 ), ...
+                      scatter_str_vs_fills( i_ff_bot, 1 ), ...
+                      GC_vs_fills{ i_ff_bot, 1 }, ...
+                      k_vs_fills( i_ff_bot, 1 ), ...
+                      dir_b4_period_vs_fills( i_ff_bot, 1 ) ...
+                      ] = ...
+                        obj.optimizePeriodOffset( guess_offset, ...
+                                                  fill_top, ...
+                                                  fill_bots(i_ff_bot), ...
+                                                  guess_period,...
+                                                  guessk, ...
+                                                  sim_opts, ...
+                                                  guess_GC );
+
+
+                    % update the guess parameters, period, k, offset
+                    guessk              = k_vs_fills( i_ff_bot, 1 );
+                    guess_period        = periods_vs_fills( i_ff_bot, 1 );
+                    guess_GC            = GC_vs_fills{ i_ff_bot, 1 };
+                    guess_offset        = offsets_vs_fills( i_ff_bot, 1 );
+
+                else
+                    % we're in a waveguide, there's no reason to run
+                    % the optimization (and actually the period sweep
+                    % bugs out when the fill = 100%)
+
+                    % save dummy 
+                    directivities_vs_fills( i_ff_bot, 1 )   = 1;
+                    angles_vs_fills( i_ff_bot, 1 )          = 0;
+                    scatter_str_vs_fills( i_ff_bot, 1 )     = 0;
+                    periods_vs_fills( i_ff_bot, 1 )         = guess_period;
+                    offsets_vs_fills( i_ff_bot, 1 )         = 0;
+                    k_vs_fills( i_ff_bot, 1 )               = guessk;
+                    GC_vs_fills{ i_ff_bot, 1 }              = waveguide;
+                    dir_b4_period_vs_fills( i_ff_bot, 1 )   = 1;
+
+                end     % end if fill_top < 1
+
+                toc;
+
+            end     % end initial domain sweep
+            
+            
+            % for parallel processing, grab these variables before entering
+            % parfor
+            offsets_vs_fills_1 = offsets_vs_fills(:,1);
+            periods_vs_fills_1 = periods_vs_fills(:,1);
+            k_vs_fills_1       = k_vs_fills(:,1);
+            GC_vs_fills_1      = GC_vs_fills(:,1);
+            % calc number of loops, also necessary apparently for parfor
+            n_fill_bots             = length(fill_bots);
+            n_fill_top_bot_ratio    = length(fill_top_bot_ratio);
+
+            % start up parallel pool
+            obj = obj.start_parpool();
+            
+            
+            % now fill in the rest of the domain
+            parfor i_ff_bot = 1:n_fill_bots
+                % For each bottom fill factor
+    
+                fprintf('Main parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
+
+                % grab starting guess period and k
+                guess_period    = periods_vs_fills_1( i_ff_bot );
+                guessk          = k_vs_fills_1( i_ff_bot );
+                guess_GC        = GC_vs_fills_1{ i_ff_bot };
+                guess_offset    = offsets_vs_fills_1( i_ff_bot ) * guess_period;
+
+                % grab bottom fill
+                fill_bot = fill_bots( i_ff_bot );
+
+
+                for i_ff_ratio = 2:n_fill_top_bot_ratio_norm
+                    % for each top/bottom fill factor ratio
+
+                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_ratio, n_fill_top_bot_ratio_norm, i_ff_bot, n_fill_bots);
+                        
+                    % Optimize period and offset
+                    fill_top = fill_top_bot_ratio_norm(i_ff_ratio) * fill_bot;
+                    if fill_top < 1
+                            % Only run optimization if theres a perturbation 
+                            
+                            [ tempobj, best_period, best_offset, best_directivity, ...
+                              best_angle, best_scatter_str, best_GC, ...
+                              best_k, dir_b4_period_vs_fill ] = obj.optimizePeriodOffset( guess_offset, ...
+                                                                                          fill_top, ...
+                                                                                          fill_bot, ...
+                                                                                          guess_period,...
+                                                                                          guessk, ...
+                                                                                          sim_opts, ...
+                                                                                          guess_GC );
+
+                            % save data
+                            if strcmp( obj.coupling_direction, 'up' )
+        %                         coupling direction is upwards
+                                directivities_vs_fills_norm( i_ff_bot, i_ff_ratio )   = best_GC.directivity;
+                                angles_vs_fills_norm( i_ff_bot, i_ff_ratio )          = best_GC.max_angle_up;
+                                scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio )     = best_GC.alpha_up;
+                            else
+                                % coupling direction is downwards
+                                directivities_vs_fills_norm( i_ff_bot, i_ff_ratio )   = 1./best_GC.directivity;
+                                angles_vs_fills_norm( i_ff_bot, i_ff_ratio )          = best_GC.max_angle_down;
+                                scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio )     = best_GC.alpha_down;
+                            end
+                            periods_vs_fills_norm( i_ff_bot, i_ff_ratio )          = best_period;
+                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio )          = best_offset/best_period;
+                            k_vs_fills_norm( i_ff_bot, i_ff_ratio )                = best_GC.k;
+                            GC_vs_fills_norm{ i_ff_bot, i_ff_ratio }               = best_GC;
+                            dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio )    = dir_b4_period_vs_fill;
+
+                            % update the guess parameters, period, k, offset
+                            guessk              = best_GC.k;
+                            guess_period        = best_period;
+                            guess_GC            = best_GC;
+                            guess_offset        = best_offset;
+
+%                             % update the offsets
+%                             % grab previous offset index
+%                             [~, indx_prev_offset] = min( abs( offsets_orig - best_offset ) );
+%                             % shift offsets to start at previous offset
+%                             offsets = circshift( offsets_orig, -( indx_prev_offset - 1 ) );
+                            
+                        else
+                            % we're in a waveguide, there's no reason to run
+                            % the optimization (and actually the period sweep
+                            % bugs out when the fill = 100%)
+
+                            % save dummy 
+                            directivities_vs_fills_norm( i_ff_bot, i_ff_ratio )    = 1;
+                            angles_vs_fills_norm( i_ff_bot, i_ff_ratio )           = 0;
+                            scatter_str_vs_fills_norm( i_ff_bot, i_ff_ratio )      = 0;
+                            periods_vs_fills_norm( i_ff_bot, i_ff_ratio )          = guess_period;
+                            offsets_vs_fills_norm( i_ff_bot, i_ff_ratio )          = 0;
+                            k_vs_fills_norm( i_ff_bot, i_ff_ratio )                = guessk;
+                            GC_vs_fills_norm{ i_ff_bot, i_ff_ratio }               = waveguide;
+                            dir_b4_period_vs_fills_norm( i_ff_bot, i_ff_ratio )    = 1;
+
+                        end
+
+
+                    end     % end for i_ff_ratio = ...
+
+                    % update progress monitor
+%                     ppm.increment();
+
+                end     % end for i_ff_bot = ...
             
             
         end     % end generate_design_space()
+        
+        
+        function obj = start_parpool( obj )
+            % convenience function for starting up a parallel pool
+            
+            % start a parallel pool session
+            my_cluster = parcluster('local');                           % cores on compute node are "local"
+            if getenv('ENVIRONMENT')                                    % true if this is a batch job
+                my_cluster.JobStorageLocation = getenv('TMPDIR');       % points to TMPDIR
+            end
+
+            poolobj = gcp('nocreate'); % If no pool, do not create new one.
+            if ~isempty(poolobj)
+                % shut down previously made parallel pool
+                delete(gcp('nocreate'));
+            end
+            % Automatically selects number of works to the max that the
+            % cluster supports
+            parpool(my_cluster, my_cluster.NumWorkers);
+            
+        end     % end start_parpool()
         
         
         function obj = synthesizeGaussianGrating(obj, MFD, DEBUG)
@@ -778,12 +1034,11 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         
         function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
                     best_GC, best_k, dir_b4_period_vs_fill ] ...
-                    = optimizePeriodOffset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
-            % optimizes period and offset for best angle/directivity
+                    = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
+            % for given fill ratios, optimizes period and offset for best angle/directivity
             %
             % Inputs:
-            %   offsets - OLD BUT STILL IN USE
-            %   guess_offset - NEW BUT NOT IMPLEMENTED
+            %   guess_offset
             %       type: scalar, double
             %       desc: guess offset position to start from, in units
             %             'units'
@@ -813,33 +1068,29 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %
             % Outputs:
             %   best_period
-            %       type:
-            %       desc: 
+            %       type: scalar, double
+            %       desc: optimal period
             %   best_offset
-            %       type:
+            %       type: scalar, double
             %       desc: absolute value of offset, in 'units'
-            %   best_offset_ratio
-            %       type:
-            %       desc:
             %   best_directivity
-            %       type:
-            %       desc:
+            %       type: scalar, double
+            %       desc: optimal directivity
             %   best_angle
-            %       type:
-            %       desc:
+            %       type: scalar, double
+            %       desc: optimal angle
             %   best_scatter_str
-            %       type:
-            %       desc:
+            %       type: scalar, double
+            %       desc: optimal scatering strength
             %   best_GC
-            %       type:
-            %       desc:
+            %       type: c_twoLevelGratingCell
+            %       desc: two level grating cell
             %   best_k
-            %       type:
-            %       desc:
+            %       type: scalar, double
+            %       desc: optimal k
             %   dir_b4_period_vs_fill
-            %       type:
-            %       desc:
-            %       mostly for debugging purposes
+            %       type: scalar, double
+            %       desc: directivity b4 period sweep, mostly for debugging purposes 
             
 %             % enable/disable debug mode
 %             DEBUG = false;

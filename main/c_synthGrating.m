@@ -79,7 +79,40 @@ classdef c_synthGrating
 %       type: function handle
 %       desc: handle to grating drawing function
 %
-% Example:
+%
+% Examples:
+%
+% Example code that makes a synthesis object and generates the design space
+%
+%   % dependencies
+%   addpath( genpath( 'C:\Users\bz\git\grating_synthesis' ) );                  % path on plab desktop to grating synth codes
+% 
+%   % inputs
+%   discretization      = 10;
+%   units               = 'nm';
+%   lambda              = 1550;
+%   background_index    = 1.0;
+%   y_domain_size       = 5000;
+%   optimal_angle       = -15;
+%   data_notes          = 'whatever';
+% 
+%   % grating cell making function handle
+%   h_makeGratingCell = @f_simple_onelevel_cell;
+% 
+%   % make synthesis object
+%   synth_obj = c_synthGrating( 'discretization',    discretization, ...
+%                               'units',             units,   ...
+%                               'lambda',            lambda, ...
+%                               'background_index',  background_index,    ...
+%                               'y_domain_size',     y_domain_size, ...
+%                               'optimal_angle',     optimal_angle, ...
+%                               'data_notes',        data_notes, ...
+%                               'h_makeGratingCell', h_makeGratingCell ...
+%                               );
+%                         
+%   % generate design space
+%   synth_obj   = synth_obj.generate_design_space();
+%   sweep_vars  = synth_obj.sweep_variables;
 
     properties
 
@@ -93,14 +126,11 @@ classdef c_synthGrating
         start_time;         % time when object was created, 'YEAR-month-day hour-min-sec'
         data_notes;         % verbose notes of what current sweep is doing
                             
-        
-                            
         h_makeGratingCell;  % handle to the grating cell making function
         
         % parameters to optimize for
         coupling_direction;     % either 'up' or 'down
         optimal_angle;          % angle to optimize for, deviation from the normal, in deg.
-%         input_wg_type;       type of input waveguide, currently supports 'bottom', 'full'
         
         % struct that holds resulting variables from sweep
         % has the following fields:
@@ -345,11 +375,7 @@ classdef c_synthGrating
             
             % snap period to discretization
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
-            
-            % pick fill ratios to sweep
-            fill_ratios_to_sweep                        = fliplr( 0.20:0.02:0.98 );
-            obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
-            
+
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
             [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
@@ -363,6 +389,10 @@ classdef c_synthGrating
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 100, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
+            
+            % pick fill ratios to sweep
+            fill_ratios_to_sweep                        = fliplr( 0.20:0.02:0.98 );
+            obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             
             % initialize saving variables
             obj.sweep_variables.directivities_vs_fill   = zeros( size(fill_ratios_to_sweep) );

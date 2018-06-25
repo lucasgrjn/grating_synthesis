@@ -1,4 +1,5 @@
-function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, offset_ratio, BOX_thickness )
+function GC = f_makeGratingCell_45RFSOI( dxy, units, lambda, background_index, y_domain_size, ...
+                                         period, fill_top, fill_bot, offset_ratio, BOX_thickness )
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
