@@ -74,31 +74,15 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %       type: double, scalar
 %       desc: desired output angle, in deg
 %
-%   'coupling_direction'
-%       type: string
-%       desc: direction of output light, 'up' or 'down'
-%
-%   'data_directory'
-%       type: string
-%       desc: path to data save directory
-%
-%   'data_filename'
-%       type: string
-%       desc: name of data file to save to/load from
-%
 %   'data_notes'
 %       type: string
 %       desc: optional verbose notes/descriptor for this simulation
 %
-%   'data_mode'
-%       type: string
-%       desc: flag to set data loading mode.
-%             use 'new' to start a fresh simulation from scratch or 'load'
-%             to load previously simulated data
-%
-%   'num_par_workers'
-%       type: int, scalar
-%       desc: number of parallel workers to use when running sweep
+%   'h_makeGratingCell'
+%       type: function handle
+%       desc: handle to grating drawing function
+
+
 
     properties
         

@@ -114,6 +114,8 @@ classdef c_synthGrating
 %   synth_obj   = synth_obj.generate_design_space();
 %   sweep_vars  = synth_obj.sweep_variables;
 
+
+
     properties
 
         discretization;     % dx and dy
@@ -151,11 +153,10 @@ classdef c_synthGrating
         % final_index
         % 
         synthesized_design;
-
-        
-        
-                            
+         
     end
+
+    
     
     methods
         

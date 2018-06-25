@@ -1,21 +1,19 @@
 % authors: bohan
 % 
-% script for testing the new, NEW synthesis pipeline object
+% script for testing the latest synthesis pipeline
 
 clear; close all;
 
 % dependencies
 addpath(['..' filesep 'main']);                                             % main code
 addpath(['..' filesep '45RFSOI']);                                          % 45rf functions
-% imec codes
-addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\code\IMEC_2018_02_07_tapeout\' ); 
 
 % initial settings
 disc                = 10;
 units               = 'nm';
 lambda              = 1550;
 index_clad          = 1.0;
-domain              = [2500, 800];      % useful
+y_domain_size       = 2500;
 optimal_angle       = 15;             % still useful
 coupling_direction  = 'down';
 data_dir            = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data';
@@ -29,6 +27,17 @@ n_workers           = 1;
 % etch_depth          = 70;
 % h_makeGratingCell   = @( synth_obj, period, fill_top, fill_bot, offset_ratio ) ...
 %                         f_makeGratingCell_IMEC( synth_obj, period, fill_top, fill_bot, offset_ratio, etch_depth );
+
+% make synthesis object
+synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
+                                      'units',             units,   ...
+                                      'lambda',            lambda, ...
+                                      'background_index',  background_index,    ...
+                                      'y_domain_size',     y_domain_size, ...
+                                      'optimal_angle',     optimal_angle, ...
+                                      'data_notes',        data_notes, ...
+                                      'h_makeGratingCell', h_makeGratingCell ...
+                                      );
 
 % make object
 Q = c_synthGrating( 'discretization',   disc,       ...

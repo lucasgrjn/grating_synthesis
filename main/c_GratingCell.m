@@ -42,6 +42,14 @@ classdef c_gratingCell < c_bloch_cell
 %             drawing/calculating Ez
 %
 % Example usage:
+%
+%   % make grating cell
+%   GC = c_gratingCell( 'discretization', dxy, ...
+%                       'units', units, ...
+%                       'lambda', lambda, ...
+%                       'domain_size', [ y_domain_size, period ], ...
+%                       'background_index', background_index, ...
+%                       'numcells', 10 );
     
     properties
         
@@ -75,6 +83,13 @@ classdef c_gratingCell < c_bloch_cell
             
             % call bloch cell constructor
             obj = obj@c_bloch_cell(varargin{:});
+            
+            % inputs and defaults
+            inputs      = { 'coupling_direction',   'none' }; 
+            obj.inputs  = [ obj.inputs, inputs ];                           % append inputs
+            
+            % parse inputs
+            p = f_parse_varargin( inputs, varargin{:} );
             
         end     % end constructor
         
