@@ -81,6 +81,20 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %   'h_makeGratingCell'
 %       type: function handle
 %       desc: handle to grating drawing function
+%
+% Examples:
+%
+%   % make synthesis object
+%   synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
+%                                       'units',             units,   ...
+%                                       'lambda',            lambda, ...
+%                                       'background_index',  background_index,    ...
+%                                       'y_domain_size',     y_domain_size, ...
+%                                       'optimal_angle',     optimal_angle, ...
+%                                       'data_notes',        data_notes, ...
+%                                       'coupling_direction', coupling_direction, ...
+%                                       'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
+%                                       );
 
 
 
@@ -102,6 +116,19 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % sweep_variables;
         % synthesized_design;
 
+        % fields saved in sweep_variables:
+        % dimensions are top/bot ratio vs. bot fill
+        % fill_tops
+        % fill_bots
+        % fill_top_bot_ratio
+        % directivities_vs_fills
+        % angles_vs_fills
+        % scatter_str_vs_fills
+        % periods_vs_fills
+        % offsets_vs_fills
+        % k_vs_fills
+        % GC_vs_fills
+        % dir_b4_period_vs_fills
                             
     end
     
@@ -113,6 +140,15 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             % call c_synthGrating constructor
             obj = obj@c_synthGrating(varargin{:});
+            
+            % inputs and defaults
+            inputs      = { 'coupling_direction',   'none' }; 
+            obj.inputs  = [ obj.inputs, inputs ];                           % append inputs
+            
+            % parse inputs
+            p = f_parse_varargin( inputs, varargin{:} );
+            
+            obj.coupling_direction = p.coupling_direction;
 
         end     % end constructor()
 
@@ -126,11 +162,13 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %
             % would be good to implement: option to save GC data or not
             
+            
+            tic;
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:1.0 );
-            fill_top_bot_ratio  = fliplr( 0.0:0.025:1.2 );
+            fill_bots           = fliplr( 0.95:0.025:0.975 );
+            fill_top_bot_ratio  = fliplr( 0.95:0.025:0.975 );
             fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
             guess_offset        = 0;
             
@@ -140,14 +178,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             obj.sweep_variables.fill_top_bot_ratio  = fill_top_bot_ratio;
             
             % initialize saving variables
-            directivities_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            angles_vs_fills         = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            periods_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            offsets_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
-            scatter_str_vs_fills    = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            k_vs_fills              = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
-            GC_vs_fills             = cell( length( fill_bots ), length( fill_top_bot_ratio_norm ) );      % dimensions bot fill vs. top/bot ratio
-            dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio_norm ) );     % dimensions bot fill vs. top/bot ratio
+            directivities_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
+            angles_vs_fills         = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
+            periods_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
+            offsets_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
+            scatter_str_vs_fills    = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
+            k_vs_fills              = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
+            GC_vs_fills             = cell( length( fill_bots ), length( fill_top_bot_ratio ) );      % dimensions bot fill vs. top/bot ratio
+            dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
             
             % make grating cell, assuming both layers are filled
             waveguide = obj.h_makeGratingCell( obj.discretization, ...
@@ -194,6 +232,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 100, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
+            sim_opts    = struct('num_modes', num_modes, 'BC', BC, 'pml_options', pml_options);
             
             
             % initially start with waveguide GC
@@ -208,7 +247,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 % Optimize period and offset
                 fill_top = fill_top_bot_ratio(1) * fill_bots(i_ff_bot);
                 if fill_top < 1
-                    % Only run optimization if theres a perturbation 
+                    % Only run optimization if theres a perturbation of
+                    % both layers
 
                     % run optimization loop and save data
                     [ obj, ...
@@ -221,7 +261,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                       k_vs_fills( i_ff_bot, 1 ), ...
                       dir_b4_period_vs_fills( i_ff_bot, 1 ) ...
                       ] = ...
-                        obj.optimizePeriodOffset( guess_offset, ...
+                        obj.optimize_period_offset( guess_offset, ...
                                                   fill_top, ...
                                                   fill_bots(i_ff_bot), ...
                                                   guess_period,...
@@ -287,41 +327,45 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 % grab bottom fill
                 fill_bot = fill_bots( i_ff_bot );
 
-
-                for i_ff_ratio = 2:n_fill_top_bot_ratio_norm
+                for i_ff_ratio = 2:n_fill_top_bot_ratio
                     % for each top/bottom fill factor ratio
 
-                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_ratio, n_fill_top_bot_ratio_norm, i_ff_bot, n_fill_bots);
+                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_ratio, n_fill_top_bot_ratio, i_ff_bot, n_fill_bots);
                         
                     % Optimize period and offset
-                    fill_top = fill_top_bot_ratio_norm(i_ff_ratio) * fill_bot;
+                    fill_top = fill_top_bot_ratio(i_ff_ratio) * fill_bot;
                     if fill_top < 1
                             % Only run optimization if theres a perturbation 
                             
                         % run optimization loop and save data
-                        [ tempobj, ...
-                          periods_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          offsets_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          directivities_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          angles_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          scatter_str_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          GC_vs_fills{ i_ff_bot, i_ff_ratio }, ...
-                          k_vs_fills( i_ff_bot, i_ff_ratio ), ...
-                          dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio ) ...
-                          ] = ...
-                            obj.optimizePeriodOffset( guess_offset, ...
+                        [ tempobj, best_period, best_offset, best_directivity, ...
+                          best_angle, best_scatter_str, best_GC, best_k, dir_b4_period_vs_fill ] = ...
+                            obj.optimize_period_offset( guess_offset, ...
                                                       fill_top, ...
                                                       fill_bot, ...
                                                       guess_period,...
                                                       guessk, ...
                                                       sim_opts, ...
                                                       guess_GC );
-
+                                        
+                        periods_vs_fills( i_ff_bot, i_ff_ratio )        = best_period;
+                        offsets_vs_fills( i_ff_bot, i_ff_ratio )        = best_offset;
+                        directivities_vs_fills( i_ff_bot, i_ff_ratio )  = best_directivity;
+                        angles_vs_fills( i_ff_bot, i_ff_ratio )         = best_angle;
+                        scatter_str_vs_fills( i_ff_bot, i_ff_ratio )    = best_scatter_str;
+                        GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
+                        k_vs_fills( i_ff_bot, i_ff_ratio )              = best_k;
+                        dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )  = dir_b4_period_vs_fill;
+                
                         % update the guess parameters, period, k, offset
-                        guessk              = k_vs_fills( i_ff_bot, i_ff_ratio );
-                        guess_period        = periods_vs_fills( i_ff_bot, i_ff_ratio );
-                        guess_GC            = GC_vs_fills{ i_ff_bot, i_ff_ratio };
-                        guess_offset        = offsets_vs_fills( i_ff_bot, i_ff_ratio );
+                        guessk              = best_k;
+                        guess_period        = best_period;
+                        guess_GC            = best_GC;
+                        guess_offset        = best_offset;
+%                         guessk              = k_vs_fills( i_ff_bot, i_ff_ratio );
+%                         guess_period        = periods_vs_fills( i_ff_bot, i_ff_ratio );
+%                         guess_GC            = GC_vs_fills{ i_ff_bot, i_ff_ratio };
+%                         guess_offset        = offsets_vs_fills( i_ff_bot, i_ff_ratio );
                             
                     else
                         % we're in a waveguide, there's no reason to run
@@ -341,8 +385,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                     end     % end if fill_top < 1
 
                 end     % end for i_ff_ratio = ...
+                
+%                 periods_vs_fills( i_ff_bot, 2:end ) = p_v_fill_thisbot;
 
-            end     % end for i_ff_bot = ...
+            end     % end parfor i_ff_bot = ...
             
             % save variables to object
             obj.sweep_variables.directivities_vs_fills  = directivities_vs_fills;
@@ -353,6 +399,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             obj.sweep_variables.k_vs_fills              = k_vs_fills;
             obj.sweep_variables.GC_vs_fills             = GC_vs_fills;
             obj.sweep_variables.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
+            
+            fprintf('Done generating design space\n');
+            toc;
             
         end     % end generate_design_space()
         
@@ -1087,16 +1136,19 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             fprintf('Sweeping offsets...\n');
             for i_offset = 1:length( offset_ratios )
 
-%                 fprintf('Iteration %i of %i\n', i_offset, length(offsets) );
-
+%                 fprintf('Sweeping offset %i of %i\n', 
+                
                 % make grating cell
-%                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
-                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                            guess_period, ...
-                                            fill_top, ...
-                                            fill_bot, ...
-                                            offset_ratios(i_offset) );
-
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               guess_period, ...
+                                               fill_top, ...
+                                               fill_bot, ...
+                                               offset_ratios(i_offset) );
+                                        
                 % run sim
                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
 
@@ -1199,25 +1251,25 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % sweep periods
             guessk = best_offset_k;
             period = guess_period;
-%             fprintf('Sweeping periods...\n');
             
             % set while loop exit flag
             angle_err_sign_flip = false;
-            
-%             for i_period = 1:length(periods)
+
             i_period    = 0;
             while ~angle_err_sign_flip
 
                 i_period = i_period + 1;
-%                 fprintf('Iteration %i\n', i_period );
 
                 % make grating cell
-%                 fill_top = fill_top_bot_ratio_norm(i_ff_ratio_norm) * fill_bots(i_ff_bot);
-                GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                            period, ...
-                                            fill_top, ...
-                                            fill_bot, ...
-                                            best_offset_ratio );
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               period, ...
+                                               fill_top, ...
+                                               fill_bot, ...
+                                               best_offset_ratio );
 
                 % run sim
                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
@@ -1240,7 +1292,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 
                 % update period
                 if decrease_periods == true
-                    
                     % check for exit condition (error of angle switches
                     % sign)
                     if angles_vs_period(i_period) < obj.optimal_angle
@@ -1249,9 +1300,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         % decrease the period
                         period = period - obj.discretization;
                     end
-                    
                 else
-                    
                     % check for exit condition (error of angle switches
                     % sign)
                     if angles_vs_period(i_period) > obj.optimal_angle
@@ -1260,7 +1309,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         % increase the period
                         period = period + obj.discretization;
                     end
-                    
                 end     % end updating period if else
                 
 %                 toc;

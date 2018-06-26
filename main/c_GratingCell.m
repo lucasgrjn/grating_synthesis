@@ -84,13 +84,6 @@ classdef c_gratingCell < c_bloch_cell
             % call bloch cell constructor
             obj = obj@c_bloch_cell(varargin{:});
             
-            % inputs and defaults
-            inputs      = { 'coupling_direction',   'none' }; 
-            obj.inputs  = [ obj.inputs, inputs ];                           % append inputs
-            
-            % parse inputs
-            p = f_parse_varargin( inputs, varargin{:} );
-            
         end     % end constructor
         
         % -----------------------------------------------------------------

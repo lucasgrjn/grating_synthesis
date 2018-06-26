@@ -48,6 +48,7 @@ function GC = f_makeGratingCell_45RFSOI( dxy, units, lambda, background_index, y
 %
 % example:
 
+
 % set domain 
 domain_size     = [ y_domain_size, period ];
 
@@ -76,8 +77,8 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 % pml_length  = pml_opts(2);
 
 % define layer thicknesses
-domain_y_half   = round( (domain_size(1)/2) /GC.discretization) * GC.discretization;
-if nargin < 6
+domain_y_half   = round( (domain_size(1)/2) /GC.dy) * GC.dy;
+if nargin < 10
     % default to box of 150nm
     t_SiO2_bot      = 150;
 else
