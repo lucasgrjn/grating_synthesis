@@ -11,7 +11,7 @@ addpath(genpath('..'));                                                     % al
 % addpath([ '..' filesep 'auxiliary_functions' ]);                            % gui
 
 % initial settings
-disc                = 5;
+disc                = 10;
 units               = 'nm';
 lambda              = 1200;
 index_clad          = 1.0; % 1.448;

@@ -1,13 +1,30 @@
-function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, offset_ratio, BOX_thickness )
+function GC = f_makeGratingCell_45RFSOI( dxy, units, lambda, background_index, y_domain_size, ...
+                                         period, fill_top, fill_bot, offset_ratio, BOX_thickness )
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
 % units are in nm, specifically for this method
 % 
 % inputs:
-%   synth_obj
-%       type: c_synthGrating object AS STRUCT
-%       desc: c_synthGrating object AS STRUCT
+%   dxy
+%       type: double, scalar or 1x2 vector
+%       desc: discretization along x and y, in units of 'units'
+%             if scalar, then dx = dy = discretization
+%             if vector, then discretization = [ dy dx ]
+%   units
+%       type: string
+%       desc: name and scaling of spatial units, supports 'm'
+%             (meters), 'mm' (millimeters), 'um' (microns), 'nm'
+%             (nanometers)
+%   lambda
+%       type: double, scalar
+%       desc: wavelength to solve at, in units 'units'
+%   background_index
+%       type: double, scalar
+%       desc: value of background index, actually unused here
+%   y_domain_size
+%       type: double, scalar
+%       desc: vertical/transverse domain size
 %   period
 %       type: double, scalar
 %       desc: period of the grating cell, in units defined by synth_obj.units
@@ -22,7 +39,7 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %       desc: ratio of bottom layer offset to period
 %   BOX_thickness
 %       type: double, scalar
-%       desc: optional custom BOX thickness
+%       desc: optional custom BOX thickness, defaults to 150nm
 %
 % outputs:
 %   GC
@@ -30,31 +47,24 @@ function GC = f_makeGratingCell_45RFSOI( synth_obj, period, fill_top, fill_bot, 
 %       desc: two level grating cell object
 %
 % example:
-%   period          = 800;
-%   fill_top        = 0.8;
-%   fill_bot        = 0.6;
-%   offset_ratio    = 0.0;
-%   GC              = f_makeGratingCell_45RFSOI( Q.convertObjToStruct(), period, fill_top, fill_bot, offset_ratio );
-%       Then you can plot it and look at what the dielectric looks like:
-%   GC.plotIndex()
+
 
 % set domain 
-domain_size     = synth_obj.domain_size;
-domain_size(2)  = period;
+domain_size     = [ y_domain_size, period ];
 
 % wrap offsets to range 0 to 1
 offset_ratio = mod( offset_ratio, 1 );
 
-% make grating cell
-GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
-                            'units', synth_obj.units.name, ...
-                            'lambda', synth_obj.lambda, ...
+% make 2 level grating cell
+GC = c_twoLevelGratingCell( 'discretization', dxy, ...
+                            'units', units, ...
+                            'lambda', lambda, ...
                             'domain_size', domain_size, ...
-                            'background_index', synth_obj.background_index, ...
+                            'background_index', background_index, ...
                             'numcells', 10 );
 
 % index of refraction
-lambda_um = synth_obj.lambda * synth_obj.units.scale * 1e6;
+lambda_um = lambda * GC.units.scale * 1e6;
 n_SiO2  = index_SiO2_fits(lambda_um);
 n_SiN   = index_SiN(lambda_um);
 n_cSi   = index_Si_fits(lambda_um);
@@ -67,17 +77,17 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 % pml_length  = pml_opts(2);
 
 % define layer thicknesses
-domain_y_half   = round( (domain_size(1)/2) /synth_obj.discretization) * synth_obj.discretization;
-if nargin < 6
+domain_y_half   = round( (domain_size(1)/2) /GC.dy) * GC.dy;
+if nargin < 10
     % default to box of 150nm
     t_SiO2_bot      = 150;
 else
     t_SiO2_bot      = BOX_thickness;
 end
-t_air           = domain_y_half - t_SiO2_bot;
-t_SiN           = 70;
-t_cSi           = 70;
-t_pSi           = 80;
+t_air   = domain_y_half - t_SiO2_bot;
+t_SiN   = 70;
+t_cSi   = 70;
+t_pSi   = 80;
 
 % draw layers
 GC = GC.addLayer( t_air, domain_size(1)-t_air, n_SiO2 );     % add in SiO2
