@@ -164,14 +164,14 @@ classdef c_synthGrating
             % Constructor
             % See top comments for input documentation
             
-            % Dependency imports
-            fname           = mfilename;                                            % name of class
-            fpath           = mfilename('fullpath');                                % full path, including fname
-            projectpath     = erase( fpath, [ 'main' filesep fname] );              % now only holds path to project's code
-            % path to emeSim
-            addpath([ projectpath 'eme' ]);
-            % path to parfor progress monitor
-            addpath([ projectpath 'auxiliary_functions' filesep 'ParforProgMon' ]);
+%             % Dependency imports
+%             fname           = mfilename;                                            % name of class
+%             fpath           = mfilename('fullpath');                                % full path, including fname
+%             projectpath     = erase( fpath, [ 'main' filesep fname] );              % now only holds path to project's code
+%             % path to emeSim
+%             addpath([ projectpath 'eme' ]);
+%             % path to parfor progress monitor
+%             addpath([ projectpath 'auxiliary_functions' filesep 'ParforProgMon' ]);
             
 
             % inputs and defaults
