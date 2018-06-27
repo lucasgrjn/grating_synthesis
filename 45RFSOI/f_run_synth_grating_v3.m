@@ -15,7 +15,8 @@ function [] = f_run_synth_grating_v3( lambda, optimal_angle, BOX_thickness )
 % clear; close all;
 
 % dependencies
-addpath(['..' filesep 'main']);                                             % main code
+addpath( genpath( '..' ) );                                                 % all synth grating code
+% addpath(['..' filesep 'main']);                                             % main code
 % addpath(['..' filesep '45RFSOI']);                                          % 45rf functions
 % imec codes
 % addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\code\IMEC_2018_02_07_tapeout\' ); 
