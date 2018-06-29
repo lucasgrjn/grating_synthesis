@@ -397,7 +397,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             obj.sweep_variables.periods_vs_fills        = periods_vs_fills;
             obj.sweep_variables.offsets_vs_fills        = offsets_vs_fills;
             obj.sweep_variables.k_vs_fills              = k_vs_fills;
-            obj.sweep_variables.GC_vs_fills             = GC_vs_fills;
+%             obj.sweep_variables.GC_vs_fills             = GC_vs_fills;
             obj.sweep_variables.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
             
             fprintf('Done generating design space\n');
