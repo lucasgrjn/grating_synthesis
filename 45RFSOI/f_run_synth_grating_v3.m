@@ -63,6 +63,9 @@ tic;
 synth_obj = synth_obj.generate_design_space();
 toc;
 
+fprintf('Design space generation sweep is done\n');
+fprintf('Saving data...\n');
+
 % save data
 % save( [ 'synth_obj_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '.mat' ], 'synth_obj', '-v7.3' );
 % save( [ 'synth_obj_' Q.start_time '.mat' ], 'Q' );
@@ -70,6 +73,8 @@ toc;
 % clear the GC from the data and save
 synth_obj.sweep_variables.GC_vs_fills = zeros( size(synth_obj.sweep_variables.GC_vs_fills) );
 save( [ 'synth_obj_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_box' num2str(BOX_thickness) '_NO_GC' '.mat' ], 'synth_obj', '-v7.3' );
+
+fprintf('Data saved\n');
 
 % directivity vs. fill
 figure;
