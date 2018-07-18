@@ -169,6 +169,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % set fill factors and offsets
             fill_bots           = fliplr( 0.4:0.025:0.975 );
             fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
+            fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
             fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
             guess_offset        = 0;
             
@@ -353,7 +354,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         directivities_vs_fills( i_ff_bot, i_ff_ratio )  = best_directivity;
                         angles_vs_fills( i_ff_bot, i_ff_ratio )         = best_angle;
                         scatter_str_vs_fills( i_ff_bot, i_ff_ratio )    = best_scatter_str;
-                        GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
+%                         GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
                         k_vs_fills( i_ff_bot, i_ff_ratio )              = best_k;
                         dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )  = dir_b4_period_vs_fill;
                 
@@ -379,7 +380,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         periods_vs_fills( i_ff_bot, i_ff_ratio )          = guess_period;
                         offsets_vs_fills( i_ff_bot, i_ff_ratio )          = 0;
                         k_vs_fills( i_ff_bot, i_ff_ratio )                = guessk;
-                        GC_vs_fills{ i_ff_bot, i_ff_ratio }               = waveguide;
+%                         GC_vs_fills{ i_ff_bot, i_ff_ratio }               = waveguide;
                         dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )    = 1;
 
                     end     % end if fill_top < 1
