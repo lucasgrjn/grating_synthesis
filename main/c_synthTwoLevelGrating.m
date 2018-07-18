@@ -167,11 +167,11 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-%             fill_bots           = fliplr( 0.4:0.025:0.975 );
+            fill_bots           = fliplr( 0.4:0.025:0.975 );
 %             fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
-%             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
-            fill_bots           = fliplr( 0.95:0.025:0.975 );
-            fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
+            fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
+%             fill_bots           = fliplr( 0.95:0.025:0.975 );
+%             fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
 
             fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
             guess_offset        = 0;
