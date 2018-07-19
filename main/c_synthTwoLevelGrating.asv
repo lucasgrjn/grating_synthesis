@@ -331,7 +331,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 guess_period    = periods_vs_fills_1( i_ff_bot );
                 guessk          = k_vs_fills_1( i_ff_bot );
                 guess_GC        = GC_vs_fills_1{ i_ff_bot };
-                guess_offset    = offsets_vs_fills_1( i_ff_bot );
+                guess_offset    = offsets_vs_fills_1( i_ff_bot ) * guess_period;
 
                 % grab bottom fill
                 fill_bot = fill_bots( i_ff_bot );
