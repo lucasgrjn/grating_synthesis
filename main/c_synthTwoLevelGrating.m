@@ -167,13 +167,13 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
             % set fill factors and offsets
-%             fill_bots           = fliplr( 0.4:0.025:0.975 );
-%             fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
+            fill_bots           = fliplr( 0.4:0.025:0.975 );
+            fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
 %             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
 %             fill_bots           = fliplr( 0.95:0.025:0.975 );
 %             fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
-            fill_bots           = fliplr( 0.475:0.025:0.975 );
-            fill_top_bot_ratio  = fliplr( 1.175:0.025:1.2 );
+%             fill_bots           = fliplr( 0.475:0.025:0.975 );
+%             fill_top_bot_ratio  = fliplr( 1.175:0.025:1.2 );
             fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
             guess_offset        = 0;
             
@@ -318,14 +318,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             
             % now fill in the rest of the domain
-            for i_ff_bot = 1:n_fill_bots
+            parfor i_ff_bot = 1:n_fill_bots
                 % For each bottom fill factor
     
                 fprintf('Main parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
-
-                if i_ff_bot == 21
-                   fprintf('iter 21\n'); 
-                end
                 
                 % grab starting guess period and k
                 guess_period    = periods_vs_fills_1( i_ff_bot );
