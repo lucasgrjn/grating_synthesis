@@ -22,7 +22,7 @@ addpath( genpath( '..' ) );                                                 % al
 % addpath( 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\code\IMEC_2018_02_07_tapeout\' ); 
 
 % initial settings
-disc                = 10;
+disc                = 5;
 units               = 'nm';
 % lambda              = 1250;
 index_clad          = 1.0; % 1.448;
