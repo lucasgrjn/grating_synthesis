@@ -331,9 +331,9 @@ classdef c_synthGrating
             
             % return and save data
             u       = u00_slice;
-            obj.u   = u;
+%             obj.u   = u;
 
-        end     % end fiberModeGaussian()
+        end     % end fiber_mode_gaussian()
         
         
         function obj = generate_design_space( obj )
