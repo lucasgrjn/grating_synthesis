@@ -150,7 +150,7 @@ classdef c_synthGrating
         % GC_synth
         % scatter_str_synth
         % fill_synth
-        % final_index
+        % N
         % 
         synthesized_design;
          
@@ -645,10 +645,10 @@ classdef c_synthGrating
                                                         in_wg_len );
             
             % stitch together the index distribution
-            obj.synthesized_design.final_index = input_waveguide.N;
+            obj.synthesized_design.N = input_waveguide.N;
             for ii = 1:n_cells
                
-                obj.synthesized_design.final_index = [ obj.synthesized_design.final_index, obj.synthesized_design.GC_synth{ii}.N ];
+                obj.synthesized_design.N = [ obj.synthesized_design.N, obj.synthesized_design.GC_synth{ii}.N ];
                 
             end
 
@@ -661,7 +661,7 @@ classdef c_synthGrating
             disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
             pol             = 0;                                                            % 0 for TE, 1 for TM
             xf              = obj.y_domain_size * obj.units.scale * um;                     % in um (transverse domain)
-            zf              = size(obj.synthesized_design.final_index,2) * disc_eme(2);     % in um (longitudinal domain)
+            zf              = size(obj.synthesized_design.N,2) * disc_eme(2);     % in um (longitudinal domain)
             lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
             eme_obj         = emeSim(   'discretization', disc_eme, ...
                                         'pml', 0.1, ...
@@ -672,7 +672,7 @@ classdef c_synthGrating
                                         'polarization', pol );
                                         
             % replace the dielectric in the eme object
-            eme_obj.diel = obj.synthesized_design.final_index;
+            eme_obj.diel = obj.synthesized_design.N;
             
             % run EME sim
             % Converts the dielectric distribution into layers for eigen mode expansion

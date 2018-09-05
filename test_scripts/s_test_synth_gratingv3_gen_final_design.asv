@@ -13,7 +13,80 @@ addpath(['..' filesep '45RFSOI']);                                          % 45
 filename = 'synth_obj_2018_08_24_17_15_00_lambda1300_optangle-20_box150_NO_GC.mat';
 filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 02 19 gaussian grating synth\2018 08 28 15 08pm 5nm disc fixed';
 
-% load obj
+% load synth_obj
 load( [ filepath filesep filename ] );
 
-% synthesize final
+% synthesize final design
+MFD             = 10 * 1e3;                                                         % in nm
+input_wg_type   = 'bottom';
+synth_obj       = synth_obj.generate_final_design_gaussian( MFD, input_wg_type );
+
+% plot final design
+
+% directivity vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.dir_synth), log10(synth_obj.synthesized_design.dir_synth), '-o' );
+xlabel('unit cell #'); ylabel('final directivity (log10)');
+title('Directivity vs unit cell');
+makeFigureNice();
+
+% bottom fill vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.bot_fill_synth), synth_obj.synthesized_design.bot_fill_synth, '-o' );
+xlabel('unit cell #'); ylabel('bottom fill');
+title('Bottom fill vs unit cell');
+makeFigureNice();
+
+% top fill vs unit cell
+top_fill = synth_obj.synthesized_design.bot_fill_synth .* synth_obj.synthesized_design.top_bot_fill_ratio_synth;
+figure;
+plot( 1:length(top_fill), top_fill, '-o' );
+xlabel('unit cell #'); ylabel('top fill');
+title('Top fill vs unit cell');
+makeFigureNice();
+
+% period vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.period_synth), synth_obj.synthesized_design.period_synth, '-o' );
+xlabel('unit cell #'); ylabel('period');
+title('Period vs unit cell');
+makeFigureNice();
+
+% offset vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.offset_synth), synth_obj.synthesized_design.offset_synth, '-o' );
+xlabel('unit cell #'); ylabel('offset');
+title('Offset vs unit cell');
+makeFigureNice();
+
+% angle vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.angles_synth), synth_obj.synthesized_design.angles_synth, '-o' );
+xlabel('unit cell #'); ylabel('angle (deg)');
+title('Angle vs unit cell');
+makeFigureNice();
+
+% scattering strength vs unit cell
+figure;
+plot( 1:length(synth_obj.synthesized_design.scatter_str_synth), synth_obj.synthesized_design.scatter_str_synth, '-o' );
+xlabel('unit cell #'); ylabel('scattering strength');
+title('S vs unit cell');
+makeFigureNice();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
