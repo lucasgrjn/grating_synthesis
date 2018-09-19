@@ -1061,8 +1061,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             obj.synthesized_design.N    = [ GC.N, obj.synthesized_design.N ];
             
             % coordinates of index distribution
-            obj.synthesized_design.x_coords = 0 : obj.discretization : ( size(obj.synthesized_design.N,2)-1 );
-            obj.synthesized_design.y_coords = 0 : obj.discretization : ( size(obj.synthesized_design.N,1)-1 );
+            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
+            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
             
             
         end     % end function generateFinalDesignGaussian()
