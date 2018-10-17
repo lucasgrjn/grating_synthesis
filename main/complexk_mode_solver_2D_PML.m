@@ -15,10 +15,11 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %       desc: Index distribution
 %   disc
 %       type: double, scalar
-%       desc: discretization size (nm)
+%       desc: discretization size (spatial units are arbitrary, as long as
+%             consistent across all inputs)
 %   k0
 %       type: double, scalar
-%       desc: free-space wavevector (1/nm)
+%       desc: free-space wavevector (1/spatial units)
 %   num_modes
 %       type: integer, scalar
 %       desc: number of modes to solve for
@@ -79,9 +80,9 @@ if PML_options(1) == 1
     y_indx = 1:ny_pml;
         
     % using polynomial strength pml
-    c       = (3e8) * (1e9);                    % nm/s
-    eps0    = (8.854187817e-12) * (1e-9);       % F/nm
-    omega   = k0*c;                             % rad/s
+%     c       = (3e8) * (1e9);                    % nm/s
+%     eps0    = (8.854187817e-12) * (1e-9);       % F/nm
+%     omega   = k0*c;                             % rad/s
     pml_y   = (1 + 1i * pml_str * ( y_indx./ny_pml ).^( pml_order )).';
         
     

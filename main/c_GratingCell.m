@@ -160,7 +160,7 @@ classdef c_gratingCell < c_bloch_cell
             [obj, obj.E_z]  = obj.stitch_E_field( obj.Phi, obj.k, obj.numcells );
             
             % for mode overlapping, stitch together single unit cell of E
-            % field, using only real(k)
+            % field, using only real(k) (so lossless)
             [obj, E_z_for_overlap]  = obj.stitch_E_field( obj.Phi, real(obj.k), 1 );
             obj.E_z_for_overlap     = E_z_for_overlap;
             
