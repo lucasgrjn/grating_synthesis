@@ -1,5 +1,5 @@
 function GC = f_makeGratingCell_45RFSOI( dxy, units, lambda, background_index, y_domain_size, ...
-                                         period, fill_top, fill_bot, offset_ratio, BOX_thickness )
+                                         period, fill_top, fill_bot, offset_ratio, BOX_thickness, draw_SiN_wall )
 % makes and returns a c_twoLevelGratingCell object
 % with the 45RFSOI process parameters
 %
@@ -48,6 +48,19 @@ function GC = f_makeGratingCell_45RFSOI( dxy, units, lambda, background_index, y
 %
 % example:
 
+% defaults
+% box thickness
+if nargin < 10
+    % default to box of 150nm
+    t_SiO2_bot      = 150;
+else
+    t_SiO2_bot      = BOX_thickness;
+end
+% draw right SiN wall
+if nargin < 11
+    % default to true
+    draw_SiN_wall      = true;
+end
 
 % set domain 
 domain_size     = [ y_domain_size, period ];
@@ -78,12 +91,6 @@ n_pSi   = index_IBM12SOI45nm_fits(lambda_um, 'polySi');
 
 % define layer thicknesses
 domain_y_half   = round( (domain_size(1)/2) /GC.dy) * GC.dy;
-if nargin < 10
-    % default to box of 150nm
-    t_SiO2_bot      = 150;
-else
-    t_SiO2_bot      = BOX_thickness;
-end
 t_air   = domain_y_half - t_SiO2_bot;
 t_SiN   = 70;
 t_cSi   = 70;
@@ -138,14 +145,15 @@ else
     % just a waveguide
     GC = GC.addLayer( t_air + t_SiO2_bot + wg_thick(2), t_SiN, n_SiN );
     
-    % sidewall2
-    if (top_layer_length <= period - t_SiN)
-        % only draw 2nd sidewall in scenario that there is enough space for it
+    % sidewall 2
+    % only draw 2nd sidewall in scenario that there is enough space for it
+    % and the user has not explicitly turned it off.
+    if (top_layer_length <= period - t_SiN) && draw_SiN_wall
         GC = GC.addRect( period - t_SiN, ...
                          t_air + t_SiO2_bot + wg_thick(2), ...
                          t_SiN, ...
                          t_SiN + wg_thick(1), ...
-                         n_SiN );
+                         n_SiN );         
     end
 end
              
