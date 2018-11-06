@@ -51,7 +51,7 @@ fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
 
 % run design space generation
 tic;
-synth_obj = synth_obj.generate_design_space();
+synth_obj = synth_obj.generate_design_space( fill_bots, fill_top_bot_ratio );
 toc;
 
 fprintf('Design space generation sweep is done\n');
