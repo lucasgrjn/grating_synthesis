@@ -130,6 +130,32 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % GC_vs_fills
         % dir_b4_period_vs_fills
                             
+        % fields saved in synthesized_design:
+        % dimensions are vs. cell #
+        % dir                 
+        % bot_fill             
+        % top_bot_fill_ratio  
+        % top_fill             
+        % period               
+        % offset              
+        % angles              
+        % scatter_str         
+        % k                 
+        % GC               
+        % des_scatter  
+        % N
+        % x_coords
+        % y_coords
+        % input_wg_type
+        
+        % debug options
+        % a struct that holds debugging options
+        % currently saved fields:
+        %   verbose
+        debug_options;
+        
+%         input_wg_type;  % 'bottom' or 'full
+        
     end
     
     methods
@@ -153,7 +179,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end constructor()
 
         
-        function obj = generate_design_space( obj )
+        function obj = generate_design_space( obj, fill_bots, fill_top_bot_ratio, verbose )
             % Generates the design space vs. fill factors
             % picking optimum offset and period for highest directivity and
             % closest angle to desired
@@ -161,15 +187,40 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % based on synthesizeGaussianGrating
             %
             % would be good to implement: option to save GC data or not
-            
+            %
+            % Inputs:
+            %   fill_bots
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing
+            %   fill_top_bot_ratio
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing
+            %   verbose
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing, spits out
+            %             a bunch of stuff to the prompt
             
             tic;
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
+            % set verbose options
+            if ~exist('verbose', 'var')
+                % default verbose off
+                obj.debug_options.verbose = false;
+            else
+                obj.debug_options.verbose = verbose;
+            end
+            
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:0.975 );
-            fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
-%             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
+            if ~exist('fill_bots', 'var')
+                % default fill
+                fill_bots           = fliplr( 0.4:0.025:0.975 );
+            end
+            if ~exist('fill_top_bot_ratio', 'var')
+                % default fill
+                fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
+            end
+            %             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
 %             fill_bots           = fliplr( 0.95:0.025:0.975 );
 %             fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
 %             fill_bots           = fliplr( 0.475:0.025:0.975 );
@@ -430,9 +481,1190 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             parpool(my_cluster, my_cluster.NumWorkers);
             
         end     % end start_parpool()
+
+        
+        
+        function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
+                    best_GC, best_k, dir_b4_period_vs_fill ] ...
+                    = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
+            % for given fill ratios, optimizes period and offset for best angle/directivity
+            %
+            % Inputs:
+            %   guess_offset
+            %       type: scalar, double
+            %       desc: guess offset position to start from, in units
+            %             'units'
+            %   fill_top
+            %       type: scalar, double
+            %       desc: ratio of top waveguide to period
+            %   fill_bot
+            %       type: scalar, double
+            %       desc: ratio of bottom waveguide to period
+            %   guess_period
+            %       type: scalar, double
+            %       desc: starting period to sweep from, in units 'units'
+            %   guessk
+            %       type: scalar, double
+            %       desc: starting guess k
+            %   sim_opts
+            %       type: struct
+            %       desc: structure with these fields:  
+            %               num_modes
+            %               BC
+            %               pml_options
+            %   guess_gc
+            %       type: grating coupler object
+            %       desc: initial grating coupler object to start with (for mode
+            %       overlapping)
+            %       
+            %
+            % Outputs:
+            %   best_period
+            %       type: scalar, double
+            %       desc: optimal period
+            %   best_offset
+            %       type: scalar, double
+            %       desc: absolute value of offset, in 'units'
+            %   best_directivity
+            %       type: scalar, double
+            %       desc: optimal directivity
+            %   best_angle
+            %       type: scalar, double
+            %       desc: optimal angle
+            %   best_scatter_str
+            %       type: scalar, double
+            %       desc: optimal scatering strength
+            %   best_GC
+            %       type: c_twoLevelGratingCell
+            %       desc: two level grating cell
+            %   best_k
+            %       type: scalar, double
+            %       desc: optimal k
+            %   dir_b4_period_vs_fill
+            %       type: scalar, double
+            %       desc: directivity b4 period sweep, mostly for debugging purposes 
+            
+%             % enable/disable debug mode
+%             DEBUG = false;
+            
+            % generate vector of absolute offsets
+            offsets         = guess_offset : obj.discretization : guess_offset + guess_period;
+            offsets         = mod( offsets, guess_period );
+            offset_ratios   = offsets / guess_period;
+
+            % init saving variables vs. offset
+            directivities = zeros( size(offset_ratios) );
+            k_vs_offset   = zeros( size(offset_ratios) );
+            angles        = zeros( size(offset_ratios) );
+            GC_vs_offset  = {};
+
+            % grab mode to overlap with
+            OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
+
+            % Sweep offsets, pick offset with best directivity
+%             fprintf('Sweeping offsets...\n');
+            for i_offset = 1:length( offset_ratios )
+
+                % verbose printing
+                if obj.debug_options.verbose == true
+                    fprintf('Sweeping offset %i of %i\n', i_offset, length(offset_ratios) );
+                end
+                
+                % make grating cell
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               guess_period, ...
+                                               fill_top, ...
+                                               fill_bot, ...
+                                               offset_ratios(i_offset) );
+                                        
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
+
+                % save directivity
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    directivities( i_offset )   = GC.directivity;
+                    angles( i_offset )          = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    directivities( i_offset )   = 1./( GC.directivity );
+                    angles( i_offset )          = GC.max_angle_down;
+                end
+
+                % update the guessk (units rad/'units')
+                guessk                  = GC.k;
+                k_vs_offset( i_offset ) = GC.k;
+                
+                % update the mode overlap field
+                GC_vs_offset{i_offset}  = GC;
+                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
+
+%                 toc;
+
+            end     % end for i_offset = ...
+%             fprintf('...done.\n');
+
+%                         % DEBUG plot directivity vs. offset
+%             if DEBUG
+%                 figure;
+%                 plot( offsets, directivities, '-o' );
+%                 xlabel('offsets'); ylabel('directivities');
+%                 title('DEBUG directivities vs offsets');
+%                 makeFigureNice();
+%                             
+%                             figure;
+%                             plot( offsets, angles, '-o' );
+%                             xlabel('offsets'); ylabel('angles');
+%                             title('DEBUG angles vs offsets for first run');
+%                             makeFigureNice();
+%                             
+%             end
+
+            % pick best offset
+            [ ~, indx_best_offset ]     = max( directivities );
+%             best_offset                 = offsets( indx_best_offset );
+            best_offset_ratio           = offset_ratios( indx_best_offset );
+            best_offset_k               = k_vs_offset( indx_best_offset );
+            best_offset_angle           = angles( indx_best_offset );
+            
+            % update mode overlap
+            OPTS.mode_to_overlap    = GC_vs_offset{indx_best_offset}.E_z_for_overlap;
+
+            % here's an output variable
+            dir_b4_period_vs_fill = max( directivities );
+
+            % DEBUG plot grating with best directivity
+%             if DEBUG
+% 
+%                 % make grating cell
+%                 GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+%                                             guess_period, ...
+%                                             fill_tops(i_ff_top), ...
+%                                             fill_bots(i_ff_bot), ...
+%                                             best_offset );
+% 
+%                 % run sim
+%                 GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
+% 
+%                 % plot field
+%                 GC.plotEz_w_edges();
+% 
+%             end
+
+
+%             % now sweep periods
+%             % only sweep larger periods. Doubtful that the period
+%             % will be smaller
+%             periods     = guess_period : obj.discretization : 1.05 * guess_period;
+%             periods     = obj.discretization * round(periods/obj.discretization);
+% %                         periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
+
+            % now sweep periods
+            % decide whether to sweep larger or smaller periods
+            % based on the angle
+            if best_offset_angle > obj.optimal_angle
+                % only sweep smaller periods
+                decrease_periods = true;
+            else
+                % only sweep larger periods
+                decrease_periods = false;
+            end
+
+            % init saving variables
+            angles_vs_period    = []; %= zeros( size(periods) );
+            k_vs_period         = []; %zeros( size(periods) );
+            GC_vs_period        = {}; % cell( size(periods) );
+            periods             = [];
+
+            % sweep periods
+            guessk = best_offset_k;
+            period = guess_period;
+            
+            % set while loop exit flag
+            angle_err_sign_flip = false;
+
+            i_period    = 0;
+            while ~angle_err_sign_flip
+
+                i_period = i_period + 1;
+                
+                % verbose printing
+                if obj.debug_options.verbose == true
+                    fprintf('Sweeping period %i\n', i_period );
+                end
+                
+                % make grating cell
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.units.name, ...
+                                               obj.lambda, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               period, ...
+                                               fill_top, ...
+                                               fill_bot, ...
+                                               best_offset_ratio );
+
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
+
+                % save angle
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    angles_vs_period( i_period ) = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    angles_vs_period( i_period ) = GC.max_angle_down;
+                end
+
+                % update for next iteration
+                periods(i_period)       = period;
+                GC_vs_period{i_period}  = GC;
+                k_vs_period(i_period)   = GC.k;
+                guessk                  = GC.k;
+                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
+                
+                % update period
+                if decrease_periods == true
+                    % check for exit condition (error of angle switches
+                    % sign)
+                    if angles_vs_period(i_period) < obj.optimal_angle
+                        angle_err_sign_flip = true;
+                    else
+                        % decrease the period
+                        period = period - obj.discretization;
+                    end
+                else
+                    % check for exit condition (error of angle switches
+                    % sign)
+                    if angles_vs_period(i_period) > obj.optimal_angle
+                        angle_err_sign_flip = true;
+                    else
+                        % increase the period
+                        period = period + obj.discretization;
+                    end
+                end     % end updating period if else
+                
+%                 toc;
+
+            end     % end period sweep
+%             fprintf('...done.\n');
+
+            % pick best period
+            [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
+            best_period_k                   = k_vs_period( indx_best_period );
+            
+ 
+            % return data
+            % best offset is already set
+            best_GC = GC_vs_period{ indx_best_period };
+            
+            if strcmp( obj.coupling_direction, 'up' )
+                % coupling direction is upwards
+                best_directivity    = best_GC.directivity;
+                best_angle          = best_GC.max_angle_up;
+                best_scatter_str    = best_GC.alpha_up;
+            else
+                % coupling direction is downwards
+                best_directivity    = 1./best_GC.directivity;
+                best_angle          = best_GC.max_angle_down;
+                best_scatter_str    = best_GC.alpha_down;
+            end
+            
+            best_period = periods( indx_best_period );
+            best_k      = best_GC.k;
+            best_offset = best_offset_ratio * best_period;
+                    
+        end     % end function optimizePeriodOffset()
+        
+        
+        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type)
+            % function for generating the final synthesized design
+            % parameters
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter, in units 'units'
+            %   input_wg_type
+            %       type: string
+            %       desc: 'bottom' for cSi only or 'full' for both cSi and
+            %             pSi
+            %
+            % Sets these fields: (not updated)
+            %   obj.dir_synth                   = [];
+            %   obj.bot_fill_synth              = [];
+            %   obj.top_bot_fill_ratio_synth    = [];
+            %   obj.period_synth                = [];
+            %   obj.offset_synth                = [];
+            %   obj.angles_synth                = [];
+            %   obj.scatter_str_synth           = [];
+            %   obj.k_synth                     = [];
+            %   obj.GC_synth                    = {};
+            %   obj.des_scatter_norm            = [];
+            
+
+            % save input waveguide type
+            obj.synthesized_design.input_wg_type = input_wg_type;
+            
+            % generate x coordinates for the gaussian mode
+            % must be large enough to fit mode
+            xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
+            xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
+            
+            % generate a fiber gaussian mode
+            w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
+            zvec        = 0;                                                            % this is unused
+            d0          = 0;                                                            % take slice at waist
+            [obj, u]    = obj.fiber_mode_gaussian(  w0, zvec, xvec,...
+                                                    obj.optimal_angle, d0, obj.background_index );
+                                              
+            % calculate desired scattering strength vs. x
+            integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
+            alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );             % in units 1/m
+            alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
+            
+            % DEBUG plot alpha desired
+            figure;
+            plot( xvec, alpha_des );
+            xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
+            title('DEBUG scattering strength for gaussian');
+            makeFigureNice();      
+
+            % meshgrid the fills
+            [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_top_bot_ratio, obj.sweep_variables.fill_bots );
+            
+            % set invert/normal threshold
+            invert_normal_top_bot_ratio_thresh = 0.6;
+
+            
+            % TODO CLEAN THIS SECTION UP
+            if strcmp( input_wg_type, 'bottom' ) == true
+                % Inverted design
+            
+                % first narrow down the space to take the datapoints with the
+                % maximum directivity per bottom fill factor (so for each row
+                % on my design space)
+
+                indx_bottom_space   = obj.sweep_variables.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
+
+                % grab variables (remember dimensions are bot fill x top bot
+                % ratio)
+                topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_bottom_space );
+                bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_bottom_space );
+                directivities_vs_fills_inv  = obj.sweep_variables.directivities_vs_fills( :, indx_bottom_space );
+                angles_vs_fills_inv         = obj.sweep_variables.angles_vs_fills( :, indx_bottom_space );      
+                periods_vs_fills_inv        = obj.sweep_variables.periods_vs_fills( :, indx_bottom_space );
+                offsets_vs_fills_inv        = obj.sweep_variables.offsets_vs_fills( :, indx_bottom_space );
+                scatter_str_vs_fills_inv    = obj.sweep_variables.scatter_str_vs_fills( :, indx_bottom_space );
+                k_vs_fills_inv              = obj.sweep_variables.k_vs_fills( :, indx_bottom_space );
+%                 GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
+                
+                % remove datapoints where the angle deviates beyond some
+                % angle, by artifically setting the directivity to be very
+                % low
+                % i dont think this is necessary?
+%                 directivities_vs_fills_inv( abs( angles_vs_fills_inv - obj.optimal_angle ) > 2 ) = 1e-6;
+
+
+                % for each top/bottom ratio, pick bottom fill with highest
+                % directivity
+                [ highest_dir_per_ratio, indx_highest_dir_per_ratio ] = max( directivities_vs_fills_inv, [], 1 );
+                % gotta use linear indexing
+                indxs                   = sub2ind( size(angles_vs_fills_inv), indx_highest_dir_per_ratio, 1:size(angles_vs_fills_inv,2)  );
+                angles_high_dir         = angles_vs_fills_inv( indxs );
+                periods_high_dir        = periods_vs_fills_inv( indxs );
+                offsets_high_dir        = offsets_vs_fills_inv( indxs );
+                scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
+                k_high_dir              = k_vs_fills_inv( indxs );
+                topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
+                bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
+%                 GC_high_dir             = GC_vs_fills_inv( indxs );
+                dir_high                = highest_dir_per_ratio;
+                
+            elseif strcmp( input_wg_type, 'full' ) == true
+                % normal design
+                
+                % first narrow down the space to take the datapoints with the
+                % maximum directivity per bottom fill factor (so for each row
+                % on my design space)
+
+                indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
+
+                % grab variables (remember dimensions are bot fill x top bot
+                % ratio)
+                topbot_ratio_vs_fills_full   = topbot_ratio_mesh( :, indx_full_space );
+                bot_fills_vs_fills_full      = bot_fills_mesh( :, indx_full_space );
+                directivities_vs_fills_full  = obj.directivities_vs_fills( :, indx_full_space );
+                angles_vs_fills_full         = obj.angles_vs_fills( :, indx_full_space );      
+                periods_vs_fills_full        = obj.periods_vs_fills( :, indx_full_space );
+                offsets_vs_fills_full        = obj.offsets_vs_fills( :, indx_full_space );
+                scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
+                k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
+                GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
+                
+                % remove datapoints where the angle deviates beyond some
+                % angle, by artifically setting the directivity to be very
+                % low
+                directivities_vs_fills_full( abs( angles_vs_fills_full - obj.optimal_angle ) > 0.5 ) = 1e-6;
+                
+                % for each bottom fill, pick the datapoint with the highest
+                % directivity
+                [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_full, [], 2 );
+                % gotta use linear indexing
+                indxs                   = sub2ind( size(angles_vs_fills_full), 1:size(angles_vs_fills_full,1), indx_highest_dir_per_bot.' );
+                angles_high_dir         = angles_vs_fills_full( indxs );
+                periods_high_dir        = periods_vs_fills_full( indxs );
+                offsets_high_dir        = offsets_vs_fills_full( indxs );
+                scatter_strs_high_dir   = scatter_str_vs_fills_full( indxs );
+                k_high_dir              = k_vs_fills_full( indxs );
+                topbot_ratio_high_dir   = topbot_ratio_vs_fills_full( indxs );
+                bot_fills_high_dir      = bot_fills_vs_fills_full( indxs );
+                GC_high_dir             = GC_vs_fills_full( indxs );
+                dir_high                = highest_dir_per_bot;
+                
+            end     % end if strcmp( input_wg_type, 'bottom' )
+            
+            % DEBUG plot the resulting picked out datapoints
+            % angles
+            figure;
+            plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
+            title('chosen datapoints, angles');
+            makeFigureNice();
+            % periods
+            figure;
+            plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
+            title('chosen datapoints, periods');
+            makeFigureNice();
+            % offsets
+            figure;
+            plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
+            title('chosen datapoints, offsets');
+            makeFigureNice();
+            % scattering strengths
+            figure;
+            plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
+            title('chosen datapoints, scattering strengths');
+            makeFigureNice();
+            % k real
+            figure;
+            plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
+            title('chosen datapoints, k real');
+            makeFigureNice();
+            % k imag
+            figure;
+            plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
+            title('chosen datapoints, k imaginary');
+            makeFigureNice();
+            % top bottom ratio
+            figure;
+            plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
+            title('chosen datapoints, top/bottom ratio');
+            makeFigureNice();
+            % bottom fill
+            figure;
+            plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
+            title('chosen datapoints, bottom fill');
+            makeFigureNice();
+            % directivity
+            figure;
+            plot( 1:length(dir_high), 10*log10(dir_high), '-o' );
+            title('chosen datapoints, directivity (dB)');
+            makeFigureNice();
+            
+%             % DEBUG plot bot fills vs topbot ratio
+%             figure;
+%             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
+%             xlabel('top/bottom ratio'); ylabel('bottom fill');
+%             title('DEBUG bottom fill vs top/bottom ratio');
+%             makeFigureNice();
+%             
+%             % DEBUG plot bot fills vs top fills
+%             figure;
+%             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
+%             xlabel('bottom fill'); ylabel('top fill');
+%             title('DEBUG bottom fill vs top/bottom ratio');
+%             makeFigureNice();
+%             
+%             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
+%             
+%             x = 0:0.01:1;
+%             y = -(x.^3)/2 + x;
+%             figure;
+%             plot(x, y);
+%             xlabel('bot'); ylabel('top');
+            
+            % now match these data points to the desired alpha
+            % starting point
+            start_alpha_des     = 1e-5;
+            [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
+            cur_x               = xvec(indx_x);
+            
+            % final synthesized variables
+            obj.synthesized_design.dir                  = [];
+            obj.synthesized_design.bot_fill             = [];
+            obj.synthesized_design.top_bot_fill_ratio   = [];
+            obj.synthesized_design.top_fill             = [];
+            obj.synthesized_design.period               = [];
+            obj.synthesized_design.offset               = [];
+            obj.synthesized_design.angles               = [];
+            obj.synthesized_design.scatter_str          = [];
+            obj.synthesized_design.k                    = [];
+            obj.synthesized_design.GC                   = {};
+            obj.synthesized_design.des_scatter          = [];
+            
+            
+            % flag for switching to using max scattering strength
+            saturate_scatter_str_to_max = false;
+ 
+            ii = 1;
+            while cur_x < xvec(end)
+                % build grating one cell at a time
+                
+                % pick design with scattering strength closest to desired
+                % alpha
+                des_scatter                 = alpha_des(indx_x);                                        % desired alpha
+                if des_scatter  > max( scatter_strs_high_dir )
+                    % desired scattering strength too high, gotta saturate
+                    saturate_scatter_str_to_max = true;
+                end
+                if ~saturate_scatter_str_to_max
+                    [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+                else
+                    [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+                end
+                
+                % save parameters
+                obj.synthesized_design.dir(ii)                   = dir_high( indx_closest_scatter );
+                obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
+                obj.synthesized_design.top_bot_fill_ratio(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
+                obj.synthesized_design.top_fill(ii)              = topbot_ratio_high_dir( indx_closest_scatter ) * bot_fills_high_dir( indx_closest_scatter );
+                obj.synthesized_design.offset(ii)                = offsets_high_dir( indx_closest_scatter );
+                obj.synthesized_design.period(ii)                = periods_high_dir( indx_closest_scatter );
+                obj.synthesized_design.angles(ii)                = angles_high_dir( indx_closest_scatter );
+                obj.synthesized_design.scatter_str(ii)           = scatter_strs_high_dir( indx_closest_scatter );
+                obj.synthesized_design.k(ii)                     = k_high_dir( indx_closest_scatter );
+                obj.synthesized_design.des_scatter(ii)           = des_scatter;
+                
+                obj.synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
+                                                       obj.discretization, ...
+                                                       obj.units.name, ...
+                                                       obj.lambda, ...
+                                                       obj.background_index, ...
+                                                       obj.y_domain_size, ...
+                                                       obj.synthesized_design.period(ii), ...
+                                                       obj.synthesized_design.bot_fill(ii) * obj.synthesized_design.top_bot_fill_ratio(ii), ...
+                                                       obj.synthesized_design.bot_fill(ii), ...
+                                                       obj.synthesized_design.offset(ii)/obj.synthesized_design.period(ii) );
+
+                
+                % move onto next
+                cur_x       = cur_x + obj.synthesized_design.period(ii);
+                [~, indx_x] = min( abs(xvec - cur_x) );
+                cur_x       = xvec( indx_x );
+                ii          = ii + 1;
+                
+            end     % end for ii = 1:ncells
+            
+            
+            % build final index distribution
+            obj.synthesized_design.N = [];
+            for ii = 1:length(obj.synthesized_design.GC)
+               
+                GC                          = obj.synthesized_design.GC{ii};
+                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+                
+            end
+            
+            % this is actually quite tricky to do. better if user does this
+            % while running post-generation simulations
+%             % add input waveguide, depending on whether bottom or full
+%             wg_length = 10*obj.discretization;
+%             if strcmp( obj.synthesized_design.input_wg_type, 'bottom' ) == true
+%                 top_fill = 0;
+%             elseif strcmp( obj.synthesized_design.input_wg_type, 'full' ) == true
+%                 top_fill = 1;
+%             end
+%             GC = obj.h_makeGratingCell(    obj.discretization, ...
+%                                            obj.units.name, ...
+%                                            obj.lambda, ...
+%                                            obj.background_index, ...
+%                                            obj.y_domain_size, ...
+%                                            wg_length, ...
+%                                            top_fill, ...
+%                                            1.0, ...
+%                                            0.0 );
+%             obj.synthesized_design.N    = [ GC.N, obj.synthesized_design.N ];
+            
+            % coordinates of index distribution
+            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
+            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
+            
+            
+        end     % end function generateFinalDesignGaussian()
+        
+        
+        
+%         function obj = generateFinalDesignGaussian_old(obj, MFD, input_wg_type)
+%             % OLD VERSION
+%             % function for generating the final synthesized design
+%             % parameters
+%             %
+%             % Inputs:
+%             %   MFD
+%             %       type: double, scalar
+%             %       desc: mode field diameter, in units 'units'
+%             %   input_wg_type
+%             %       type: string
+%             %       desc: 'bottom' for cSi only or 'full' for both cSi and
+%             %             pSi
+%             %
+%             % Sets these fields:
+%             %   obj.dir_synth                   = [];
+%             %   obj.bot_fill_synth              = [];
+%             %   obj.top_bot_fill_ratio_synth    = [];
+%             %   obj.period_synth                = [];
+%             %   obj.offset_synth                = [];
+%             %   obj.angles_synth                = [];
+%             %   obj.scatter_str_synth           = [];
+%             %   obj.k_synth                     = [];
+%             %   obj.GC_synth                    = {};
+%             %   obj.des_scatter_norm            = [];
+%             
+% 
+%             % save input waveguide type
+%             obj.input_wg_type = input_wg_type;
+%             
+%             % generate x coordinates for the gaussian mode
+%             % must be large enough to fit mode
+%             xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
+%             xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
+%             
+%             % generate a fiber gaussian mode
+%             w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
+%             zvec        = 0;                                                            % this is unused
+%             d0          = 0;                                                            % take slice at waist
+%             [obj, u]    = obj.fiberModeGaussian(    w0, zvec, xvec,...
+%                                                     obj.optimal_angle, d0, obj.background_index );
+%             
+%             % calculate desired scattering strength vs. x
+%             integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
+%             alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );  % in units 1/m
+% %             alpha_des(end)  = 0;                                                            % for stability
+%             alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
+%             
+%             
+%             % DEBUG plot alpha desired
+%             figure;
+%             plot( xvec, alpha_des );
+%             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
+%             title('DEBUG scattering strength for gaussian');
+%             makeFigureNice();
+% %             
+% 
+%             % meshgrid the fills
+%             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
+%             
+%             % set invert/normal threshold
+%             invert_normal_top_bot_ratio_thresh = 0.6;
+% 
+%             if strcmp( input_wg_type, 'bottom' ) == true
+%                 % Inverted design
+%             
+%                 % first narrow down the space to take the datapoints with the
+%                 % maximum directivity per bottom fill factor (so for each row
+%                 % on my design space)
+% 
+%                 indx_bottom_space   = obj.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
+% 
+%                 % grab variables (remember dimensions are bot fill x top bot
+%                 % ratio)
+%                 topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_bottom_space );
+%                 bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_bottom_space );
+%                 directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_bottom_space );
+%                 angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_bottom_space );      
+%                 periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_bottom_space );
+%                 offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_bottom_space );
+%                 scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_bottom_space );
+%                 k_vs_fills_inv              = obj.k_vs_fills( :, indx_bottom_space );
+%                 GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
+%                 
+%                 % remove datapoints where the angle deviates beyond some
+%                 % angle, by artifically setting the directivity to be very
+%                 % low
+%                 directivities_vs_fills_inv( abs( angles_vs_fills_inv - obj.optimal_angle ) > 1 ) = 1e-6;
+% 
+% 
+%                 % for each top/bottom ratio, pick bottom fill with highest
+%                 % directivity
+%                 [ highest_dir_per_ratio, indx_highest_dir_per_ratio ] = max( directivities_vs_fills_inv, [], 1 );
+%                 % gotta use linear indexing
+%                 indxs                   = sub2ind( size(angles_vs_fills_inv), indx_highest_dir_per_ratio, 1:size(angles_vs_fills_inv,2)  );
+%                 angles_high_dir         = angles_vs_fills_inv( indxs );
+%                 periods_high_dir        = periods_vs_fills_inv( indxs );
+%                 offsets_high_dir        = offsets_vs_fills_inv( indxs );
+%                 scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
+%                 k_high_dir              = k_vs_fills_inv( indxs );
+%                 topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
+%                 bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
+%                 GC_high_dir             = GC_vs_fills_inv( indxs );
+%                 dir_high                = highest_dir_per_ratio;
+%                 
+%             elseif strcmp( input_wg_type, 'full' ) == true
+%                 % normal design
+%                 
+%                 % first narrow down the space to take the datapoints with the
+%                 % maximum directivity per bottom fill factor (so for each row
+%                 % on my design space)
+% 
+%                 indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
+% 
+%                 % grab variables (remember dimensions are bot fill x top bot
+%                 % ratio)
+%                 topbot_ratio_vs_fills_full   = topbot_ratio_mesh( :, indx_full_space );
+%                 bot_fills_vs_fills_full      = bot_fills_mesh( :, indx_full_space );
+%                 directivities_vs_fills_full  = obj.directivities_vs_fills( :, indx_full_space );
+%                 angles_vs_fills_full         = obj.angles_vs_fills( :, indx_full_space );      
+%                 periods_vs_fills_full        = obj.periods_vs_fills( :, indx_full_space );
+%                 offsets_vs_fills_full        = obj.offsets_vs_fills( :, indx_full_space );
+%                 scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
+%                 k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
+%                 GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
+%                 
+%                 % remove datapoints where the angle deviates beyond some
+%                 % angle, by artifically setting the directivity to be very
+%                 % low
+%                 directivities_vs_fills_full( abs( angles_vs_fills_full - obj.optimal_angle ) > 0.5 ) = 1e-6;
+%                 
+%                 % for each bottom fill, pick the datapoint with the highest
+%                 % directivity
+%                 [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_full, [], 2 );
+%                 % gotta use linear indexing
+%                 indxs                   = sub2ind( size(angles_vs_fills_full), 1:size(angles_vs_fills_full,1), indx_highest_dir_per_bot.' );
+%                 angles_high_dir         = angles_vs_fills_full( indxs );
+%                 periods_high_dir        = periods_vs_fills_full( indxs );
+%                 offsets_high_dir        = offsets_vs_fills_full( indxs );
+%                 scatter_strs_high_dir   = scatter_str_vs_fills_full( indxs );
+%                 k_high_dir              = k_vs_fills_full( indxs );
+%                 topbot_ratio_high_dir   = topbot_ratio_vs_fills_full( indxs );
+%                 bot_fills_high_dir      = bot_fills_vs_fills_full( indxs );
+%                 GC_high_dir             = GC_vs_fills_full( indxs );
+%                 dir_high                = highest_dir_per_bot;
+%                 
+%             end     % end if strcmp( input_wg_type, 'bottom' )
+%             
+%             % DEBUG plot the resulting picked out datapoints
+%             % angles
+%             figure;
+%             plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
+%             title('chosen datapoints, angles');
+%             makeFigureNice();
+%             % periods
+%             figure;
+%             plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
+%             title('chosen datapoints, periods');
+%             makeFigureNice();
+%             % offsets
+%             figure;
+%             plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
+%             title('chosen datapoints, offsets');
+%             makeFigureNice();
+%             % scattering strengths
+%             figure;
+%             plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
+%             title('chosen datapoints, scattering strengths');
+%             makeFigureNice();
+%             % k real
+%             figure;
+%             plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
+%             title('chosen datapoints, k real');
+%             makeFigureNice();
+%             % k imag
+%             figure;
+%             plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
+%             title('chosen datapoints, k imaginary');
+%             makeFigureNice();
+%             % top bottom ratio
+%             figure;
+%             plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
+%             title('chosen datapoints, top/bottom ratio');
+%             makeFigureNice();
+%             % bottom fill
+%             figure;
+%             plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
+%             title('chosen datapoints, bottom fill');
+%             makeFigureNice();
+%             % directivity
+%             figure;
+%             plot( 1:length(dir_high), 10*log10(dir_high), '-o' );
+%             title('chosen datapoints, directivity (dB)');
+%             makeFigureNice();
+%             
+% %             % DEBUG plot bot fills vs topbot ratio
+% %             figure;
+% %             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
+% %             xlabel('top/bottom ratio'); ylabel('bottom fill');
+% %             title('DEBUG bottom fill vs top/bottom ratio');
+% %             makeFigureNice();
+% %             
+% %             % DEBUG plot bot fills vs top fills
+% %             figure;
+% %             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
+% %             xlabel('bottom fill'); ylabel('top fill');
+% %             title('DEBUG bottom fill vs top/bottom ratio');
+% %             makeFigureNice();
+% %             
+% %             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
+% %             
+% %             x = 0:0.01:1;
+% %             y = -(x.^3)/2 + x;
+% %             figure;
+% %             plot(x, y);
+% %             xlabel('bot'); ylabel('top');
+%             
+%             % now match these data points to the desired alpha
+%             % starting point
+%             start_alpha_des     = 1e-5;
+%             [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
+%             cur_x               = xvec(indx_x);
+%             
+%             % final synthesized variables
+%             obj.synthesized_design.dir_synth                   = [];
+%             obj.synthesized_design.bot_fill_synth              = [];
+%             obj.synthesized_design.top_bot_fill_ratio_synth    = [];
+%             obj.synthesized_design.period_synth                = [];
+%             obj.synthesized_design.offset_synth                = [];
+%             obj.synthesized_design.angles_synth                = [];
+%             obj.synthesized_design.scatter_str_synth           = [];
+%             obj.synthesized_design.k_synth                     = [];
+%             obj.synthesized_design.GC_synth                    = {};
+%             obj.synthesized_design.des_scatter_synth           = [];
+%             
+%             % flag for switching to using max scattering strength
+%             saturate_scatter_str_to_max = false;
+%  
+%             ii = 1;
+%             while cur_x < xvec(end)
+%                 % build grating one cell at a time
+%                 
+%                 % pick design with scattering strength closest to desired
+%                 % alpha
+%                 des_scatter                 = alpha_des(indx_x);                                        % desired alpha
+%                 if des_scatter  > max( scatter_strs_high_dir )
+%                     % desired scattering strength too high, gotta saturate
+%                     saturate_scatter_str_to_max = true;
+%                 end
+%                 if ~saturate_scatter_str_to_max
+%                     [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+%                 else
+%                     [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+%                 end
+%                 
+%                 % save parameters
+%                 obj.dir_synth(ii)                   = dir_high( indx_closest_scatter );
+%                 obj.bot_fill_synth(ii)              = bot_fills_high_dir( indx_closest_scatter );
+%                 obj.top_bot_fill_ratio_synth(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
+%                 obj.offset_synth(ii)                = offsets_high_dir( indx_closest_scatter );
+%                 obj.period_synth(ii)                = periods_high_dir( indx_closest_scatter );
+%                 obj.angles_synth(ii)                = angles_high_dir( indx_closest_scatter );
+%                 obj.scatter_str_synth(ii)           = scatter_strs_high_dir( indx_closest_scatter );
+%                 obj.k_synth(ii)                     = k_high_dir( indx_closest_scatter );
+% %                 obj.GC_synth{ii}                    = GC_high_dir{ indx_closest_scatter };
+%                 obj.des_scatter_synth(ii)           = des_scatter;
+%                 
+%                 % move onto next
+%                 cur_x       = cur_x + obj.period_synth(ii);
+%                 [~, indx_x] = min( abs(xvec - cur_x) );
+%                 cur_x       = xvec( indx_x );
+%                 ii          = ii + 1;
+%                 
+%             end     % end for ii = 1:ncells
+%             
+%             
+%         end     % end function generateFinalDesignGaussian_old()
+        
+        
+        function obj = runFinalDesignEME(obj, MFD)
+            % runs the final design's index distribution in EME and saves
+            % some coupling parameters
+            %
+            % Inputs:
+            %   obj
+            %       takes the synthesized params as input (meaning this function
+            %       can only be run after a synthesis run)
+            %   MFD
+            %       mode field diameter of fiber, in units 'units'
+            %
+            % sets these object fields:
+            %   final_index
+            %   obj.final_design.max_coupling_angle
+            %   obj.final_design.max_coupling_offset    
+            %   obj.final_design.power_reflection  
+            %   obj.final_design.eme_obj 
+            %   obj.final_design.final_index
+            %
+            % also opens the EME UI
+            
+            % input waveguide length
+            in_wg_len   = obj.discretization * 50;                          % input waveguide length
+            
+            % number of cells
+            n_cells = length(obj.dir_synth);
+            
+            
+            % make input waveguide
+            if strcmp( obj.input_wg_type, 'bottom' )
+                % inverted design, bottom waveguide input only
+                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                in_wg_len, ...
+                                                0, ...
+                                                1, ...
+                                                0 );
+            elseif strcmp( obj.input_wg_type, 'full' )
+                % normal design, thick waveguide input
+                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
+                                                in_wg_len, ...
+                                                1, ...
+                                                1, ...
+                                                0 );
+            end
+            
+            % lets stitch together the index distribution
+            % i'm curious to see what it looks like
+            obj.final_index = input_waveguide.N;
+%             obj.final_index = obj.GC_synth{1}.N;
+            for ii = 1:n_cells
+               
+                obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
+                
+            end
+
+
+            % Set Up Simulation
+            % note that emeSim uses 'z' as propagation direction and 'x'
+            % as transverse (synthGrating uses 'x' and 'y' respectively)
+            % and units are in um
+            um              = 1e6;
+            disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
+            pol             = 0;                                                            % 0 for TE, 1 for TM
+            xf              = obj.domain_size(1) * obj.units.scale * um;                    % in um (transverse domain)
+            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
+            lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
+            eme_obj         = emeSim(   'discretization', disc_eme, ...
+                                        'pml', 0.2, ...
+                                        'domain', [xf, zf], ...
+                                        'backgroundIndex', obj.background_index, ...
+                                        'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
+                                        'debug', 'no',...                   
+                                        'polarization', pol );
+                                        
+            % replace the dielectric in the eme object
+            eme_obj.diel = obj.final_index;
+            
+            % run EME sim
+            % Converts the dielectric distribution into layers for eigen mode expansion
+            eme_obj = eme_obj.convertDiel();   
+            % Runs simulation
+            eme_obj = eme_obj.runSimulation('plotSource','yes');      
+            % compute fiber overlap
+            z_offset    = 0 : 0.25 : zf;
+            angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
+            eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
+                                                'angleVec', angle_vec,...
+                                                'MFD', MFD * obj.units.scale * um,...
+                                                'overlapDir', obj.coupling_direction, ...
+                                                'nClad', obj.background_index );
+                                        
+            % DEBUG show results
+            gratingUI(eme_obj);
+            
+            % save final results
+            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
+            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
+            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
+            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
+            final_design.eme_obj                = eme_obj;
+            final_design.final_index            = obj.final_index;
+            final_design.input_wg_type          = obj.input_wg_type;
+            final_design.MFD                    = MFD;
+            obj.final_design                    = final_design;
+            
+            % calculate final up/down directivity
+            obj = obj.calc_final_design_directivity();
+            
+        end     % end runFinalDesignEME()
+        
+        
+        function obj = runFinalDesignEME_fiber_overlap(obj, MFD, fiber_offsets, angles)
+            % mostly for debugging purposes
+            % only runs the fiber oveerlap and not the EME simulation
+            % because its faster lol
+            %
+            % Inputs
+            %   MFD
+            %       units of 'units'
+            %   fiber_offsets
+            %       units of 'units'
+            %   angles
+            %       deg.
+            
+            eme_obj = obj.final_design.eme_obj;
+            
+            % compute fiber overlap
+            um      = 1e6;
+            eme_obj = eme_obj.fiberOverlap( 'zOffset', fiber_offsets * obj.units.scale * um,...
+                                            'angleVec', angles,...
+                                            'MFD', MFD * obj.units.scale * um,...
+                                            'overlapDir', obj.coupling_direction, ...
+                                            'nClad', obj.background_index );
+                                        
+            % save final results
+            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
+            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
+            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
+            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
+            final_design.eme_obj                = eme_obj;
+            final_design.final_index            = obj.final_index;
+            obj.final_design                    = final_design;
+            
+        end     % end runFinalDesignEME_fiber_overlap()
+        
+        
+        function [obj, up_down_directivity] = calc_final_design_directivity(obj)
+            % mostly for debugging purposes
+            % calculates the directivity of the final designed grating,
+            % using the field from the simulated eme obj
+            
+            % repeating code from twoLevelGratingCell which I don't like to
+            % do this is bad prog. practice but whatever
+            
+            % define constants (all eme obj units are in um)
+            mu0     = 4*pi*1e-7;                % units of H/m
+            mu0     = mu0 * obj.units.scale;    % units of H/(units)
+            c       = 3e8;                      % units of m/s
+            c       = c/obj.units.scale;        % units of (units)/s
+            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
+       
+            % grab field and coordinates
+            % defined as Ey in eme obj but Ez in my def.
+            Ez = obj.final_design.eme_obj.fullFields.Ey;
+            dy = obj.final_design.eme_obj.domain.discretization(1);
+            dx = obj.final_design.eme_obj.domain.discretization(2);
+            
+            
+%             % Calc propagating power vs. x
+%             
+%             % H y in , on second to end-1 steps, using entire E_z
+%             % dimensions are y (transverse) vs. x
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+%             
+%             % poynting vector in, dimensions are y vs x(2:end-1)
+%             Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+% 
+%             % power per x slice
+%             P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*omega0*mu0) .* ( Ez( 3:end,:) - Ez( 1:end-2,:) )/(2*dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez( 2:end-1,: ) );           % Sy = real( Ez Hx* )
+            P_per_y_slice       = -sum( Sy, 2 )*dx;                                 % using Sy compmonent, for some reason up/down are flipped
+
+            [~, indx_max_up]    = max( P_per_y_slice );
+            [~, indx_max_down]  = min( P_per_y_slice );
+            Sy_up               = Sy( indx_max_up, : );                                 % dimensions Sy vs. x
+            Sy_down             = Sy( indx_max_down, : );
+            
+%             % save to obj
+% %             obj.Sx              = Sx;
+% %             obj.P_per_x_slice 	= P_per_x_slice;
+%             obj.Sy              = Sy;
+%             obj.P_per_y_slice   = P_per_y_slice;
+
+            % calc radiated power (Sy only, not including angle of
+            % incidence)
+            P_rad_up    = sum( abs( Sy_up(:) ) ) * dx;
+            P_rad_down  = sum( abs( Sy_down(:) ) ) * dx;
+            
+            % calc directivity save to object
+            up_down_directivity                  = P_rad_up/P_rad_down;
+            obj.final_design.up_down_directivity = up_down_directivity;
+            
+        end     % end calc_final_design_directivity()
+        
+        
+        function [obj, max_eff_vs_MFD] = calc_eff_vs_MFD(obj, MFDs)
+            % mostly for debugging
+            % plotting max efficiency vs. different MFDs
+            %
+            % returns max efficiency vs. mfd
+            %
+            % Inputs
+            %   MFDs
+            %       type: double, vector
+            %       desc: mode field diameters to try, units 'units'
+            %
+            % Outputs
+            %   max_eff_vs_MFD
+            %       type: 3d tensor, double
+            %       desc: eff vs. 
+            
+            % init vars
+            max_eff_vs_MFD  = zeros(size(MFDs));
+            fiber_offsets   = ( 0:0.5:12 ) * 1e-6 / obj.units.scale;        % units 'units'
+            angles          = 0:0.1:45;
+
+            for ii = 1:length(MFDs)
+
+                fprintf('mfd iteration %i of %i\n', ii, length(MFDs) );
+
+                % run EME sim
+                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
+                % save result
+                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
+
+            end
+            
+        end     % end calc_eff_vs_MFD()
+        
+        
+        function [obj, eff_vs_wavelength_angle] = calc_eff_vs_wavelength(obj, wavelengths)
+            % mostly for debugging
+            % plotting eff. vs. wavelength and angle
+            %
+            % i dont really want to do this right now haha
+            
+            % init vars
+            angles                  = 0:0.1:45;
+            eff_vs_wavelength_angle = zeros( length(wavelengths), length(angles) );     % dimensions eff. vs. wl vs. angle
+            
+            for ii = 1:length(wavelengths)
+               
+                fprintf('wavelength iteration %i of %i\n', ii, length(wavelengths) );
+                
+                % run EME sim
+                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
+                % save result
+                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
+                
+            end
+            
+            
+        end     % end calc_eff_vs_wavelength()
         
         
         function obj = synthesizeGaussianGrating(obj, MFD, DEBUG)
+            % DEPRECATED
+            % replaced (mostly) by generate_design_space
+            %
             % Synthesizes a grating that is mode-matched to fiber gaussian
             % mode
             %
@@ -1059,846 +2291,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
         end     % end synthesizeGaussianGrating()
         
-        
-        function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
-                    best_GC, best_k, dir_b4_period_vs_fill ] ...
-                    = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
-            % for given fill ratios, optimizes period and offset for best angle/directivity
-            %
-            % Inputs:
-            %   guess_offset
-            %       type: scalar, double
-            %       desc: guess offset position to start from, in units
-            %             'units'
-            %   fill_top
-            %       type: scalar, double
-            %       desc: ratio of top waveguide to period
-            %   fill_bot
-            %       type: scalar, double
-            %       desc: ratio of bottom waveguide to period
-            %   guess_period
-            %       type: scalar, double
-            %       desc: starting period to sweep from, in units 'units'
-            %   guessk
-            %       type: scalar, double
-            %       desc: starting guess k
-            %   sim_opts
-            %       type: struct
-            %       desc: structure with these fields:  
-            %               num_modes
-            %               BC
-            %               pml_options
-            %   guess_gc
-            %       type: grating coupler object
-            %       desc: initial grating coupler object to start with (for mode
-            %       overlapping)
-            %       
-            %
-            % Outputs:
-            %   best_period
-            %       type: scalar, double
-            %       desc: optimal period
-            %   best_offset
-            %       type: scalar, double
-            %       desc: absolute value of offset, in 'units'
-            %   best_directivity
-            %       type: scalar, double
-            %       desc: optimal directivity
-            %   best_angle
-            %       type: scalar, double
-            %       desc: optimal angle
-            %   best_scatter_str
-            %       type: scalar, double
-            %       desc: optimal scatering strength
-            %   best_GC
-            %       type: c_twoLevelGratingCell
-            %       desc: two level grating cell
-            %   best_k
-            %       type: scalar, double
-            %       desc: optimal k
-            %   dir_b4_period_vs_fill
-            %       type: scalar, double
-            %       desc: directivity b4 period sweep, mostly for debugging purposes 
-            
-%             % enable/disable debug mode
-%             DEBUG = false;
-            
-            % generate vector of absolute offsets
-            offsets         = guess_offset : obj.discretization : guess_offset + guess_period;
-            offsets         = mod( offsets, guess_period );
-            offset_ratios   = offsets / guess_period;
-
-            % init saving variables vs. offset
-            directivities = zeros( size(offset_ratios) );
-            k_vs_offset   = zeros( size(offset_ratios) );
-            angles        = zeros( size(offset_ratios) );
-            GC_vs_offset  = {};
-
-            % grab mode to overlap with
-            OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
-
-            % Sweep offsets, pick offset with best directivity
-%             fprintf('Sweeping offsets...\n');
-            for i_offset = 1:length( offset_ratios )
-
-%                 fprintf('Sweeping offset %i of %i\n', 
-                
-                % make grating cell
-                GC = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
-                                               obj.background_index, ...
-                                               obj.y_domain_size, ...
-                                               guess_period, ...
-                                               fill_top, ...
-                                               fill_bot, ...
-                                               offset_ratios(i_offset) );
-                                        
-                % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
-
-                % save directivity
-                if strcmp( obj.coupling_direction, 'up' )
-                    % coupling direction is upwards
-                    directivities( i_offset )   = GC.directivity;
-                    angles( i_offset )          = GC.max_angle_up;
-                else
-                    % coupling direction is downwards
-                    directivities( i_offset )   = 1./( GC.directivity );
-                    angles( i_offset )          = GC.max_angle_down;
-                end
-
-                % update the guessk (units rad/'units')
-                guessk                  = GC.k;
-                k_vs_offset( i_offset ) = GC.k;
-                
-                % update the mode overlap field
-                GC_vs_offset{i_offset}  = GC;
-                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-
-%                 toc;
-
-            end     % end for i_offset = ...
-%             fprintf('...done.\n');
-
-%                         % DEBUG plot directivity vs. offset
-%             if DEBUG
-%                 figure;
-%                 plot( offsets, directivities, '-o' );
-%                 xlabel('offsets'); ylabel('directivities');
-%                 title('DEBUG directivities vs offsets');
-%                 makeFigureNice();
-%                             
-%                             figure;
-%                             plot( offsets, angles, '-o' );
-%                             xlabel('offsets'); ylabel('angles');
-%                             title('DEBUG angles vs offsets for first run');
-%                             makeFigureNice();
-%                             
-%             end
-
-            % pick best offset
-            [ ~, indx_best_offset ]     = max( directivities );
-%             best_offset                 = offsets( indx_best_offset );
-            best_offset_ratio           = offset_ratios( indx_best_offset );
-            best_offset_k               = k_vs_offset( indx_best_offset );
-            best_offset_angle           = angles( indx_best_offset );
-            
-            % update mode overlap
-            OPTS.mode_to_overlap    = GC_vs_offset{indx_best_offset}.E_z_for_overlap;
-
-            % here's an output variable
-            dir_b4_period_vs_fill = max( directivities );
-
-            % DEBUG plot grating with best directivity
-%             if DEBUG
-% 
-%                 % make grating cell
-%                 GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-%                                             guess_period, ...
-%                                             fill_tops(i_ff_top), ...
-%                                             fill_bots(i_ff_bot), ...
-%                                             best_offset );
-% 
-%                 % run sim
-%                 GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
-% 
-%                 % plot field
-%                 GC.plotEz_w_edges();
-% 
-%             end
-
-
-%             % now sweep periods
-%             % only sweep larger periods. Doubtful that the period
-%             % will be smaller
-%             periods     = guess_period : obj.discretization : 1.05 * guess_period;
-%             periods     = obj.discretization * round(periods/obj.discretization);
-% %                         periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
-
-            % now sweep periods
-            % decide whether to sweep larger or smaller periods
-            % based on the angle
-            if best_offset_angle > obj.optimal_angle
-                % only sweep smaller periods
-                decrease_periods = true;
-            else
-                % only sweep larger periods
-                decrease_periods = false;
-            end
-
-            % init saving variables
-            angles_vs_period    = []; %= zeros( size(periods) );
-            k_vs_period         = []; %zeros( size(periods) );
-            GC_vs_period        = {}; % cell( size(periods) );
-            periods             = [];
-
-            % sweep periods
-            guessk = best_offset_k;
-            period = guess_period;
-            
-            % set while loop exit flag
-            angle_err_sign_flip = false;
-
-            i_period    = 0;
-            while ~angle_err_sign_flip
-
-                i_period = i_period + 1;
-
-                % make grating cell
-                GC = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
-                                               obj.background_index, ...
-                                               obj.y_domain_size, ...
-                                               period, ...
-                                               fill_top, ...
-                                               fill_bot, ...
-                                               best_offset_ratio );
-
-                % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
-
-                % save angle
-                if strcmp( obj.coupling_direction, 'up' )
-                    % coupling direction is upwards
-                    angles_vs_period( i_period ) = GC.max_angle_up;
-                else
-                    % coupling direction is downwards
-                    angles_vs_period( i_period ) = GC.max_angle_down;
-                end
-
-                % update for next iteration
-                periods(i_period)       = period;
-                GC_vs_period{i_period}  = GC;
-                k_vs_period(i_period)   = GC.k;
-                guessk                  = GC.k;
-                OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-                
-                % update period
-                if decrease_periods == true
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) < obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % decrease the period
-                        period = period - obj.discretization;
-                    end
-                else
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) > obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % increase the period
-                        period = period + obj.discretization;
-                    end
-                end     % end updating period if else
-                
-%                 toc;
-
-            end     % end period sweep
-%             fprintf('...done.\n');
-
-            % pick best period
-            [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
-            best_period_k                   = k_vs_period( indx_best_period );
-            
- 
-            % return data
-            % best offset is already set
-            best_GC = GC_vs_period{ indx_best_period };
-            
-            if strcmp( obj.coupling_direction, 'up' )
-                % coupling direction is upwards
-                best_directivity    = best_GC.directivity;
-                best_angle          = best_GC.max_angle_up;
-                best_scatter_str    = best_GC.alpha_up;
-            else
-                % coupling direction is downwards
-                best_directivity    = 1./best_GC.directivity;
-                best_angle          = best_GC.max_angle_down;
-                best_scatter_str    = best_GC.alpha_down;
-            end
-            
-            best_period = periods( indx_best_period );
-            best_k      = best_GC.k;
-            best_offset = best_offset_ratio * best_period;
-                    
-        end     % end function optimizePeriodOffset()
-        
-        
-        function obj = generateFinalDesignGaussian(obj, MFD, input_wg_type)
-            % function for generating the final synthesized design
-            % parameters
-            %
-            % Inputs:
-            %   MFD
-            %       type: double, scalar
-            %       desc: mode field diameter, in units 'units'
-            %   input_wg_type
-            %       type: string
-            %       desc: 'bottom' for cSi only or 'full' for both cSi and
-            %             pSi
-            %
-            % Sets these fields:
-            %   obj.dir_synth                   = [];
-            %   obj.bot_fill_synth              = [];
-            %   obj.top_bot_fill_ratio_synth    = [];
-            %   obj.period_synth                = [];
-            %   obj.offset_synth                = [];
-            %   obj.angles_synth                = [];
-            %   obj.scatter_str_synth           = [];
-            %   obj.k_synth                     = [];
-            %   obj.GC_synth                    = {};
-            %   obj.des_scatter_norm            = [];
-            
-
-            % save input waveguide type
-            obj.input_wg_type = input_wg_type;
-            
-            % generate x coordinates for the gaussian mode
-            % must be large enough to fit mode
-            xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
-            xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
-            
-            % generate a fiber gaussian mode
-            w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
-            zvec        = 0;                                                            % this is unused
-            d0          = 0;                                                            % take slice at waist
-            [obj, u]    = obj.fiberModeGaussian(    w0, zvec, xvec,...
-                                                    obj.optimal_angle, d0, obj.background_index );
-            
-            % calculate desired scattering strength vs. x
-            integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
-            alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );  % in units 1/m
-%             alpha_des(end)  = 0;                                                            % for stability
-            alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
-            
-            
-            % DEBUG plot alpha desired
-            figure;
-            plot( xvec, alpha_des );
-            xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
-            title('DEBUG scattering strength for gaussian');
-            makeFigureNice();
-%             
-
-            % meshgrid the fills
-            [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
-            
-            % set invert/normal threshold
-            invert_normal_top_bot_ratio_thresh = 0.6;
-
-            if strcmp( input_wg_type, 'bottom' ) == true
-                % Inverted design
-            
-                % first narrow down the space to take the datapoints with the
-                % maximum directivity per bottom fill factor (so for each row
-                % on my design space)
-
-                indx_bottom_space   = obj.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
-
-                % grab variables (remember dimensions are bot fill x top bot
-                % ratio)
-                topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_bottom_space );
-                bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_bottom_space );
-                directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_bottom_space );
-                angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_bottom_space );      
-                periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_bottom_space );
-                offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_bottom_space );
-                scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_bottom_space );
-                k_vs_fills_inv              = obj.k_vs_fills( :, indx_bottom_space );
-                GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
-                
-                % remove datapoints where the angle deviates beyond some
-                % angle, by artifically setting the directivity to be very
-                % low
-                directivities_vs_fills_inv( abs( angles_vs_fills_inv - obj.optimal_angle ) > 1 ) = 1e-6;
-
-
-                % for each top/bottom ratio, pick bottom fill with highest
-                % directivity
-                [ highest_dir_per_ratio, indx_highest_dir_per_ratio ] = max( directivities_vs_fills_inv, [], 1 );
-                % gotta use linear indexing
-                indxs                   = sub2ind( size(angles_vs_fills_inv), indx_highest_dir_per_ratio, 1:size(angles_vs_fills_inv,2)  );
-                angles_high_dir         = angles_vs_fills_inv( indxs );
-                periods_high_dir        = periods_vs_fills_inv( indxs );
-                offsets_high_dir        = offsets_vs_fills_inv( indxs );
-                scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
-                k_high_dir              = k_vs_fills_inv( indxs );
-                topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
-                bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
-                GC_high_dir             = GC_vs_fills_inv( indxs );
-                dir_high                = highest_dir_per_ratio;
-                
-            elseif strcmp( input_wg_type, 'full' ) == true
-                % normal design
-                
-                % first narrow down the space to take the datapoints with the
-                % maximum directivity per bottom fill factor (so for each row
-                % on my design space)
-
-                indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
-
-                % grab variables (remember dimensions are bot fill x top bot
-                % ratio)
-                topbot_ratio_vs_fills_full   = topbot_ratio_mesh( :, indx_full_space );
-                bot_fills_vs_fills_full      = bot_fills_mesh( :, indx_full_space );
-                directivities_vs_fills_full  = obj.directivities_vs_fills( :, indx_full_space );
-                angles_vs_fills_full         = obj.angles_vs_fills( :, indx_full_space );      
-                periods_vs_fills_full        = obj.periods_vs_fills( :, indx_full_space );
-                offsets_vs_fills_full        = obj.offsets_vs_fills( :, indx_full_space );
-                scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
-                k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
-                GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
-                
-                % remove datapoints where the angle deviates beyond some
-                % angle, by artifically setting the directivity to be very
-                % low
-                directivities_vs_fills_full( abs( angles_vs_fills_full - obj.optimal_angle ) > 0.5 ) = 1e-6;
-                
-                % for each bottom fill, pick the datapoint with the highest
-                % directivity
-                [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_full, [], 2 );
-                % gotta use linear indexing
-                indxs                   = sub2ind( size(angles_vs_fills_full), 1:size(angles_vs_fills_full,1), indx_highest_dir_per_bot.' );
-                angles_high_dir         = angles_vs_fills_full( indxs );
-                periods_high_dir        = periods_vs_fills_full( indxs );
-                offsets_high_dir        = offsets_vs_fills_full( indxs );
-                scatter_strs_high_dir   = scatter_str_vs_fills_full( indxs );
-                k_high_dir              = k_vs_fills_full( indxs );
-                topbot_ratio_high_dir   = topbot_ratio_vs_fills_full( indxs );
-                bot_fills_high_dir      = bot_fills_vs_fills_full( indxs );
-                GC_high_dir             = GC_vs_fills_full( indxs );
-                dir_high                = highest_dir_per_bot;
-                
-            end     % end if strcmp( input_wg_type, 'bottom' )
-            
-            % DEBUG plot the resulting picked out datapoints
-            % angles
-            figure;
-            plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
-            title('chosen datapoints, angles');
-            makeFigureNice();
-            % periods
-            figure;
-            plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
-            title('chosen datapoints, periods');
-            makeFigureNice();
-            % offsets
-            figure;
-            plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
-            title('chosen datapoints, offsets');
-            makeFigureNice();
-            % scattering strengths
-            figure;
-            plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
-            title('chosen datapoints, scattering strengths');
-            makeFigureNice();
-            % k real
-            figure;
-            plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
-            title('chosen datapoints, k real');
-            makeFigureNice();
-            % k imag
-            figure;
-            plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
-            title('chosen datapoints, k imaginary');
-            makeFigureNice();
-            % top bottom ratio
-            figure;
-            plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
-            title('chosen datapoints, top/bottom ratio');
-            makeFigureNice();
-            % bottom fill
-            figure;
-            plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
-            title('chosen datapoints, bottom fill');
-            makeFigureNice();
-            % directivity
-            figure;
-            plot( 1:length(dir_high), 10*log10(dir_high), '-o' );
-            title('chosen datapoints, directivity (dB)');
-            makeFigureNice();
-            
-%             % DEBUG plot bot fills vs topbot ratio
-%             figure;
-%             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
-%             xlabel('top/bottom ratio'); ylabel('bottom fill');
-%             title('DEBUG bottom fill vs top/bottom ratio');
-%             makeFigureNice();
-%             
-%             % DEBUG plot bot fills vs top fills
-%             figure;
-%             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
-%             xlabel('bottom fill'); ylabel('top fill');
-%             title('DEBUG bottom fill vs top/bottom ratio');
-%             makeFigureNice();
-%             
-%             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
-%             
-%             x = 0:0.01:1;
-%             y = -(x.^3)/2 + x;
-%             figure;
-%             plot(x, y);
-%             xlabel('bot'); ylabel('top');
-            
-            % now match these data points to the desired alpha
-            % starting point
-            start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
-            cur_x               = xvec(indx_x);
-            
-            % final synthesized variables
-            obj.dir_synth                   = [];
-            obj.bot_fill_synth              = [];
-            obj.top_bot_fill_ratio_synth    = [];
-            obj.period_synth                = [];
-            obj.offset_synth                = [];
-            obj.angles_synth                = [];
-            obj.scatter_str_synth           = [];
-            obj.k_synth                     = [];
-            obj.GC_synth                    = {};
-            obj.des_scatter_synth           = [];
-            
-            % flag for switching to using max scattering strength
-            saturate_scatter_str_to_max = false;
- 
-            ii = 1;
-            while cur_x < xvec(end)
-                % build grating one cell at a time
-                
-                % pick design with scattering strength closest to desired
-                % alpha
-                des_scatter                 = alpha_des(indx_x);                                        % desired alpha
-                if des_scatter  > max( scatter_strs_high_dir )
-                    % desired scattering strength too high, gotta saturate
-                    saturate_scatter_str_to_max = true;
-                end
-                if ~saturate_scatter_str_to_max
-                    [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
-                else
-                    [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
-                end
-                
-                % save parameters
-                obj.dir_synth(ii)                   = dir_high( indx_closest_scatter );
-                obj.bot_fill_synth(ii)              = bot_fills_high_dir( indx_closest_scatter );
-                obj.top_bot_fill_ratio_synth(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
-                obj.offset_synth(ii)                = offsets_high_dir( indx_closest_scatter );
-                obj.period_synth(ii)                = periods_high_dir( indx_closest_scatter );
-                obj.angles_synth(ii)                = angles_high_dir( indx_closest_scatter );
-                obj.scatter_str_synth(ii)           = scatter_strs_high_dir( indx_closest_scatter );
-                obj.k_synth(ii)                     = k_high_dir( indx_closest_scatter );
-                obj.GC_synth{ii}                    = GC_high_dir{ indx_closest_scatter };
-                obj.des_scatter_synth(ii)           = des_scatter;
-                
-                % move onto next
-                cur_x       = cur_x + obj.period_synth(ii);
-                [~, indx_x] = min( abs(xvec - cur_x) );
-                cur_x       = xvec( indx_x );
-                ii          = ii + 1;
-                
-            end     % end for ii = 1:ncells
-            
-            
-        end     % end function generateFinalDesignGaussian()
-        
-        
-        function obj = runFinalDesignEME(obj, MFD)
-            % runs the final design's index distribution in EME and saves
-            % some coupling parameters
-            %
-            % Inputs:
-            %   obj
-            %       takes the synthesized params as input (meaning this function
-            %       can only be run after a synthesis run)
-            %   MFD
-            %       mode field diameter of fiber, in units 'units'
-            %
-            % sets these object fields:
-            %   final_index
-            %   obj.final_design.max_coupling_angle
-            %   obj.final_design.max_coupling_offset    
-            %   obj.final_design.power_reflection  
-            %   obj.final_design.eme_obj 
-            %   obj.final_design.final_index
-            %
-            % also opens the EME UI
-            
-            % input waveguide length
-            in_wg_len   = obj.discretization * 50;                          % input waveguide length
-            
-            % number of cells
-            n_cells = length(obj.dir_synth);
-            
-            
-            % make input waveguide
-            if strcmp( obj.input_wg_type, 'bottom' )
-                % inverted design, bottom waveguide input only
-                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                                in_wg_len, ...
-                                                0, ...
-                                                1, ...
-                                                0 );
-            elseif strcmp( obj.input_wg_type, 'full' )
-                % normal design, thick waveguide input
-                input_waveguide = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-                                                in_wg_len, ...
-                                                1, ...
-                                                1, ...
-                                                0 );
-            end
-            
-            % lets stitch together the index distribution
-            % i'm curious to see what it looks like
-            obj.final_index = input_waveguide.N;
-%             obj.final_index = obj.GC_synth{1}.N;
-            for ii = 1:n_cells
-               
-                obj.final_index = [ obj.final_index, obj.GC_synth{ii}.N ];
-                
-            end
-
-
-            % Set Up Simulation
-            % note that emeSim uses 'z' as propagation direction and 'x'
-            % as transverse (synthGrating uses 'x' and 'y' respectively)
-            % and units are in um
-            um              = 1e6;
-            disc_eme        = obj.discretization * obj.units.scale * um .* [ 1, 1 ];        % [x,z]
-            pol             = 0;                                                            % 0 for TE, 1 for TM
-            xf              = obj.domain_size(1) * obj.units.scale * um;                    % in um (transverse domain)
-            zf              = size(obj.final_index,2) * disc_eme(2);                        % in um (longitudinal domain)
-            lambda_um       = obj.lambda * obj.units.scale * um;                            % wl in um
-            eme_obj         = emeSim(   'discretization', disc_eme, ...
-                                        'pml', 0.2, ...
-                                        'domain', [xf, zf], ...
-                                        'backgroundIndex', obj.background_index, ...
-                                        'wavelengthSpectrum', [lambda_um lambda_um 0.1], ...
-                                        'debug', 'no',...                   
-                                        'polarization', pol );
-                                        
-            % replace the dielectric in the eme object
-            eme_obj.diel = obj.final_index;
-            
-            % run EME sim
-            % Converts the dielectric distribution into layers for eigen mode expansion
-            eme_obj = eme_obj.convertDiel();   
-            % Runs simulation
-            eme_obj = eme_obj.runSimulation('plotSource','yes');      
-            % compute fiber overlap
-            z_offset    = 0 : 0.25 : zf;
-            angle_vec   = obj.optimal_angle - 15 : 0.25 : obj.optimal_angle + 15;
-            eme_obj     = eme_obj.fiberOverlap( 'zOffset', z_offset,...
-                                                'angleVec', angle_vec,...
-                                                'MFD', MFD * obj.units.scale * um,...
-                                                'overlapDir', obj.coupling_direction, ...
-                                                'nClad', obj.background_index );
-                                        
-            % DEBUG show results
-            gratingUI(eme_obj);
-            
-            % save final results
-            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
-            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
-            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
-            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-            final_design.eme_obj                = eme_obj;
-            final_design.final_index            = obj.final_index;
-            final_design.input_wg_type          = obj.input_wg_type;
-            final_design.MFD                    = MFD;
-            obj.final_design                    = final_design;
-            
-            % calculate final up/down directivity
-            obj = obj.calc_final_design_directivity();
-            
-        end     % end runFinalDesignEME()
-        
-        
-        function obj = runFinalDesignEME_fiber_overlap(obj, MFD, fiber_offsets, angles)
-            % mostly for debugging purposes
-            % only runs the fiber oveerlap and not the EME simulation
-            % because its faster lol
-            %
-            % Inputs
-            %   MFD
-            %       units of 'units'
-            %   fiber_offsets
-            %       units of 'units'
-            %   angles
-            %       deg.
-            
-            eme_obj = obj.final_design.eme_obj;
-            
-            % compute fiber overlap
-            um      = 1e6;
-            eme_obj = eme_obj.fiberOverlap( 'zOffset', fiber_offsets * obj.units.scale * um,...
-                                            'angleVec', angles,...
-                                            'MFD', MFD * obj.units.scale * um,...
-                                            'overlapDir', obj.coupling_direction, ...
-                                            'nClad', obj.background_index );
-                                        
-            % save final results
-            final_design.max_coupling_angle     = eme_obj.fiberCoup.optAngle;
-            final_design.max_coupling_offset    = eme_obj.fiberCoup.optZOffset;
-            final_design.max_coupling_eff       = eme_obj.fiberCoup.optCoup;
-            final_design.power_reflection       = eme_obj.scatterProperties.PowerRefl(1,1);
-            final_design.eme_obj                = eme_obj;
-            final_design.final_index            = obj.final_index;
-            obj.final_design                    = final_design;
-            
-        end     % end runFinalDesignEME_fiber_overlap()
-        
-        
-        function [obj, up_down_directivity] = calc_final_design_directivity(obj)
-            % mostly for debugging purposes
-            % calculates the directivity of the final designed grating,
-            % using the field from the simulated eme obj
-            
-            % repeating code from twoLevelGratingCell which I don't like to
-            % do this is bad prog. practice but whatever
-            
-            % define constants (all eme obj units are in um)
-            mu0     = 4*pi*1e-7;                % units of H/m
-            mu0     = mu0 * obj.units.scale;    % units of H/(units)
-            c       = 3e8;                      % units of m/s
-            c       = c/obj.units.scale;        % units of (units)/s
-            omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
-       
-            % grab field and coordinates
-            % defined as Ey in eme obj but Ez in my def.
-            Ez = obj.final_design.eme_obj.fullFields.Ey;
-            dy = obj.final_design.eme_obj.domain.discretization(1);
-            dx = obj.final_design.eme_obj.domain.discretization(2);
-            
-            
-%             % Calc propagating power vs. x
-%             
-%             % H y in , on second to end-1 steps, using entire E_z
-%             % dimensions are y (transverse) vs. x
-%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
-%             
-%             % poynting vector in, dimensions are y vs x(2:end-1)
-%             Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
-% 
-%             % power per x slice
-%             P_per_x_slice = sum( Sx, 1 )*obj.dy;
-            
-
-            % Calculate power radiated up
-            
-            % calculate H_x
-            % dimensions H_x vs. y vs x
-            H_x  = 1/(1i*omega0*mu0) .* ( Ez( 3:end,:) - Ez( 1:end-2,:) )/(2*dy);
-
-            % power flowing across y
-            Sy                  = real( conj( H_x ) .* Ez( 2:end-1,: ) );           % Sy = real( Ez Hx* )
-            P_per_y_slice       = -sum( Sy, 2 )*dx;                                 % using Sy compmonent, for some reason up/down are flipped
-
-            [~, indx_max_up]    = max( P_per_y_slice );
-            [~, indx_max_down]  = min( P_per_y_slice );
-            Sy_up               = Sy( indx_max_up, : );                                 % dimensions Sy vs. x
-            Sy_down             = Sy( indx_max_down, : );
-            
-%             % save to obj
-% %             obj.Sx              = Sx;
-% %             obj.P_per_x_slice 	= P_per_x_slice;
-%             obj.Sy              = Sy;
-%             obj.P_per_y_slice   = P_per_y_slice;
-
-            % calc radiated power (Sy only, not including angle of
-            % incidence)
-            P_rad_up    = sum( abs( Sy_up(:) ) ) * dx;
-            P_rad_down  = sum( abs( Sy_down(:) ) ) * dx;
-            
-            % calc directivity save to object
-            up_down_directivity                  = P_rad_up/P_rad_down;
-            obj.final_design.up_down_directivity = up_down_directivity;
-            
-        end     % end calc_final_design_directivity()
-        
-        
-        function [obj, max_eff_vs_MFD] = calc_eff_vs_MFD(obj, MFDs)
-            % mostly for debugging
-            % plotting max efficiency vs. different MFDs
-            %
-            % returns max efficiency vs. mfd
-            %
-            % Inputs
-            %   MFDs
-            %       type: double, vector
-            %       desc: mode field diameters to try, units 'units'
-            %
-            % Outputs
-            %   max_eff_vs_MFD
-            %       type: 3d tensor, double
-            %       desc: eff vs. 
-            
-            % init vars
-            max_eff_vs_MFD  = zeros(size(MFDs));
-            fiber_offsets   = ( 0:0.5:12 ) * 1e-6 / obj.units.scale;        % units 'units'
-            angles          = 0:0.1:45;
-
-            for ii = 1:length(MFDs)
-
-                fprintf('mfd iteration %i of %i\n', ii, length(MFDs) );
-
-                % run EME sim
-                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
-                % save result
-                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
-
-            end
-            
-        end     % end calc_eff_vs_MFD()
-        
-        
-        function [obj, eff_vs_wavelength_angle] = calc_eff_vs_wavelength(obj, wavelengths)
-            % mostly for debugging
-            % plotting eff. vs. wavelength and angle
-            %
-            % i dont really want to do this right now haha
-            
-            % init vars
-            angles                  = 0:0.1:45;
-            eff_vs_wavelength_angle = zeros( length(wavelengths), length(angles) );     % dimensions eff. vs. wl vs. angle
-            
-            for ii = 1:length(wavelengths)
-               
-                fprintf('wavelength iteration %i of %i\n', ii, length(wavelengths) );
-                
-                % run EME sim
-                obj = obj.runFinalDesignEME_fiber_overlap( MFDs(ii), fiber_offsets, angles );
-                % save result
-                max_eff_vs_MFD(ii) = obj.final_design.max_coupling_eff;
-                
-            end
-            
-            
-        end     % end calc_eff_vs_wavelength()
         
         
         function obj  = sweepPeriodFill(obj)

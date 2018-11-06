@@ -15,10 +15,11 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %       desc: Index distribution
 %   disc
 %       type: double, scalar
-%       desc: discretization size (nm)
+%       desc: discretization size (spatial units are arbitrary, as long as
+%             consistent across all inputs)
 %   k0
 %       type: double, scalar
-%       desc: free-space wavevector (1/nm)
+%       desc: free-space wavevector (1/spatial units)
 %   num_modes
 %       type: integer, scalar
 %       desc: number of modes to solve for
@@ -64,7 +65,6 @@ er = N.^2;
 
 % draw in PMLs
 if PML_options(1) == 1
-    % currently using uniaxial pml formulation
     
     % grab params
     pml_len_nm  = PML_options(2);   % length of pml in nm
@@ -72,54 +72,29 @@ if PML_options(1) == 1
     pml_order   = PML_options(4);   % pml polynomial order
     
     % setup discretizations
-%     ny_pml = 2 * (pml_len_nm/disc); 
     ny_pml = 2 * round(pml_len_nm/disc);                                             % number of discretizations that pml spans, double sampled grid
     if abs(ny_pml - round(ny_pml)) >= 1e-5
         % discretization was not integer value
         error('Integer # of discretizations did not fit into the PML');
     end
     y_indx = 1:ny_pml;
-    
-%     % TEMPORARY CHOOSE THE PML TYPE
-%     if PML_options(5) == 1
-%         % type 1
-%         
-%         % using slide 39 of lecture 9 slides of dr. rumpfs CEM lectures
-%         % setup amplitude
-%         ay = 1 + pml_str * ( y_indx./ny_pml ).^( pml_order );
-%         % setup conductivity
-%         sigmay = ( sin( pi*y_indx./(2*ny_pml) ).^2 );
-%         % combine
-%         eta0    = 376.73031346177;                              % ohms
-%         pml_y   = ( ay.*( 1 + 1i * eta0 * sigmay ) ).';
-%         
-%     elseif PML_options(5) == 2
-        % type 2
         
-        % using polynomial strength pml
-        c       = (3e8) * (1e9);                    % nm/s
-        eps0    = (8.854187817e-12) * (1e-9);       % F/nm
-        omega   = k0*c;                             % rad/s
-%         pml_y   = 1 + ( ( 1i/( omega*eps0 ) ) * pml_str * ( y_indx./ny_pml ).^( pml_order ) ).';
-        pml_y   = (1 + 1i * pml_str * ( y_indx./ny_pml ).^( pml_order )).';
+    % using polynomial strength pml
+%     c       = (3e8) * (1e9);                    % nm/s
+%     eps0    = (8.854187817e-12) * (1e-9);       % F/nm
+%     omega   = k0*c;                             % rad/s
+    pml_y   = (1 + 1i * pml_str * ( y_indx./ny_pml ).^( pml_order )).';
         
-%     end
     
     % draw stretched coordinate pml
     pml_y_all                           = ones( 2*size(N,1), size(N,2) );
     pml_y_all( 1:ny_pml-1, : )          = repmat( flipud( pml_y(1:end-1) ), 1, nx );
     pml_y_all( end-ny_pml+1:end, : )    = repmat( pml_y, 1, nx );
-%     pml_y_all                           = pml_y_all.^(-1);
     
     % stretched coordinate operator
     pml_y_all_vec   = pml_y_all(:);
     Sy_f            = spdiags( 1./pml_y_all_vec(2:2:end), 0, n_elem, n_elem );                % half step for forward Sy
     Sy_b            = spdiags( 1./pml_y_all_vec(1:2:end-1), 0, n_elem, n_elem );              % on grid for backwards Sy
-%     Sy_f = Sy_b;    % DEBUG
-    
-%     % fill in pmls, working with permittivity OLD
-%     er( 1:ny_pml, : )           = er( 1:ny_pml, : ).*repmat( flipud(pml_y), 1, nx );
-%     er( end-ny_pml+1:end, : )   = er( end-ny_pml+1:end, : ).*repmat( pml_y, 1, nx );
     
     % DEBUG plot the pml profile
     if DEBUG
@@ -212,9 +187,7 @@ end
 % shift diag1
 diag1( 2:end ) = diag1( 1:end-1 );
 % stitch together the diags
-% diag_all        = [ diagBC, diag0, diag1 ];
 diag_all        = [ diag0, diag1 ];
-% diag_indexs     = [ -(ny-1), 0, 1 ];
 diag_indexs     = [ 0, 1 ];
 % make sparse matrix
 Dy_f    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
@@ -232,12 +205,9 @@ if BC == 1
     % PMC
     diag0( 1:ny:end ) = 0;
 end
-% diagBC              = zeros(n_elem, 1);             % diag 0 + (ny-1)
-% diagBC( 1:ny:end )  = 0;                            % again, force PEC for now
+
 % stitch together the diags
-% diag_all        = [ diagm1, diag0, diagBC ];
 diag_all        = [ diagm1, diag0 ]; 
-% diag_indexs     = [ -1, 0, ny-1 ];
 diag_indexs     = [ -1, 0 ];
 % make sparse matrix
 Dy_b    = (1/disc)*spdiags( diag_all, diag_indexs, n_elem, n_elem );
@@ -257,8 +227,6 @@ Dy2 = Dy_b*Dy_f;
 % spy( Dy_b );
 % title('DEBUG d_y backward');
 
-
-
 % generate Dx forward
 diag0           = -ones( n_elem, 1 );
 diagP           = ones( n_elem, 1 ); 
@@ -267,7 +235,6 @@ diag_all        = [ diagBC, diag0, diagP ];
 diag_indexes    = [ -(n_elem-ny), 0, ny ];
 % make sparse matrix
 Dx_f    = (1/disc)*spdiags( diag_all, diag_indexes, n_elem, n_elem );
-
 
 % generate Dx backward
 diag0           = ones( n_elem, 1 );
@@ -286,10 +253,8 @@ Dx_b    = (1/disc)*spdiags( diag_all, diag_indexes, n_elem, n_elem );
 % spy( Dx_b );
 % title('DEBUG d_x backward');
 
-
 % generate Dx squared
 Dx2 = Dx_b*Dx_f;
-
 
 % make eigenvalue eq
 n2      = spdiags( er(:), 0, n_elem, n_elem );
