@@ -43,12 +43,13 @@ synth_obj   = synth_obj.generate_design_space( fill_bots, fill_top_bot_ratio, ve
 % directivity vs. fill
 figure;
 imagesc( synth_obj.sweep_variables.fill_bots, ...
-         synth_obj.sweep_variables.fill_top_bot_ratio, ...
+         synth_obj.sweep_variables.fill_top_bot_fill_ratio.*, ...
          10*log10( synth_obj.sweep_variables.directivities_vs_fills ) );
 colorbar; set( gca, 'ydir', 'normal' );
-xlabel('bottom fill factor'); ylabel('top bottom fill ratio');
+xlabel('bottom fill factor'); ylabel('top fill factor');
 title('Directivity (dB) vs. fill factors');
-
+savefig('dir_v_ff.fig');
+saveas(gcf, 'dir_v_ff.png');
 % 
 % % directivity vs. fill, saturated
 % dir_v_fill_sat                                  = 10*log10(Q.directivities_vs_fills);
