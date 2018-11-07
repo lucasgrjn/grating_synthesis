@@ -148,6 +148,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % y_coords
         % input_wg_type
         
+        % debug options
+        % a struct that holds debugging options
+        % currently saved fields:
+        %   verbose
+        debug_options;
+        
 %         input_wg_type;  % 'bottom' or 'full
         
     end
@@ -173,7 +179,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end constructor()
 
         
-        function obj = generate_design_space( obj )
+        function obj = generate_design_space( obj, fill_bots, fill_top_bot_ratio, verbose )
             % Generates the design space vs. fill factors
             % picking optimum offset and period for highest directivity and
             % closest angle to desired
@@ -181,15 +187,40 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % based on synthesizeGaussianGrating
             %
             % would be good to implement: option to save GC data or not
-            
+            %
+            % Inputs:
+            %   fill_bots
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing
+            %   fill_top_bot_ratio
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing
+            %   verbose
+            %       type: double, array
+            %       desc: OPTIONAL Currently mostly for testing, spits out
+            %             a bunch of stuff to the prompt
             
             tic;
             fprintf('Sweeping fill factors for directivity and angle...\n');
             
+            % set verbose options
+            if ~exist('verbose', 'var')
+                % default verbose off
+                obj.debug_options.verbose = false;
+            else
+                obj.debug_options.verbose = verbose;
+            end
+            
             % set fill factors and offsets
-            fill_bots           = fliplr( 0.4:0.025:0.975 );
-            fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
-%             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
+            if ~exist('fill_bots', 'var')
+                % default fill
+                fill_bots           = fliplr( 0.4:0.025:0.975 );
+            end
+            if ~exist('fill_top_bot_ratio', 'var')
+                % default fill
+                fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
+            end
+            %             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
 %             fill_bots           = fliplr( 0.95:0.025:0.975 );
 %             fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
 %             fill_bots           = fliplr( 0.475:0.025:0.975 );
@@ -534,7 +565,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             fprintf('Sweeping offsets...\n');
             for i_offset = 1:length( offset_ratios )
 
-%                 fprintf('Sweeping offset %i of %i\n', 
+                % verbose printing
+                if obj.debug_options.verbose == true
+                    fprintf('Sweeping offset %i of %i\n', i_offset, length(offset_ratios) );
+                end
                 
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
@@ -657,7 +691,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             while ~angle_err_sign_flip
 
                 i_period = i_period + 1;
-
+                
+                % verbose printing
+                if obj.debug_options.verbose == true
+                    fprintf('Sweeping period %i\n', i_period );
+                end
+                
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
                                                obj.units.name, ...
