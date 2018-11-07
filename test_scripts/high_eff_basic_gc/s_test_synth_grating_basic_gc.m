@@ -36,7 +36,7 @@ fill_bots           = fliplr( 0.95:0.025:0.975 );
 fill_top_bot_ratio  = fliplr( 0.975:0.025:1.0 );
 % run generation
 verbose     = true;
-synth_obj   = synth_obj.generate_design_space( fill_bots, fill_top_bot_ratio, verbose );
+synth_obj   = synth_obj.generate_design_space( fill_bots, fill_top_bot_ratio );
 
 % Plot results
 
