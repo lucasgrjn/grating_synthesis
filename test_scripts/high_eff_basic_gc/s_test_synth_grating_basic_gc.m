@@ -29,6 +29,9 @@ synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
                                       'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
                                       );
 
+                                  
+% DEBUG run the function
+% f_run_synth_grating_basic_gc( lambda, optimal_angle );
         
 % generate design space
 % a small test scenario
