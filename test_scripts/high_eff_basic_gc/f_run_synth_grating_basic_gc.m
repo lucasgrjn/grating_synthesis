@@ -19,7 +19,7 @@ function [] = f_run_synth_grating_basic_gc( lambda, optimal_angle )
 disc                = 10;
 units               = 'nm';
 % lambda              = 1250;
-index_clad          = 1.0; % 1.448;
+index_clad          = 1.45; % 1.448;
 y_domain_size       = 2500;
 % optimal_angle       = 20;             % still useful
 coupling_direction  = 'down';
@@ -47,7 +47,9 @@ synth_obj
 
 % design space fills
 fill_bots           = fliplr( 0.025:0.025:0.975 );
-fill_top_bot_ratio  = fliplr( 0.025:0.025:2.0 );
+fill_top_bot_ratio  = fliplr( 0.025:0.025:2.5 );
+% fill_bots           = fliplr( 0.95:0.025:0.975 );
+% fill_top_bot_ratio  = fliplr( 0.95:0.025:0.975 );
 
 % run design space generation
 tic;
@@ -57,9 +59,13 @@ toc;
 fprintf('Design space generation sweep is done\n');
 fprintf('Saving data...\n');
 
+% make folder to save to
+save_data_path = [ pwd filesep synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
+mkdir( save_data_path );
+
 % clear the GC from the data and save
 % synth_obj.sweep_variables.GC_vs_fills = zeros( size(synth_obj.sweep_variables.GC_vs_fills) );
-save( [ 'synth_obj_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_NO_GC' '.mat' ], 'synth_obj', '-v7.3' );
+save( [  save_data_path filesep 'synth_obj_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_NO_GC' '.mat' ], 'synth_obj', '-v7.3' );
 
 fprintf('Data saved\n');
 
@@ -72,7 +78,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) vs. fill factors');
 figure_name = [ 'dir_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % directivity BEFORE sweeping periods vs. fill
 figure;
@@ -81,7 +87,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
 figure_name = [ 'dir_b4_period_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % angles vs. fill
 figure;
@@ -92,7 +98,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Angles (deg) vs. fill factors');
 figure_name = [ 'angle_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % scattering strength (imaginary) alpha vs. fill
 figure;
@@ -103,7 +109,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Scattering strength (imaginary) vs. fill factors');
 figure_name = [ 'scatter_str_imag_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % scattering strength alpha vs. fill
 figure;
@@ -114,7 +120,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Scattering strength (real) vs. fill factors');
 figure_name = [ 'scatter_str_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % period vs. fill
 figure;
@@ -125,7 +131,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title(['Period (' synth_obj.units.name ') vs. fill factors']);
 figure_name = [ 'period_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % offset vs. fill
 figure;
@@ -136,7 +142,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Offset vs. fill factors');
 figure_name = [ 'offsets_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 % k vs. fill
 figure;
@@ -147,7 +153,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Real k vs. fill factors');
 figure_name = [ 'k_real_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 figure;
 imagesc( synth_obj.sweep_variables.fill_top_bot_ratio, ...
@@ -157,7 +163,7 @@ colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top/bottom fill ratio'); ylabel('bottom fill factor');
 title('Imag k vs. fill factors');
 figure_name = [ 'k_imag_v_ff_' synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
-save_fig_multiformat( gcf, pwd, figure_name );
+save_fig_multiformat( gcf, save_data_path, figure_name );
 
 
 % % TEMP remove sat
