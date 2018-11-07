@@ -46,8 +46,8 @@ synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
 synth_obj
 
 % design space fills
-fill_bots           = fliplr( 0.4:0.025:0.975 );
-fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
+fill_bots           = fliplr( 0.025:0.025:0.975 );
+fill_top_bot_ratio  = fliplr( 0.025:0.025:2.0 );
 
 % run design space generation
 tic;
