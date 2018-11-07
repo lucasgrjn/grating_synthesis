@@ -13,7 +13,7 @@ function [] = f_run_synth_grating_basic_gc( lambda, optimal_angle )
 % clear; close all;
 
 % dependencies
-addpath( genpath( [ '..' filesep '..' ] ) );                                % all synth grating code
+% addpath( genpath( [ '..' filesep '..' ] ) );                                % all synth grating code
 
 % initial settings
 disc                = 10;
