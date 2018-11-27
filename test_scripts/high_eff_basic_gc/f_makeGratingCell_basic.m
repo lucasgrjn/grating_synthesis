@@ -74,7 +74,7 @@ t_Si_top        = 100;
 % draw two levels using two level builder function
 % the inputs are organized [ top level, bottom level ]
 wg_thick        = [ t_Si_top, t_Si_bottom ];
-wg_min_y        = [ domain_y_half-t_Si_bottom, domain_y_half ];
+wg_min_y        = [ domain_y_half, domain_y_half-t_Si_bottom ];
 wgs_duty_cycles = [ fill_top, fill_bot ];
 wgs_offsets     = [ 0, offset_ratio*period ];
 GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, [ n_Si, n_Si ], ...

@@ -838,7 +838,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_top_bot_ratio, obj.sweep_variables.fill_bots );
             
             % set invert/normal threshold
-            invert_normal_top_bot_ratio_thresh = 0.6;
+            invert_normal_top_bot_ratio_thresh = 0.8;
 
             
             % TODO CLEAN THIS SECTION UP
