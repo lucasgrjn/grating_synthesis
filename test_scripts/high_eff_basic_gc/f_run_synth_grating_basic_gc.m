@@ -1,4 +1,4 @@
-function [] = f_run_synth_grating_basic_gc( lambda, optimal_angle )
+function [] = f_run_synth_grating_basic_gc( lambda, optimal_angle, layer_thick )
 % authors: bohan
 % 
 % script for testing the latest synthesis object on the scc
@@ -9,6 +9,8 @@ function [] = f_run_synth_grating_basic_gc( lambda, optimal_angle )
 %       wavelength in nm
 %   optimal_angle
 %       angle in deg, can be negative
+%   layer_thick
+%       layer thickness, in nm
 
 % clear; close all;
 
@@ -29,6 +31,13 @@ data_notes          = ['lambda ' num2str(lambda) ' optimal angle ' num2str(optim
 fprintf('Inputs are:\n');
 fprintf('Wavelength: %f %s\n', lambda, units);
 fprintf('Angle: %f degrees\n', optimal_angle);
+fprintf('Layer thickness: %f %s\n', layer_thick, units);
+
+% make grating cell function
+h_makeGratingCell = @(dxy, units, lambda, background_index, y_domain_size, ...
+                      period, fill_top, fill_bot, offset_ratio) ...
+                      f_makeGratingCell_basic( dxy, units, lambda, background_index, y_domain_size, ...
+                                         period, fill_top, fill_bot, offset_ratio, layer_thick )
 
 % make synthesis object
 synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
@@ -39,7 +48,7 @@ synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
                                       'optimal_angle',     optimal_angle, ...
                                       'data_notes',        data_notes, ...
                                       'coupling_direction', coupling_direction, ...
-                                      'h_makeGratingCell', @f_makeGratingCell_basic ...
+                                      'h_makeGratingCell', h_makeGratingCell ...
                                       );
 
 % display Q for logging purposes
@@ -60,7 +69,7 @@ fprintf('Design space generation sweep is done\n');
 fprintf('Saving data...\n');
 
 % make folder to save to
-save_data_path = [ pwd filesep synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) ];
+save_data_path = [ pwd filesep synth_obj.start_time 'lambda' num2str(lambda) '_optangle' num2str(optimal_angle) '_thick' num2str(layer_thick) ];
 mkdir( save_data_path );
 
 % clear the GC from the data and save

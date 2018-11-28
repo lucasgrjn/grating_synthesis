@@ -12,15 +12,16 @@ addpath(genpath('C:\Users\bz\git\grating_synthesis'));                      % gr
 addpath(genpath('C:\Users\beezy\git\grating_synthesis'));                   % grating synthesis codes
 
 % synthesis object to load
-filename = 'synth_obj_2018_11_08_15_42_29_lambda1300_optangle-15_NO_GC.mat';
-filepath = 'C:\Users\beezy\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_08_15_42_29_lambda1300_optangle-15';
+filename = 'synth_obj_2018_11_26_20_58_26_lambda1300_optangle-15_NO_GC.mat';
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_26_20_58_26_lambda1300_optangle-15';
 
 % load synth_obj
 load( [ filepath filesep filename ] );
 
 % synthesize final design
-MFD             = 10 * 1e3;                                                         % in nm
+MFD             = 10.4 * 1e3;                                                         % in nm
 input_wg_type   = 'bottom';
+fill_thresh     = 0.50;
 synth_obj       = synth_obj.generate_final_design_gaussian( MFD, input_wg_type );
 
 % plot final design

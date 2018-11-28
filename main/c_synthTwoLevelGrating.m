@@ -781,7 +781,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function optimizePeriodOffset()
         
         
-        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type)
+        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type, invert_normal_top_bot_ratio_thresh)
             % function for generating the final synthesized design
             % parameters
             %
@@ -793,6 +793,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       type: string
             %       desc: 'bottom' for cSi only or 'full' for both cSi and
             %             pSi
+            %   invert_normal_top_bot_ratio_thresh
+            %       type: double, scalar
+            %       desc: OPTIONAL: top/bottom fill factor threshold
+            %             currently for my own debugging purposes
             %
             % Sets these fields: (not updated)
             %   obj.dir_synth                   = [];
@@ -838,7 +842,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_top_bot_ratio, obj.sweep_variables.fill_bots );
             
             % set invert/normal threshold
-            invert_normal_top_bot_ratio_thresh = 0.8;
+            if ~exist( 'invert_normal_top_bot_ratio_thresh', 'var' )
+                invert_normal_top_bot_ratio_thresh = 0.6;
+            end
 
             
             % TODO CLEAN THIS SECTION UP
