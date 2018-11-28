@@ -781,7 +781,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function optimizePeriodOffset()
         
         
-        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type)
+        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type, invert_normal_top_bot_ratio_thresh)
             % function for generating the final synthesized design
             % parameters
             %

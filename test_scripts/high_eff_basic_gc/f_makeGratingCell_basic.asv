@@ -38,7 +38,7 @@ function GC = f_makeGratingCell_basic( dxy, units, lambda, background_index, y_d
 %       desc: ratio of bottom layer offset to period
 %   layer_thick
 %       type: double, scalar
-%       desc: OPTIONAL each layer thickness, defaults to 100nm
+%       
 %
 % outputs:
 %   GC
@@ -70,15 +70,14 @@ n_Si    = 3.47;
 
 % define layer thicknesses (nm)
 domain_y_half   = round( (domain_size(1)/2) /GC.dy) * GC.dy;
-if ~exist( 'layer_thick', 'var' )
-    layer_thick = 100;
-end
+t_Si_bottom     = 100;
+t_Si_top        = 100;
                         
 % draw cell
 % draw two levels using two level builder function
 % the inputs are organized [ top level, bottom level ]
-wg_thick        = [ layer_thick, layer_thick ];
-wg_min_y        = [ domain_y_half, domain_y_half-layer_thick ];
+wg_thick        = [ t_Si_top, t_Si_bottom ];
+wg_min_y        = [ domain_y_half, domain_y_half-t_Si_bottom ];
 wgs_duty_cycles = [ fill_top, fill_bot ];
 wgs_offsets     = [ 0, offset_ratio*period ];
 GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, [ n_Si, n_Si ], ...
