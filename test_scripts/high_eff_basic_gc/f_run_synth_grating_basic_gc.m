@@ -56,7 +56,7 @@ synth_obj
 
 % design space fills
 fill_bots           = fliplr( 0.025:0.025:0.975 );
-fill_top_bot_ratio  = fliplr( 0.025:0.025:2.5 );
+fill_top_bot_ratio  = fliplr( 0.025:0.025:1.5 );
 % fill_bots           = fliplr( 0.95:0.025:0.975 );
 % fill_top_bot_ratio  = fliplr( 0.95:0.025:0.975 );
 
