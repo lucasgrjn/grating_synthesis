@@ -12,8 +12,13 @@ addpath(genpath('C:\Users\bz\git\grating_synthesis'));                      % gr
 addpath(genpath('C:\Users\beezy\git\grating_synthesis'));                   % grating synthesis codes
 
 % synthesis object to load
+% best grating so far, lambda 1300 angle -15 deg
 filename = 'synth_obj_2018_11_26_20_58_26_lambda1300_optangle-15_NO_GC.mat';
 filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_26_20_58_26_lambda1300_optangle-15';
+% 150nm thick layers
+filename = 'synth_obj_2018_11_28_11_59_42_lambda1300_optangle-15_NO_GC';
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_28_11_59_42_lambda1300_optangle-15_thick150';
+
 
 % load synth_obj
 load( [ filepath filesep filename ] );
