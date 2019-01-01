@@ -1,10 +1,11 @@
 % authors: bohan
-
-% Script for testing and debugging the new two level grating cell class
+% A simple script for testing the basic grating cell class
+% Can be used to debug the grating cell class
 
 clear; close all;
 
-addpath(['..' filesep 'main']);
+% Dependencies
+addpath( genpath( ['..' filesep '..' ] ));
 
 % initial settings
 disc        = 10;
@@ -25,7 +26,7 @@ GC = c_twoLevelGratingCell(  'discretization', disc, ...
 % draw cell
 % draw two levels using two level builder function
 % the inputs are organized [ top level, bottom level ]
-fill            = 0.9;
+fill            = 0.8;
 ratio           = 1.0;
 offset          = 0.0;
 period          = domain(2);
@@ -33,7 +34,6 @@ wg_index        = [ 3.4, 3.4 ];
 wg_thick        = [ 100, 100 ];
 wg_min_y        = [ domain(1)/2, domain(1)/2-wg_thick(1) ];
 wgs_duty_cycles = [ fill*ratio, fill ];
-% wgs_offsets     = [ 0, offset*period ];
 wgs_offsets     = [ 0, 200 ];
 GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
                                         wgs_duty_cycles, wgs_offsets );

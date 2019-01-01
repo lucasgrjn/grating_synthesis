@@ -1,0 +1,15 @@
+digraph "run"
+{
+ // LATEX_PDF_SIZE
+  edge [fontname="FreeSans",fontsize="10",labelfontname="FreeSans",labelfontsize="10"];
+  node [fontname="FreeSans",fontsize="10",shape=record];
+  rankdir="RL";
+  Node33 [label="run",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black",tooltip="Loop over accepting connections and updating."];
+  Node33 -> Node34 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
+  Node34 [label="updateBar",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$class_parfor_progress_monitor_1_1_prog_server.html#a53af36f24a8ebba1e6283fe659e87c35",tooltip="On the EDT, update the progress bar."];
+  Node34 -> Node35 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
+  Node35 [label="increment",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$class_parfor_progress_monitor_1_1_prog_server.html#aa26c3d3c6c423915c88815088e4ca9eb",tooltip="Provide public access to this for pool-close PARFORs."];
+  Node35 -> Node36 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
+  Node36 [label="acceptAndIncrement",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$class_parfor_progress_monitor_1_1_prog_server.html#a10b53f040e74de858999f6010878c036",tooltip="If there's a connection - accept and then disconnect; increment our count."];
+  Node36 -> Node33 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
+}
