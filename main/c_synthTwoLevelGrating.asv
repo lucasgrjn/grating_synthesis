@@ -668,14 +668,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 for i_ff_top = 2:n_fill_tops
                     % for each top/bottom fill factor ratio
 
-                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_top, n_fill_tops, i_ff_bot, n_fill_bots);
+                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_ratio, n_fill_tops, i_ff_bot, n_fill_bots);
                         
-                    fill_top = fill_tops(i_ff_top);
-                    
                     % Optimize period and offset
-%                     fill_top = fill_top_bot_ratio(i_ff_ratio) * fill_bot;
+                    fill_top = fill_top_bot_ratio(i_ff_ratio) * fill_bot;
                     if fill_top < 1
-                        % Only run optimization if theres a perturbation 
+                            % Only run optimization if theres a perturbation 
                             
                         % run optimization loop and save data
                         [ ~, best_period, best_offset, best_directivity, ...
@@ -688,14 +686,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                                       sim_opts, ...
                                                       guess_GC );
                                         
-                        periods_vs_fills( i_ff_bot, i_ff_top )        = best_period;
-                        offsets_vs_fills( i_ff_bot, i_ff_top )        = best_offset;
-                        directivities_vs_fills( i_ff_bot, i_ff_top )  = best_directivity;
-                        angles_vs_fills( i_ff_bot, i_ff_top )         = best_angle;
-                        scatter_str_vs_fills( i_ff_bot, i_ff_top )    = best_scatter_str;
+                        periods_vs_fills( i_ff_bot, i_ff_ratio )        = best_period;
+                        offsets_vs_fills( i_ff_bot, i_ff_ratio )        = best_offset;
+                        directivities_vs_fills( i_ff_bot, i_ff_ratio )  = best_directivity;
+                        angles_vs_fills( i_ff_bot, i_ff_ratio )         = best_angle;
+                        scatter_str_vs_fills( i_ff_bot, i_ff_ratio )    = best_scatter_str;
 %                         GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
-                        k_vs_fills( i_ff_bot, i_ff_top )              = best_k;
-                        dir_b4_period_vs_fills( i_ff_bot, i_ff_top )  = dir_b4_period_vs_fill;
+                        k_vs_fills( i_ff_bot, i_ff_ratio )              = best_k;
+                        dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )  = dir_b4_period_vs_fill;
                 
                         % update the guess parameters, period, k, offset
                         guessk              = best_k;
@@ -708,20 +706,23 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %                         guess_offset        = offsets_vs_fills( i_ff_bot, i_ff_ratio );
                             
                     else
-                        % at least one of the layers is not perturbed, so there is no optimization to run
-                        % save dummy values
-                        directivities_vs_fills( i_ff_bot, i_ff_top )    = 1;
-                        angles_vs_fills( i_ff_bot, i_ff_top )           = 0;
-                        scatter_str_vs_fills( i_ff_bot, i_ff_top )      = 0;
-                        periods_vs_fills( i_ff_bot, i_ff_top )          = guess_period;
-                        offsets_vs_fills( i_ff_bot, i_ff_top )          = 0;
-                        k_vs_fills( i_ff_bot, i_ff_top )                = guessk;
+                        % we're in a waveguide, there's no reason to run
+                        % the optimization (and actually the period sweep
+                        % bugs out when the fill = 100%)
+
+                        % save dummy 
+                        directivities_vs_fills( i_ff_bot, i_ff_ratio )    = 1;
+                        angles_vs_fills( i_ff_bot, i_ff_ratio )           = 0;
+                        scatter_str_vs_fills( i_ff_bot, i_ff_ratio )      = 0;
+                        periods_vs_fills( i_ff_bot, i_ff_ratio )          = guess_period;
+                        offsets_vs_fills( i_ff_bot, i_ff_ratio )          = 0;
+                        k_vs_fills( i_ff_bot, i_ff_ratio )                = guessk;
 %                         GC_vs_fills{ i_ff_bot, i_ff_ratio }               = waveguide;
-                        dir_b4_period_vs_fills( i_ff_bot, i_ff_top )    = 1;
+                        dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )    = 1;
 
                     end     % end if fill_top < 1
 
-                end     % end for i_ff_top = ...
+                end     % end for i_ff_ratio = ...
                 
 %                 periods_vs_fills( i_ff_bot, 2:end ) = p_v_fill_thisbot;
 
