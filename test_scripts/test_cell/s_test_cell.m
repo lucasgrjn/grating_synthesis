@@ -1,6 +1,8 @@
 % authors: bohan
 % A simple script for testing the basic grating cell class
 % Can be used to debug the grating cell class
+%
+% needs some cleaning up and editing
 
 clear; close all;
 
