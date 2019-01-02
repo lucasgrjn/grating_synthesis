@@ -1,87 +1,103 @@
+%> Class for simulating a bloch cell, using FDFD complex-k solver
+%>
+%> Authors: bohan zhang
+%>
+%> Description:
+%>
+%> Notes:
+%>   - propagation direction coordinate is 'x'. 
+%>   - transverse (in plane) direction coordinate is 'y'.
+%>   - transverse (out of plane) direction is 'z'.
+%>
+%> Inputs to constructor: \n 
+%>   Inputs are name-value pairs: \n
+%>   'discretization' \n
+%>       type: double, scalar or 1x2 vector \n
+%>       desc: discretization along x and y, in units of 'units' \n
+%>             if scalar, then dx = dy = discretization \n
+%>             if vector, then discretization = [ dy dx ] \n
+%>
+%>   'units' \n
+%>       type: string \n
+%>       desc: name and scaling of spatial units, supports 'm' \n
+%>             (meters), 'mm' (millimeters), 'um' (microns), 'nm' \n
+%>             (nanometers) \n
+%>
+%>   'lambda' \n
+%>       type: double, scalar \n
+%>       desc: wavelength to solve at, in units 'units' \n
+%>
+%>   'background_index' \n
+%>       type: double, scalar \n
+%>       desc: value of background index \n
+%>
+%>   'domain_size' \n
+%>       type: 1x2 array, double \n
+%>       desc: domain size, [ y height, x length ] \n
+%>
+%>   'num_cells' \n
+%>       type: integer, scalar \n
+%>       desc: OPTIONAL: pick the number of grating cells to repeat when \n
+%>             drawing/calculating Ez \n
+%>
+%> Example usage:
 classdef c_bloch_cell
-% Class for simulating a bloch cell, using FDFD complex-k solver
-%
-% Authors: bohan zhang
-%
-% Description:
-%
-% Notes:
-%   - propagation direction coordinate is 'x'. 
-%   - transverse (in plane) direction coordinate is 'y'.
-%   - transverse (out of plane) direction is 'z'.
-%
-% Inputs to constructor:
-%   Inputs are name-value pairs:
-%   'discretization'
-%       type: double, scalar or 1x2 vector
-%       desc: discretization along x and y, in units of 'units'
-%             if scalar, then dx = dy = discretization
-%             if vector, then discretization = [ dy dx ]
-%
-%   'units'
-%       type: string
-%       desc: name and scaling of spatial units, supports 'm'
-%             (meters), 'mm' (millimeters), 'um' (microns), 'nm'
-%             (nanometers)
-%
-%   'lambda'
-%       type: double, scalar
-%       desc: wavelength to solve at, in units 'units'
-%
-%   'background_index'
-%       type: double, scalar
-%       desc: value of background index
-%
-%   'domain_size'
-%       type: 1x2 array, double
-%       desc: domain size, [ y height, x length ]
-%
-%   'num_cells'
-%       type: integer, scalar
-%       desc: OPTIONAL: pick the number of grating cells to repeat when
-%             drawing/calculating Ez
-%
-% Example usage:
     
     properties
         
-        N;                  % index profile
-        dx;                 % discretization in x (dir of propagation)
-        dy;                 % discretization in y (transverse direction)
-        units;              % name and scaling of spatial units, supports 'm', 'mm', 'um', 'nm'
-        lambda;             % free space wavelength, units 'units'
-        domain_size;        % [ max_y, max_x ], where y = transverse and x = direction of propagation
-        x_coords;           % vector of x coordinates (dir of prop)
-        y_coords;           % vector of y coords (transverse dir)
+        %> index profile
+        N;              
+        %> discretization in x (dir of propagation)
+        dx;                 
+        %> discretization in y (transverse direction)
+        dy;
+        %> name and scaling of spatial units, supports 'm', 'mm', 'um', 'nm'
+        units;
+        %> free space wavelength, units 'units'
+        lambda;
+        %> [ max_y, max_x ], where y = transverse and x = direction of propagation
+        domain_size;
+        %> vector of x coordinates (dir of prop)
+        x_coords;
+        %> vector of y coords (transverse dir)
+        y_coords;           
         
-        % struct that holds simulation options
-        % current options are:
-        %   'num_modes'     - number of modes
-        %   'BC'            - boundary conditions, 0 for pec 1 for pmc i think
-        %   'pml_options'   - pml options, see complexk solver for details
-        %                     PML_options(1): PML in y direction (yes=1 or no=0)
-        %                     PML_options(2): length of PML layer in nm
-        %                     PML_options(3): strength of PML in the complex plane
-        %                     PML_options(4): PML polynomial order (1, 2, 3...)
+        %> struct that holds simulation options \n
+        %> current options are: \n
+        %>  'num_modes'     - number of modes \n
+        %>   'BC'            - boundary conditions, 0 for pec 1 for pmc i think \n
+        %>   'pml_options'   - pml options, see complexk solver for details \n
+        %>                     PML_options(1): PML in y direction (yes=1 or no=0) \n
+        %>                     PML_options(2): length of PML layer in nm \n
+        %>                     PML_options(3): strength of PML in the complex plane \n
+        %>                     PML_options(4): PML polynomial order (1, 2, 3...) \n
         sim_opts;
         
-        % mode characteristics
-        k;                  % complex k, units rad/'units'
-        Phi;                % field envelope
-        numcells;           % number of cells repeated in E_z
-        E_z                 % saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
-        k_vs_mode;          % k vs mode #
-        Phi_vs_mode;        % Phi vs mode #, dimensions y vs. x vs mode #
-        chosen_mode_num;    % which mode was chosen
-        E_z_for_overlap;    % Field for mode overlapping. One unit cell with only real(k) in the phase
+        %> mode characteristics
+        %> complex k, units rad/'units'
+        k;                  
+        %> field envelope
+        Phi;                
+        %> number of cells repeated in E_z
+        numcells;           
+        %> saves n_periods of the field, Phi(x,y)*exp(jkx) (z stands for z polarization)
+        E_z                 
+        %> k vs mode #
+        k_vs_mode;          
+        %> Phi vs mode #, dimensions y vs. x vs mode #
+        Phi_vs_mode;        
+        %> which mode was chosen
+        chosen_mode_num;    
+        %> Field for mode overlapping. One unit cell with only real(k) in the phase
+        E_z_for_overlap;    
         
-        % DEBUG struct for holding temporary values that are useful during
-        % debugging
-        %   Current fields: k_all, phi_all, unguided_power, guided_power,
-        %                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down, Sx_in
-        %                   P_rad_up_onecell, P_rad_down_onecell,
-        %                   Sx, Sy, P_per_y_slice, P_per_x_slice
-        %   Some of the above fields may have been removed.
+        %> DEBUG struct for holding temporary values that are useful during
+        %> debugging
+        %>   Current fields: k_all, phi_all, unguided_power, guided_power,
+        %>                   p_rad_up, Sx_up, Sx_down, Sy_up, Sy_down, Sx_in
+        %>                   P_rad_up_onecell, P_rad_down_onecell,
+        %>                   Sx, Sy, P_per_y_slice, P_per_x_slice
+        %>   Some of the above fields may have been removed.
         debug;
         
     end     % end properties
@@ -90,8 +106,7 @@ classdef c_bloch_cell
     methods
         
         % -----------------------------------------------------------------
-        % Constructor
-        
+        %> Constructor
         function obj = c_bloch_cell( varargin )
             
             % parse inputs
@@ -170,94 +185,98 @@ classdef c_bloch_cell
         % -----------------------------------------------------------------
         % Drawing functions
         
+        % -----------------
+        %> Draws a horizontal layer of dielectric
+        %>
+        %> Inputs:
+        %>   min_y
+        %>       Desc: scalar double, minimum y
+        %>   height_y
+        %>       Desc: scalar double, height/thickness of layer
+        %>   index
+        %>       Desc: scalar double, index of refraction of layer
         function obj = addLayer( obj, min_y, height_y, index )
-            % Draws a horizontal layer of dielectric
-            %
-            % Inputs:
-            %   min_y
-            %       Desc: scalar double, minimum y
-            %   height_y
-            %       Desc: scalar double, height/thickness of layer
-            %   index
-            %       Desc: scalar double, index of refraction of layer
+
             
             y = obj.y_coords;
             
             % fill in the layer
-            obj.N( y > (min_y - obj.dy/2) & y <= (min_y + height_y - obj.dy/2), : ) = index; 
+            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y + obj.dy/2), : ) = index; 
             
         end     % end function addLayer()
         
+        % -----------------
+        %> Draws a rectangle
+        %>
+        %> Inputs:
+        %>   min_x
+        %>       Desc: scalar double, left edge of rectangle
+        %>   min_y
+        %>       Desc: scalar double, bottom edge of rectangle
+        %>   width_x
+        %>       Desc: scalar double, width of rectangle
+        %>   height_y
+        %>       Desc: scalar double, height of rectangle
+        %>   index
+        %>       Desc: index of refraction
         function obj = addRect( obj, min_x, min_y, width_x, height_y, index )
-            % Draws a rectangle
-            %
-            % Inputs:
-            %   min_x
-            %       Desc: scalar double, left edge of rectangle
-            %   min_y
-            %       Desc: scalar double, bottom edge of rectangle
-            %   width_x
-            %       Desc: scalar double, width of rectangle
-            %   height_y
-            %       Desc: scalar double, height of rectangle
-            %   index
-            %       Desc: index of refraction
+            
             
             x = obj.x_coords;
             y = obj.y_coords;
             
             % fill in the rect
-            obj.N( y > (min_y - obj.dy/2) & y <= (min_y + height_y - obj.dy/2), ...
-                    x > (min_x - obj.dx/2) & x <= (min_x + width_x - obj.dx/2) ) = index; 
+            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y + obj.dy/2), ...
+                    x > (min_x - obj.dx/2) & x < (min_x + width_x + obj.dx/2) ) = index; 
             
         end     % end function addRect()
         
         % -----------------------------------------------------------------
         % Running simulations
         
+        % -----------------
+        %> Runs new mode solver
+        %>
+        %> Description:
+        %>   Runs complex-k mode solver. Stores the mode with the most
+        %>   guided power. Calculates up/down power, directivity,
+        %>   angle of maximum radiation, and scattering strength.
+        %>
+        %> Inputs:
+        %>   num_modes
+        %>       type: integer
+        %>       desc: # of modes (max) to simulate
+        %>   BC
+        %>       type: integer
+        %>       desc: 0 for PEC, 1 for PMC
+        %>   pml_options
+        %>       type: array, double
+        %>       desc: 1x4 Array with the following elements:
+        %>               PML_options(1): PML in y direction (yes=1 or no=0)
+        %>               PML_options(2): length of PML layer in nm
+        %>               PML_options(3): strength of PML in the complex plane
+        %>               PML_options(4): PML polynomial order (1, 2, 3...)
+        %>   guessk
+        %>       type: scalar, double (can be complex)
+        %>       desc: guess k value. Works best when closest to desired
+        %>             mode. In units rad/'units'
+        %>   OPTS
+        %>       type: struct
+        %>       desc: optional options with the following fields
+        %>           'mode_to_overlap'
+        %>               type: matrix, double
+        %>               desc: mode to overlap
+        %>
+        %> Sets these properties:
+        %>   obj.k
+        %>       units rad/'units'
+        %>   obj.Phi
+        %>       dimensions y vs. x (x is dir. of propagation)
+        %>   obj.E_z
+        %>       field repeated, i can't remember why or if i use this
+        %>   obj.directivity
+        %>       up/down power ratio
         function obj = runSimulation( obj, num_modes, BC, pml_options, guessk, OPTS )
-            % Runs new mode solver
-            %
-            % Description:
-            %   Runs complex-k mode solver. Stores the mode with the most
-            %   guided power. Calculates up/down power, directivity,
-            %   angle of maximum radiation, and scattering strength.
-            %
-            % Inputs:
-            %   num_modes
-            %       type: integer
-            %       desc: # of modes (max) to simulate
-            %   BC
-            %       type: integer
-            %       desc: 0 for PEC, 1 for PMC
-            %   pml_options
-            %       type: array, double
-            %       desc: 1x4 Array with the following elements:
-            %               PML_options(1): PML in y direction (yes=1 or no=0)
-            %               PML_options(2): length of PML layer in nm
-            %               PML_options(3): strength of PML in the complex plane
-            %               PML_options(4): PML polynomial order (1, 2, 3...)
-            %   guessk
-            %       type: scalar, double (can be complex)
-            %       desc: guess k value. Works best when closest to desired
-            %             mode. In units rad/'units'
-            %   OPTS
-            %       type: struct
-            %       desc: optional options with the following fields
-            %           'mode_to_overlap'
-            %               type: matrix, double
-            %               desc: mode to overlap
-            %
-            % Sets these properties:
-            %   obj.k
-            %       units rad/'units'
-            %   obj.Phi
-            %       dimensions y vs. x (x is dir. of propagation)
-            %   obj.E_z
-            %       field repeated, i can't remember why or if i use this
-            %   obj.directivity
-            %       up/down power ratio
-            
 
             % default OPTS
             if nargin < 6
@@ -334,24 +353,25 @@ classdef c_bloch_cell
         end     % end function runSimulation()
         
         
+        % -----------------
+        %> Function that chooses which mode becomes the accepted mode
+        %>
+        %> Inputs:
+        %>   mode_to_overlap
+        %>       type: matrix, double
+        %>       desc: This function will choose the mode with the closest overlap.
+        %>             The mode_to_overlap doesn't have to have the same
+        %>             size as the domain
+        %>
+        %> Sets these properties:
+        %>   obj.k
+        %>       prop. k of chosen mode
+        %>   obj.Phi
+        %>       field envelope of chosen mode
+        %>   obj.chosen_mode_num
+        %>       index of chosen mode (chosen mode k = obj.k_vs_mode(
+        %>       obj.chosen_mode_num))
         function obj = choose_mode( obj, mode_to_overlap )
-            % Function that chooses which mode becomes the accepted mode
-            %
-            % Inputs:
-            %   mode_to_overlap
-            %       type: matrix, double
-            %       desc: This function will choose the mode with the closest overlap.
-            %             The mode_to_overlap doesn't have to have the same
-            %             size as the domain
-            %
-            % Sets these properties:
-            %   obj.k
-            %       prop. k of chosen mode
-            %   obj.Phi
-            %       field envelope of chosen mode
-            %   obj.chosen_mode_num
-            %       index of chosen mode (chosen mode k = obj.k_vs_mode(
-            %       obj.chosen_mode_num))
 
             % run overlaps
             [obj, max_overlaps] = obj.calc_mode_overlaps( mode_to_overlap );
@@ -365,21 +385,22 @@ classdef c_bloch_cell
         end     % end function choose_mode()
         
         
-        function [obj, max_overlaps] = calc_mode_overlaps( obj, mode_to_overlap )
-            % Takes in a mode and overlaps it with the modes that were
-            % solved in this object
-            % Overlap is performed using a cross correlation
-            %
-            % Inputs:
-            %   mode_to_overlap
-            %       type: matrix, double
-            %       desc: field to overlap with. Remove the exponential
-            %             term from it
-            %
-            % Outputs:
-            %   max_overlaps
-            %       type: vector, double
-            %       desc: Max mode overlap vs. mode #     
+        % -----------------
+        %> Takes in a mode and overlaps it with the modes that were
+        %> solved in this object
+        %> Overlap is performed using a cross correlation
+        %>
+        %> Inputs:
+        %>   mode_to_overlap
+        %>       type: matrix, double
+        %>       desc: field to overlap with. Remove the exponential
+        %>             term from it
+        %>
+        %> Outputs:
+        %>   max_overlaps
+        %>       type: vector, double
+        %>       desc: Max mode overlap vs. mode #   
+        function [obj, max_overlaps] = calc_mode_overlaps( obj, mode_to_overlap )  
             
             % number of modes
             n_modes = length( obj.k_vs_mode );
@@ -417,19 +438,21 @@ classdef c_bloch_cell
         end     % end function calc_mode_overlaps()
         
         
+        % -----------------
+        %> Stitches the E field together from the phase and envelope
+        %>
+        %> Inputs:
+        %>   Phi
+        %>       type: matrix, double
+        %>       desc: field envelope
+        %>   k
+        %>       type: scalar, double
+        %>       desc: propagation constant
+        %>   num_cells
+        %>       type: scalar, int
+        %>       desc: number of cells to repeat
         function [obj, E_z] = stitch_E_field( obj, Phi, k, num_cells )
-            % Stitches the E field together from the phase and envelope
-            %
-            % Inputs:
-            %   Phi
-            %       type: matrix, double
-            %       desc: field envelope
-            %   k
-            %       type: scalar, double
-            %       desc: propagation constant
-            %   num_cells
-            %       type: scalar, int
-            %       desc: number of cells to repeat
+
             
             % stitch together e field, including the phase
             nx              = round( num_cells*obj.domain_size(2)/obj.dx );
@@ -439,17 +462,17 @@ classdef c_bloch_cell
             
         end     % end function stitch_E_field()
         
-        
+        % -----------------
+        %> Circularly shifts the index by the shift length
+        %> Shift length can be positive or negative
+        %> Ideally the shift length is an integer multiple of obj.dx
+        %>
+        %> Inputs:
+        %>   shift_length_x
+        %>       type: double, scalar
+        %>       desc: length to shift by, can be either positive or
+        %>             negative value
         function obj = shift_index_circ( obj, shift_length_x )
-            % Circularly shifts the index by the shift length
-            % Shift length can be positive or negative
-            % Ideally the shift length is an integer multiple of obj.dx
-            %
-            % Inputs:
-            %   shift_length_x
-            %       type: double, scalar
-            %       desc: length to shift by, can be either positive or
-            %             negative value
             
             % calc number of units to shift by
             nx      = round( shift_length_x/obj.dx );
@@ -458,9 +481,10 @@ classdef c_bloch_cell
         end     % end function shift_index_circ()
         
         
+        % -----------------
+        %> Plots the index distribution
         function plotIndex(obj)
-            % Plots the index distribution
-            
+                        
             figure;
             imagesc( obj.x_coords, obj.y_coords, obj.N );
             colorbar;
@@ -472,29 +496,30 @@ classdef c_bloch_cell
         end     % end function plotIndex()
         
         
+        % -----------------
+        %> plots all modes in a gui
+        %>
+        %>   Plot Ez, either with or without the phase and decay
+        %>   real imag amp or intensity
+        %>   with or without edges
+        %>   H field?
+        %>   with numcells
+        %>
+        %> Inputs:
+        %>   phi
+        %>       type: double, tensor
+        %>       desc: Field (envelope), dimensions y vs x vs mode #, where y = in
+        %>             plane transverse dimension and x = direction of propagation
+        %>   x
+        %>       type: double, vector
+        %>       desc: x coordinates
+        %>   y 
+        %>       type: double, vector
+        %>       desc: y coordinates
+        %>   k
+        %>       type: double, vector
+        %>       desc: prop. eigenvalues vs. mode #
         function [obj] = plot_E_field_gui( obj )
-            % plots all modes in a gui
-            %
-            %   Plot Ez, either with or without the phase and decay
-            %   real imag amp or intensity
-            %   with or without edges
-            %   H field?
-            %   with numcells
-            %
-            % Inputs:
-            %   phi
-            %       type: double, tensor
-            %       desc: Field (envelope), dimensions y vs x vs mode #, where y = in
-            %             plane transverse dimension and x = direction of propagation
-            %   x
-            %       type: double, vector
-            %       desc: x coordinates
-            %   y 
-            %       type: double, vector
-            %       desc: y coordinates
-            %   k
-            %       type: double, vector
-            %       desc: prop. eigenvalues vs. mode #
 
             % Create a figure and axes
             f   = figure('Visible','off');
@@ -583,7 +608,7 @@ classdef c_bloch_cell
             % Make figure visble after adding all components
             f.Visible = 'on';
 
-            % function for selecting which mode to draw
+            %> function for selecting which mode to draw
             function selectmode( source, event )
                 % selects which mode to draw
 
@@ -592,7 +617,7 @@ classdef c_bloch_cell
                 plot_field( mode_num, mode_comp );
             end
 
-            % function for selecting which component to draw
+            %> function for selecting which component to draw
             function select_component( source, event )
                 % selects which mode to draw
 
@@ -602,7 +627,7 @@ classdef c_bloch_cell
                 plot_field( mode_num, mode_comp );
             end
 
-            % function for toggling phase on/off
+            %> function for toggling phase on/off
             function toggle_phase( source, event )
 
                 if source.Value == true
@@ -613,7 +638,7 @@ classdef c_bloch_cell
                 plot_field( mode_num, mode_comp );
             end
    
-            % function for toggling index overlay on/off
+            %> function for toggling index overlay on/off
             function toggle_index_overlay( source, event )
 
                 if source.Value == true
@@ -625,12 +650,12 @@ classdef c_bloch_cell
             end
             
 
-            % function that plots the field
+            %> function that plots the field
+            %> depends on the variables:
+            %>   mode_num
+            %>   mode_comp
+            %> which are automatically updated by the other ui functions
             function plot_field( mode_num, mode_comp )
-                % depends on the variables:
-                %   mode_num
-                %   mode_comp
-                % which are automatically updated by the other ui functions
 
                 hold off;
                 

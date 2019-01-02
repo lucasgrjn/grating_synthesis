@@ -56,14 +56,14 @@ pml_options = [ 1, 200, 5, 2 ];
 GC = GC.runSimulation( num_modes, BC, pml_options, guessk );
 
 % DEBUG plot physical fields and all fields
-k_all       = GC.debug.k_all;
+k_all       = GC.k_vs_mode;
 ka_2pi_all  = k_all*domain(2)/(2*pi);
 
 for ii = 1:length( k_all )
     % Plotting physical fields
     % plot field, abs
     figure;
-    imagesc( GC.x_coords, GC.y_coords, abs( GC.debug.phi_all(:,:,ii) ) );
+    imagesc( GC.x_coords, GC.y_coords, abs( GC.Phi_vs_mode(:,:,ii) ) );
     colorbar;
     set( gca, 'YDir', 'normal' );
     title( sprintf( 'Field (abs) for mode %i, k*a/2pi real = %f', ii, real( ka_2pi_all(ii) ) ) );
@@ -100,7 +100,7 @@ fprintf('Up/down power directivity = %f\n', GC.directivity);
 fprintf('\nAngle of maximum radiation = %f deg\n', GC.max_angle_up);
 
 % plot full Ez with grating geometry overlaid
-GC.plotEz_w_edges();
+GC.plot_E_field_gui();
 axis equal;
 
 % % plot a slice of Eup vs. Sup
