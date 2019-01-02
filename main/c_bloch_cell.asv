@@ -651,11 +651,12 @@ classdef c_bloch_cell
             
 
             %> function that plots the field
-            %> depends on the variables:
-            %>   mode_num
-            %>   mode_comp
-            %> which are automatically updated by the other ui functions
+            % depends on the variables:
+            %   mode_num
+            %   mode_comp
+            % which are automatically updated by the other ui functions
             function plot_field( mode_num, mode_comp )
+
 
                 hold off;
                 

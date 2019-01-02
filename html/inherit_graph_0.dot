@@ -4,7 +4,7 @@ digraph "Graphical Class Hierarchy"
   edge [fontname="FreeSans",fontsize="10",labelfontname="FreeSans",labelfontsize="10"];
   node [fontname="FreeSans",fontsize="10",shape=record];
   rankdir="LR";
-  Node0 [label="c_bloch_cell",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$classc__bloch__cell.html",tooltip=" "];
+  Node0 [label="c_bloch_cell",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$classc__bloch__cell.html",tooltip="Class for simulating a bloch cell, using FDFD complex-k solver."];
   Node0 -> Node1 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
   Node1 [label="c_gratingCell",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$classc__grating_cell.html",tooltip=" "];
   Node1 -> Node2 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
