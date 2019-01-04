@@ -228,6 +228,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
             guess_offset        = 0;
             
+            % sort fills so they are in descending order
+            fill_bots           = sort( fill_bots, 'descend' );
+            fill_top_bot_ratio  = sort( fill_top_bot_ratio, 'descend' );
+            
             % save fills and offsets
             obj.sweep_variables.fill_tops           = fill_tops;
             obj.sweep_variables.fill_bots           = fill_bots;
