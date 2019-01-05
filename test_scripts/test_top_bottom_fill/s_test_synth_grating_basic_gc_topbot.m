@@ -16,6 +16,13 @@ y_domain_size       = 2500;
 optimal_angle       = -15;
 coupling_direction  = 'down';   % either 'up' or 'down'
 data_notes          = 'meh';
+layer_thick         = 100;
+
+% make grating cell function
+h_makeGratingCell = @(dxy, units, lambda, background_index, y_domain_size, ...
+                      period, fill_top, fill_bot, offset_ratio) ...
+                      f_makeGratingCell_basic( dxy, units, lambda, background_index, y_domain_size, ...
+                                         period, fill_top, fill_bot, offset_ratio, layer_thick );
 
 % make synthesis object
 synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
@@ -26,7 +33,7 @@ synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
                                       'optimal_angle',     optimal_angle, ...
                                       'data_notes',        data_notes, ...
                                       'coupling_direction', coupling_direction, ...
-                                      'h_makeGratingCell', @f_makeGratingCell_45RFSOI ...
+                                      'h_makeGratingCell', h_makeGratingCell ...
                                       );
 
                                   
@@ -35,21 +42,21 @@ synth_obj = c_synthTwoLevelGrating(   'discretization',    disc, ...
         
 % generate design space
 % a small test scenario
-fill_bots           = fliplr( 0.95:0.025:0.975 );
-fill_top_bot_ratio  = fliplr( 0.975:0.025:1.0 );
+fill_bots  = 0.95:-0.025:0.925; %fliplr( 0.95:0.025:0.975 );
+fill_tops  = 0.95:-0.025:0.925; %fliplr( 0.95:0.025:0.975 );
 % run generation
 verbose     = true;
-synth_obj   = synth_obj.generate_design_space( fill_bots, fill_top_bot_ratio );
+synth_obj   = synth_obj.generate_design_space_filltopbot( fill_bots, fill_tops, verbose );
 
 % Plot results
 
 % directivity vs. fill
 figure;
 imagesc( synth_obj.sweep_variables.fill_bots, ...
-         synth_obj.sweep_variables.fill_top_bot_ratio, ...
+         synth_obj.sweep_variables.fill_tops, ...
          10*log10( synth_obj.sweep_variables.directivities_vs_fills ) );
 colorbar; set( gca, 'ydir', 'normal' );
-xlabel('bottom fill factor'); ylabel('top bottom fill ratio');
+xlabel('bottom fill factor'); ylabel('top fill factor');
 title('Directivity (dB) vs. fill factors');
 
 % 
