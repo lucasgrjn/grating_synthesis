@@ -1,0 +1,58 @@
+
+                            < M A T L A B (R) >
+                  Copyright 1984-2018 The MathWorks, Inc.
+                   R2018b (9.5.0.944444) 64-bit (glnxa64)
+                              August 28, 2018
+
+ 
+To get started, type doc.
+For product information, visit www.mathworks.com.
+ 
+Inputs are:
+Wavelength: 1310.000000 nm
+Angle: -20.000000 degrees
+Layer thickness: 100.000000 nm
+
+synth_obj = 
+
+  c_synthTwoLevelGrating with properties:
+
+         debug_options: []
+        discretization: 10
+                 units: [1x1 struct]
+                lambda: 1310
+      background_index: 1.4500
+         y_domain_size: 2500
+                inputs: {1x18 cell}
+            start_time: '2019_01_05_22_29_36_'
+            data_notes: 'lambda 1310 optimal angle -20'
+     h_makeGratingCell: [function_handle]
+    coupling_direction: 'down'
+         optimal_angle: -20
+       sweep_variables: []
+    synthesized_design: []
+
+Sweeping fill factors for directivity and angle...
+Right side of domain, fill iteration 1 of 3
+Elapsed time is 31.205742 seconds.
+Right side of domain, fill iteration 2 of 3
+Elapsed time is 61.388391 seconds.
+Right side of domain, fill iteration 3 of 3
+Elapsed time is 91.063774 seconds.
+Starting parallel pool (parpool) using the 'local' profile ...
+connected to 28 workers.
+Main parfor iteration 1 of 3
+Main parfor iteration 2 of 3
+Main parfor iteration 3 of 3
+Fill factor ratio 2 of 3, main parfor iteration 3 of 3
+Fill factor ratio 3 of 3, main parfor iteration 3 of 3
+Fill factor ratio 2 of 3, main parfor iteration 2 of 3
+Fill factor ratio 3 of 3, main parfor iteration 2 of 3
+Fill factor ratio 2 of 3, main parfor iteration 1 of 3
+Fill factor ratio 3 of 3, main parfor iteration 1 of 3
+Done generating design space
+Elapsed time is 217.376320 seconds.
+Elapsed time is 217.376556 seconds.
+Design space generation sweep is done
+Saving data...
+Data saved
