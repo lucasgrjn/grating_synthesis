@@ -244,45 +244,45 @@ classdef c_gratingCell < c_bloch_cell
             % DEBUG plot E_fz if desired
             if plot_k_distribution
                 
-%                 % first normalize E fields
-%                 E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-%                 E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-% 
-%                 % DEBUG plot E_fz down
-%                 figure;
-%                 plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-%                 xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%                 title('DEBUG abs(E(f_x)) down, no decay, within radiation window');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz down
-%                 fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-%                 fy_down     = fy_down./max(abs(fy_down));
-%                 figure;
-%                 plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-%                 plot( fx_vec, fy_down, '--' );
-%                 xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%                 legend('E_z', 'rad. circle');
-%                 title('DEBUG abs(E(f_x)) down, no decay, ALL');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz up
-%                 figure;
-%                 plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-%                 xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%                 title('DEBUG abs(E(f_x)) up, no decay, within radiation window');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz up
-%                 fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-%                 fy_up     = fy_up./max(abs(fy_up));
-%                 figure;
-%                 plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-%                 plot( fx_vec, fy_up, '--' );
-%                 xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%                 legend('E_z', 'rad. circle');
-%                 title('DEBUG abs(E(f_x)) up, no decay, ALL');
-%                 makeFigureNice();
+                % first normalize E fields
+                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
+                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
+
+                % DEBUG plot E_fz down
+                figure;
+                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) down, no decay, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz down
+                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
+                fy_down     = fy_down./max(abs(fy_down));
+                figure;
+                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
+                plot( fx_vec, fy_down, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) down, no decay, ALL');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                figure;
+                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
+                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
+                title('DEBUG abs(E(f_x)) up, no decay, within radiation window');
+                makeFigureNice();
+
+                % DEBUG plot E_fz up
+                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
+                fy_up     = fy_up./max(abs(fy_up));
+                figure;
+                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
+                plot( fx_vec, fy_up, '--' );
+                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
+                legend('E_z', 'rad. circle');
+                title('DEBUG abs(E(f_x)) up, no decay, ALL');
+                makeFigureNice();
                 
                 % now do the same but with decay
                 [obj, E_z_w_decay] = obj.stitch_E_field( obj.Phi, obj.k, numcells );
@@ -292,11 +292,9 @@ classdef c_gratingCell < c_bloch_cell
                 % take FFT
                 E_z_fx_up   = fftshift( fft( ifftshift( E_z_up ) ) );
                 E_z_fx_down = fftshift( fft( ifftshift( E_z_down ) ) );
-                % normalize E fields NOT
-%                 E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-%                 E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-                E_z_fx_down_norm    = E_z_fx_down;
-                E_z_fx_up_norm      = E_z_fx_up;
+                % normalize E fields
+                E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
+                E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
                 
                 % DEBUG plot E_fz down
                 figure;
@@ -700,9 +698,30 @@ classdef c_gratingCell < c_bloch_cell
             % Calculate directivity based on a single angle
             % Requires that simulation has already been run
             %
-            % this function is very much a WIP
-            %
             % inputs:
+            %   mode_num
+            %       type: scalar, int
+            %       desc: OPTIONAL, mode number to calc Sx and Sy for
+            %
+            % outputs:
+            %   Sx
+            %       type: matrix, double
+            %       desc: x component (in dir. of waveguide prop) of poynting vector
+            %             dimensions y vs. x(2:end-1)
+            %   Sy
+            %       type: matrix, double
+            %       desc: y component (transverse dir, pos = up) of poynting vector
+            %             dimensions y(2:end-1) vs. x
+            %   P_per_x_slice
+            %       type: vector, double
+            %       desc: integral of Sx aka power propagating through each
+            %             x slice of the domain
+            %             dimensions power vs. x(2:end-1)
+            %   P_per_y_slice
+            %       type: vector, double
+            %       desc: integral of Sy aka power propagating through each
+            %             y slice of the domain
+            %             dimensions power vs. y(2:end-1)
             
             if nargin < 2
                 choose_mode = false;
@@ -725,8 +744,13 @@ classdef c_gratingCell < c_bloch_cell
             % pick monitor planes
             [~, indx_max_up]    = max( obj.P_per_y_slice );
             [~, indx_max_down]  = min( obj.P_per_y_slice );
-         
-        end     % end function calc_directivity_single_angle()
+
+            
+
+
+            
+            
+        end     % end function calc_power_distribution_onecell()
         
         
     end     % end methods

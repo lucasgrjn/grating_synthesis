@@ -1414,17 +1414,17 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       desc: 'bottom' for body only or 'full' for both layers
             %
             % Sets these fields: (not updated)
-            %     obj.synthesized_design.dir                  
-            %     obj.synthesized_design.bot_fill            
-            %     obj.synthesized_design.top_bot_fill_ratio  
-            %     obj.synthesized_design.top_fill            
-            %     obj.synthesized_design.period              
-            %     obj.synthesized_design.offset              
-            %     obj.synthesized_design.angles             
-            %     obj.synthesized_design.scatter_str        
-            %     obj.synthesized_design.k                  
-            %     obj.synthesized_design.GC                 
-            %     obj.synthesized_design.des_scatter        
+            obj.synthesized_design.dir                  = [];
+            obj.synthesized_design.bot_fill             = [];
+            obj.synthesized_design.top_bot_fill_ratio   = [];
+            obj.synthesized_design.top_fill             = [];
+            obj.synthesized_design.period               = [];
+            obj.synthesized_design.offset               = [];
+            obj.synthesized_design.angles               = [];
+            obj.synthesized_design.scatter_str          = [];
+            obj.synthesized_design.k                    = [];
+            obj.synthesized_design.GC                   = {};
+            obj.synthesized_design.des_scatter          = [];
             
 
             % save input waveguide type
