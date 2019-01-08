@@ -1577,7 +1577,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % now match these data points to the desired alpha
             % starting point
             start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
+            [~, indx_x]         = min(abs( alpha_des(1:end/2) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
