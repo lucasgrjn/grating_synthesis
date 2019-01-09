@@ -1133,6 +1133,43 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             end
 
             
+            % Select subset of domain to use
+            if strcmp( input_wg_type, 'bottom' ) == true
+                % input waveguide is the bottom layer
+            
+                % first narrow down the space to take the datapoints with the
+                % maximum directivity per bottom fill factor (so for each row
+                % on my design space)
+
+                indx_bottom_space   = obj.sweep_variables.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
+                
+                % narrow down design space (take top left quadrant)
+                % recall fills are sorted in descending order
+                top_fills       = top_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
+                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
+                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );      
+                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                
+            elseif strcmp( input_wg_type, 'full' ) == true
+                % input waveguide is a full waveguide
+                
+                % narrow down design space (take top right quadrant)
+                top_fills       = top_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
+                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
+                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );      
+                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                
+            end     % end if strcmp( input_wg_type, 'bottom' )
+            
+            
             % TODO CLEAN THIS SECTION UP
             if strcmp( input_wg_type, 'bottom' ) == true
                 % Inverted design
@@ -1414,17 +1451,17 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       desc: 'bottom' for body only or 'full' for both layers
             %
             % Sets these fields: (not updated)
-            obj.synthesized_design.dir                  = [];
-            obj.synthesized_design.bot_fill             = [];
-            obj.synthesized_design.top_bot_fill_ratio   = [];
-            obj.synthesized_design.top_fill             = [];
-            obj.synthesized_design.period               = [];
-            obj.synthesized_design.offset               = [];
-            obj.synthesized_design.angles               = [];
-            obj.synthesized_design.scatter_str          = [];
-            obj.synthesized_design.k                    = [];
-            obj.synthesized_design.GC                   = {};
-            obj.synthesized_design.des_scatter          = [];
+            %     obj.synthesized_design.dir                  
+            %     obj.synthesized_design.bot_fill            
+            %     obj.synthesized_design.top_bot_fill_ratio  
+            %     obj.synthesized_design.top_fill            
+            %     obj.synthesized_design.period              
+            %     obj.synthesized_design.offset              
+            %     obj.synthesized_design.angles             
+            %     obj.synthesized_design.scatter_str        
+            %     obj.synthesized_design.k                  
+            %     obj.synthesized_design.GC                 
+            %     obj.synthesized_design.des_scatter        
             
 
             % save input waveguide type
@@ -1577,7 +1614,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % now match these data points to the desired alpha
             % starting point
             start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
+            [~, indx_x]         = min(abs( alpha_des(1:end/2) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
