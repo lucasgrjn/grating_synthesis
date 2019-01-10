@@ -15,14 +15,25 @@ addpath(genpath('C:\Users\beezy\git\grating_synthesis'));                   % gr
 % 100nm thick layers, -20 deg, initial test run
 filename = 'synth_obj_2019_01_06_12_11_22_lambda1310_optangle-20_NO_GC.mat';
 filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2019 01 19 basic grating topbot\2019_01_06_12_11_22_lambda1310_optangle-20_thick100';
+% 100 nm thick lambda 1310 angle -20 deg
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2019 01 19 basic grating topbot\2019_01_10_11_13_37_lambda1310_optangle-20_thick100';
+filename = 'synth_obj_2019_01_10_11_13_37_lambda1310_optangle-20_NO_GC.mat';
 
 % load synth_obj
 load( [ filepath filesep filename ] );
 
+% enforce min feature size?
+enforce_min_feat = false;
+
 % synthesize final design
 MFD             = 10.4 * 1e3;                                                         % in nm
 input_wg_type   = 'bottom';
-synth_obj       = synth_obj.generate_final_design_gaussian_topbot( MFD, input_wg_type );
+if enforce_min_feat
+    % @enforce_min_feat_size located in c_synthTwoLevelGrating
+    synth_obj = synth_obj.generate_final_design_gaussian_topbot( MFD, input_wg_type, @f_enforce_min_feat_size );
+else
+    synth_obj = synth_obj.generate_final_design_gaussian_topbot( MFD, input_wg_type );
+end
 
 % plot final design
 

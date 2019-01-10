@@ -1067,7 +1067,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function optimizePeriodOffset()
         
         
-        function obj = generate_final_design_gaussian(obj, MFD, input_wg_type, invert_normal_top_bot_ratio_thresh)
+        function obj = generate_final_design_gaussian( obj, MFD, input_wg_type, invert_normal_top_bot_ratio_thresh, enforce_min_feat_size_func )
             % function for generating the final synthesized design
             % parameters
             %
@@ -1189,6 +1189,31 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             bot_fills_high_dir      = bot_fills( indxs );
 %                 GC_high_dir             = GC_vs_fills_inv( indxs );
             
+
+            % enforce min feature size
+            if exist( 'enforce_min_feat_size_func', 'var' )
+                % loop through each cell and discard any that violate
+                % feature size rules
+                indices_to_keep = [];
+                for ii = 1:length( periods_high_dir )
+                    if enforce_min_feat_size_func(  periods_high_dir(ii), ...
+                                                    topbot_ratio_high_dir(ii) .* bot_fills_high_dir(ii), ...
+                                                    bot_fills_high_dir(ii) ) ...
+                                                    == true
+                        indices_to_keep(end+1) = ii;
+                    end
+                end
+                
+                angles_high_dir         = angles_high_dir(indices_to_keep);
+                periods_high_dir        = periods_high_dir(indices_to_keep);
+                offsets_high_dir        = offsets_high_dir(indices_to_keep);
+                scatter_strs_high_dir   = scatter_strs_high_dir(indices_to_keep);
+                k_high_dir              = k_high_dir(indices_to_keep);
+                topbot_ratio_high_dir   = topbot_ratio_high_dir(indices_to_keep);
+                bot_fills_high_dir      = bot_fills_high_dir(indices_to_keep);
+                        
+            end
+
             % DEBUG plot the resulting picked out datapoints
             % angles
             figure;
@@ -1260,8 +1285,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             % now match these data points to the desired alpha
             % starting point
-            start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des(1:end/2) - start_alpha_des ) );
+            [~, indx_max_alpha] = max( alpha_des );
+            start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
+            [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
@@ -1348,7 +1374,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function generate_final_design_gaussian()
         
         
-        function obj = generate_final_design_gaussian_topbot(obj, MFD, input_wg_type)
+        function obj = generate_final_design_gaussian_topbot( obj, MFD, input_wg_type, enforce_min_feat_size_func )
             % function for generating the final synthesized design
             % parameters
             %
@@ -1361,6 +1387,13 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %   input_wg_type
             %       type: string
             %       desc: 'bottom' for body only or 'full' for both layers
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: OPTIONAL INPUT
+            %             A function that user makes which enforces min.
+            %             feat size
+            %             See the example function at the bottom of this
+            %             file
             %
             % Sets these fields: (not updated)
             %     obj.synthesized_design.dir                  
@@ -1453,6 +1486,28 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             top_fills_high_dir      = top_fills( indxs );
             bot_fills_high_dir      = bot_fills( indxs );
 %                 GC_high_dir             = GC_vs_fills_inv( indxs );
+
+            % enforce min feature size
+            if exist( 'enforce_min_feat_size_func', 'var' )
+                % loop through each cell and discard any that violate
+                % feature size rules
+                indices_to_keep = [];
+                for ii = 1:length( periods_high_dir )
+                    if enforce_min_feat_size_func( periods_high_dir(ii), top_fills_high_dir(ii), bot_fills_high_dir(ii) ) == true
+                        indices_to_keep(end+1) = ii;
+                    end
+                end
+                
+                angles_high_dir         = angles_high_dir(indices_to_keep);
+                periods_high_dir        = periods_high_dir(indices_to_keep);
+                offsets_high_dir        = offsets_high_dir(indices_to_keep);
+                scatter_strs_high_dir   = scatter_strs_high_dir(indices_to_keep);
+                k_high_dir              = k_high_dir(indices_to_keep);
+                top_fills_high_dir      = top_fills_high_dir(indices_to_keep);
+                bot_fills_high_dir      = bot_fills_high_dir(indices_to_keep);
+                        
+            end
+                
             
             % DEBUG plot the resulting picked out datapoints
             % angles
@@ -1525,8 +1580,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             % now match these data points to the desired alpha
             % starting point
-            start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des(1:end/2) - start_alpha_des ) );
+            [~, indx_max_alpha] = max( alpha_des );
+            start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
+            [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
@@ -3105,10 +3161,6 @@ GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
                                         wgs_duty_cycles, wgs_offsets );
             
 end
-
-
-
-
 
 
 

@@ -1,7 +1,7 @@
 % authors: bohan
 % 
 % script for testing the latest synthesis pipeline
-% generate final design
+% generate final design using the top/bot sweep
 
 clear; close all;
 
@@ -12,35 +12,29 @@ addpath(genpath('C:\Users\bz\git\grating_synthesis'));                      % gr
 addpath(genpath('C:\Users\beezy\git\grating_synthesis'));                   % grating synthesis codes
 
 % synthesis object to load
-% % best grating so far, lambda 1300 angle -15 deg
-% filename = 'synth_obj_2018_11_26_20_58_26_lambda1300_optangle-15_NO_GC.mat';
-% filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_26_20_58_26_lambda1300_optangle-15';
-% % 150nm thick layers
-% filename = 'synth_obj_2018_11_28_11_59_42_lambda1300_optangle-15_NO_GC';
-% filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_28_11_59_42_lambda1300_optangle-15_thick150';
-% % 110nm thick, lambda 1300 angle -16 deg
-% filename = 'synth_obj_2018_11_29_18_37_51_lambda1300_optangle-15_NO_GC';
-% filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_29_18_37_51_lambda1300_optangle-15_thick110';
+% 100nm thick layers, -20 deg, initial test run
+filename = 'synth_obj_2019_01_06_12_11_22_lambda1310_optangle-20_NO_GC.mat';
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2019 01 19 basic grating topbot\2019_01_06_12_11_22_lambda1310_optangle-20_thick100';
 
-
+% 100 nm thick lambda 1310 angle -20 deg
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2019_01_10_11_13_37_lambda1310_optangle-20_thick100';
+filename = 'synth_obj_2019_01_10_11_13_37_lambda1310_optangle-20_NO_GC.mat';
 
 % load synth_obj
 load( [ filepath filesep filename ] );
 
 % enforce min feature size?
-enforce_min_feat = false;
+enforce_min_feat = true;
 
 % synthesize final design
 MFD             = 10.4 * 1e3;                                                         % in nm
 input_wg_type   = 'bottom';
-fill_thresh     = 0.55;
 if enforce_min_feat
     % @enforce_min_feat_size located in c_synthTwoLevelGrating
-    synth_obj = synth_obj.generate_final_design_gaussian( MFD, input_wg_type, fill_thresh, @f_enforce_min_feat_size );
+    synth_obj = synth_obj.generate_final_design_gaussian_topbot( MFD, input_wg_type, @f_enforce_min_feat_size );
 else
-    synth_obj = synth_obj.generate_final_design_gaussian( MFD, input_wg_type, fill_thresh );
+    synth_obj = synth_obj.generate_final_design_gaussian_topbot( MFD, input_wg_type );
 end
-
 
 % plot final design
 
