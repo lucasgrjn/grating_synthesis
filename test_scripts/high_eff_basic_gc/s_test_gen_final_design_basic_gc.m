@@ -18,7 +18,9 @@ filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating syn
 % 150nm thick layers
 filename = 'synth_obj_2018_11_28_11_59_42_lambda1300_optangle-15_NO_GC';
 filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_28_11_59_42_lambda1300_optangle-15_thick150';
-
+% 110nm thick, lambda 1300 angle -16 deg
+filename = 'synth_obj_2018_11_29_18_37_51_lambda1300_optangle-15_NO_GC';
+filepath = 'C:\Users\bz\Google Drive\research\popovic group\projects\grating synthesis\data\2018 11 06 high eff basic grating\2018_11_29_18_37_51_lambda1300_optangle-15_thick110';
 
 % load synth_obj
 load( [ filepath filesep filename ] );

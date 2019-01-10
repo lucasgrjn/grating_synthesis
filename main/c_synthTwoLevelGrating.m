@@ -1299,7 +1299,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 end
                 
                 % save parameters
-                obj.synthesized_design.dir(ii)                   = dir_high( indx_closest_scatter );
+                obj.synthesized_design.dir(ii)                   = high_dirs( indx_closest_scatter );
                 obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
                 obj.synthesized_design.top_bot_fill_ratio(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
                 obj.synthesized_design.top_fill(ii)              = topbot_ratio_high_dir( indx_closest_scatter ) * bot_fills_high_dir( indx_closest_scatter );
