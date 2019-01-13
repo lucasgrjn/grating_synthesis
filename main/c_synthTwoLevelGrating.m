@@ -147,6 +147,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % x_coords
         % y_coords
         % input_wg_type
+        % use_min_feat_size     currently either true or false, doesn't save values
         
         % debug options
         % a struct that holds debugging options
@@ -1191,9 +1192,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
 
             % enforce min feature size
+            obj.synthesized_design.use_min_feat_size = false;                   % default to false
             if exist( 'enforce_min_feat_size_func', 'var' )
                 % loop through each cell and discard any that violate
                 % feature size rules
+                obj.synthesized_design.use_min_feat_size = true;
+                
                 indices_to_keep = [];
                 for ii = 1:length( periods_high_dir )
                     if enforce_min_feat_size_func(  periods_high_dir(ii), ...
@@ -1488,9 +1492,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %                 GC_high_dir             = GC_vs_fills_inv( indxs );
 
             % enforce min feature size
+            obj.synthesized_design.use_min_feat_size = false;                   % default to false
             if exist( 'enforce_min_feat_size_func', 'var' )
                 % loop through each cell and discard any that violate
                 % feature size rules
+                obj.synthesized_design.use_min_feat_size = true;
+                
                 indices_to_keep = [];
                 for ii = 1:length( periods_high_dir )
                     if enforce_min_feat_size_func( periods_high_dir(ii), top_fills_high_dir(ii), bot_fills_high_dir(ii) ) == true

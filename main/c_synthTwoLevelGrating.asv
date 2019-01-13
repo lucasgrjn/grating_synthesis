@@ -147,6 +147,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % x_coords
         % y_coords
         % input_wg_type
+        % min_feat_size     currently either true or false, doesn't save values
         
         % debug options
         % a struct that holds debugging options
@@ -1191,6 +1192,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
 
             % enforce min feature size
+            o
             if exist( 'enforce_min_feat_size_func', 'var' )
                 % loop through each cell and discard any that violate
                 % feature size rules
@@ -1282,12 +1284,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             figure;
 %             plot(x, y);
 %             xlabel('bot'); ylabel('top');
-            
-            % now match these data points to the desired alpha
-            % starting point
-            start_alpha_des     = 1e-5;
-            [~, indx_x]         = min(abs( alpha_des(1:end/2) - start_alpha_des ) );
-            cur_x               = xvec(indx_x);
             
             % now match these data points to the desired alpha
             % starting point
