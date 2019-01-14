@@ -21,8 +21,8 @@ function is_ok = f_enforce_min_feat_size( period, top_fill, bot_fill )
 is_ok = true;
 
 % hardcoded min. feature sizes (nm)
-min_gap = 50;
-min_wg  = 50;
+min_gap = 80;
+min_wg  = 80;
 
 % check for min. waveguide length is satisfied
 top_len = top_fill * period;

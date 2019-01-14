@@ -1668,6 +1668,19 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
         end     % end function generate_final_design_gaussian_topbot()
         
+        function obj = build_final_index( obj )
+        % build final index distribution
+        % to be run after a design has been synthesized
+        
+            obj.synthesized_design.N = [];
+            for ii = 1:length(obj.synthesized_design.GC)
+
+                GC                          = obj.synthesized_design.GC{ii};
+                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+
+            end
+            
+        end     % end build_final_index()
         
 %         function obj = generateFinalDesignGaussian_old(obj, MFD, input_wg_type)
 %             % OLD VERSION
