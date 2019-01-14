@@ -1362,13 +1362,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             
             % build final index distribution
-            obj.synthesized_design.N = [];
-            for ii = 1:length(obj.synthesized_design.GC)
-               
-                GC                          = obj.synthesized_design.GC{ii};
-                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
-                
-            end
+            obj = obj.build_final_index();
+%             obj.synthesized_design.N = [];
+%             for ii = 1:length(obj.synthesized_design.GC)
+%                
+%                 GC                          = obj.synthesized_design.GC{ii};
+%                 obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+%                 
+%             end
             
             % coordinates of index distribution
             obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
@@ -1660,13 +1661,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             
             % build final index distribution
-            obj.synthesized_design.N = [];
-            for ii = 1:length(obj.synthesized_design.GC)
-               
-                GC                          = obj.synthesized_design.GC{ii};
-                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
-                
-            end
+            obj = obj.build_final_index();
+%             obj.synthesized_design.N = [];
+%             for ii = 1:length(obj.synthesized_design.GC)
+%                
+%                 GC                          = obj.synthesized_design.GC{ii};
+%                 obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+%                 
+%             end
             
             % coordinates of index distribution
             obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );

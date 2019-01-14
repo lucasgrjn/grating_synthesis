@@ -201,7 +201,8 @@ classdef c_bloch_cell
             y = obj.y_coords;
             
             % fill in the layer
-            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y + obj.dy/2), : ) = index; 
+            % cut off before end of grid
+            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), : ) = index; 
             
         end     % end function addLayer()
         
@@ -226,8 +227,24 @@ classdef c_bloch_cell
             y = obj.y_coords;
             
             % fill in the rect
-            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y + obj.dy/2), ...
-                    x > (min_x - obj.dx/2) & x < (min_x + width_x + obj.dx/2) ) = index; 
+            % cut off before end of grid
+            obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
+                    x > (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
+%             % cut off after end of grid
+%             obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
+%                     x > (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
+%             % cut off right before grid
+%             obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y), ...
+%                     x > (min_x - obj.dx/2) & x < (min_x + width_x) ) = index; 
+%             % cut off on grid
+%             obj.N( y > (min_y - obj.dy/2) & y <= (min_y + height_y), ...
+%                     x > (min_x - obj.dx/2) & x <= (min_x + width_x) ) = index; 
+%             % cut off on grid, both ends
+%             obj.N( y >= (min_y) & y <= (min_y + height_y), ...
+%                     x >= (min_x) & x <= (min_x + width_x) ) = index; 
+%             % cut off on grid on left, right before grid on right
+%             obj.N( y >= (min_y) & y < (min_y + height_y), ...
+%                     x >= (min_x) & x < (min_x + width_x) ) = index; 
             
         end     % end function addRect()
         

@@ -466,14 +466,14 @@ classdef c_gratingCell < c_bloch_cell
             % grab field
             E_z = obj.E_z;
             
-            % H x in
-            % gonna calculate input power at grid point 2
-            H_x_in1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, 2 ) - E_z( 1:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 1
-            H_x_in2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, 2 ) - E_z( 2:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 2
-            % interleave two arrays
-            H_x_in                                  = zeros( size( [H_x_in1, H_x_in2] ) );
-            H_x_in( ( 1:length(H_x_in1) )*2 - 1)    = H_x_in1;
-            H_x_in( ( 1:length(H_x_in2) )*2 )       = H_x_in2;
+%             % H x in
+%             % gonna calculate input power at grid point 2
+%             H_x_in1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, 2 ) - E_z( 1:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 1
+%             H_x_in2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, 2 ) - E_z( 2:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 2
+%             % interleave two arrays
+%             H_x_in                                  = zeros( size( [H_x_in1, H_x_in2] ) );
+%             H_x_in( ( 1:length(H_x_in1) )*2 - 1)    = H_x_in1;
+%             H_x_in( ( 1:length(H_x_in2) )*2 )       = H_x_in2;
             
             % H y in (on the same grid as Hx in)
 %             H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
