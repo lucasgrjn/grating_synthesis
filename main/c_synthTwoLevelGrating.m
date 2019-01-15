@@ -1692,7 +1692,45 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function generate_final_design_gaussian_topbot()
         
         
-        function obj = generate_final_design_uniform( obj )
+        function obj = generate_final_design_uniform( obj, MFD )
+            % purpose of this function right now is just for uniform
+            % gratings for CLO
+            
+            % save input waveguide type
+            obj.synthesized_design.input_wg_type = 'bottom';
+            
+            
+            
+        end
+        
+        
+        function [ obj, alpha_des ] = calculate_desired_scattering( obj )
+            % Calculates desired scattering profile for a Gaussian field
+            % with the given MFD
+           
+            % generate x coordinates for the gaussian mode
+            % must be large enough to fit mode
+            xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
+            xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
+            
+            % generate a fiber gaussian mode
+            w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
+            zvec        = 0;                                                            % this is unused
+            d0          = 0;                                                            % take slice at waist
+            [obj, u]    = obj.fiber_mode_gaussian(  w0, zvec, xvec,...
+                                                    obj.optimal_angle, d0, obj.background_index );
+                                              
+            % calculate desired scattering strength vs. x
+            integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
+            alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );             % in units 1/m
+            alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
+            
+            % DEBUG plot alpha desired
+            figure;
+            plot( xvec, alpha_des );
+            xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
+            title('DEBUG scattering strength for gaussian');
+            makeFigureNice(); 
             
         end
         
