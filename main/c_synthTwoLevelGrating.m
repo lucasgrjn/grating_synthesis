@@ -1287,78 +1287,85 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             plot(x, y);
 %             xlabel('bot'); ylabel('top');
             
-            % now match these data points to the desired alpha
-            % starting point
-            [~, indx_max_alpha] = max( alpha_des );
-            start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
-            [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
-            cur_x               = xvec(indx_x);
-            
-            % final synthesized variables
-            obj.synthesized_design.dir                  = [];
-            obj.synthesized_design.bot_fill             = [];
-            obj.synthesized_design.top_bot_fill_ratio   = [];
-            obj.synthesized_design.top_fill             = [];
-            obj.synthesized_design.period               = [];
-            obj.synthesized_design.offset               = [];
-            obj.synthesized_design.angles               = [];
-            obj.synthesized_design.scatter_str          = [];
-            obj.synthesized_design.k                    = [];
-            obj.synthesized_design.GC                   = {};
-            obj.synthesized_design.des_scatter          = [];
-            
-            
-            % flag for switching to using max scattering strength
-            saturate_scatter_str_to_max = false;
- 
-            ii = 1;
-            while cur_x < xvec(end)
-                % build grating one cell at a time
-                
-                % pick design with scattering strength closest to desired
-                % alpha
-                des_scatter                 = alpha_des(indx_x);                                        % desired alpha
-                if des_scatter  > max( scatter_strs_high_dir )
-                    % desired scattering strength too high, gotta saturate
-                    saturate_scatter_str_to_max = true;
-                end
-                if ~saturate_scatter_str_to_max
-                    [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
-                else
-                    [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
-                end
-                
-                % save parameters
-                obj.synthesized_design.dir(ii)                   = high_dirs( indx_closest_scatter );
-                obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
-                obj.synthesized_design.top_bot_fill_ratio(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
-                obj.synthesized_design.top_fill(ii)              = topbot_ratio_high_dir( indx_closest_scatter ) * bot_fills_high_dir( indx_closest_scatter );
-                obj.synthesized_design.offset(ii)                = offsets_high_dir( indx_closest_scatter );
-                obj.synthesized_design.period(ii)                = periods_high_dir( indx_closest_scatter );
-                obj.synthesized_design.angles(ii)                = angles_high_dir( indx_closest_scatter );
-                obj.synthesized_design.scatter_str(ii)           = scatter_strs_high_dir( indx_closest_scatter );
-                obj.synthesized_design.k(ii)                     = k_high_dir( indx_closest_scatter );
-                obj.synthesized_design.des_scatter(ii)           = des_scatter;
-                
-                obj.synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
-                                                       obj.discretization, ...
-                                                       obj.units.name, ...
-                                                       obj.lambda, ...
-                                                       obj.background_index, ...
-                                                       obj.y_domain_size, ...
-                                                       obj.synthesized_design.period(ii), ...
-                                                       obj.synthesized_design.top_fill(ii), ...
-                                                       obj.synthesized_design.bot_fill(ii), ...
-                                                       obj.synthesized_design.offset(ii)/obj.synthesized_design.period(ii) );
+            % match datapoints to desired alpha
+            obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+                                         bot_fills_high_dir, top_fills_high_dir, ...
+                                         offsets_high_dir, periods_high_dir, ...
+                                         angles_high_dir, scatter_strs_high_dir, ...
+                                         k_high_dir );
 
-                
-                % move onto next
-                cur_x       = cur_x + obj.synthesized_design.period(ii);
-                [~, indx_x] = min( abs(xvec - cur_x) );
-                cur_x       = xvec( indx_x );
-                ii          = ii + 1;
-                
-            end     % end for ii = 1:ncells
+%             % now match these data points to the desired alpha
+%             % starting point
+%             [~, indx_max_alpha] = max( alpha_des );
+%             start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
+%             [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
+%             cur_x               = xvec(indx_x);
+%             
+%             % final synthesized variables
+%             obj.synthesized_design.dir                  = [];
+%             obj.synthesized_design.bot_fill             = [];
+%             obj.synthesized_design.top_bot_fill_ratio   = [];
+%             obj.synthesized_design.top_fill             = [];
+%             obj.synthesized_design.period               = [];
+%             obj.synthesized_design.offset               = [];
+%             obj.synthesized_design.angles               = [];
+%             obj.synthesized_design.scatter_str          = [];
+%             obj.synthesized_design.k                    = [];
+%             obj.synthesized_design.GC                   = {};
+%             obj.synthesized_design.des_scatter          = [];
+%             
+%             
+%             % flag for switching to using max scattering strength
+%             saturate_scatter_str_to_max = false;
+%  
+%             ii = 1;
+%             while cur_x < xvec(end)
+%                 % build grating one cell at a time
+%                 
+%                 % pick design with scattering strength closest to desired
+%                 % alpha
+%                 des_scatter                 = alpha_des(indx_x);                                        % desired alpha
+%                 if des_scatter  > max( scatter_strs_high_dir )
+%                     % desired scattering strength too high, gotta saturate
+%                     saturate_scatter_str_to_max = true;
+%                 end
+%                 if ~saturate_scatter_str_to_max
+%                     [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+%                 else
+%                     [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+%                 end
+%                 
+%                 % save parameters
+%                 obj.synthesized_design.dir(ii)                   = high_dirs( indx_closest_scatter );
+%                 obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.top_bot_fill_ratio(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.top_fill(ii)              = topbot_ratio_high_dir( indx_closest_scatter ) * bot_fills_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.offset(ii)                = offsets_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.period(ii)                = periods_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.angles(ii)                = angles_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.scatter_str(ii)           = scatter_strs_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.k(ii)                     = k_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.des_scatter(ii)           = des_scatter;
+%                 
+%                 obj.synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
+%                                                        obj.discretization, ...
+%                                                        obj.units.name, ...
+%                                                        obj.lambda, ...
+%                                                        obj.background_index, ...
+%                                                        obj.y_domain_size, ...
+%                                                        obj.synthesized_design.period(ii), ...
+%                                                        obj.synthesized_design.top_fill(ii), ...
+%                                                        obj.synthesized_design.bot_fill(ii), ...
+%                                                        obj.synthesized_design.offset(ii)/obj.synthesized_design.period(ii) );
+% 
+%                 
+%                 % move onto next
+%                 cur_x       = cur_x + obj.synthesized_design.period(ii);
+%                 [~, indx_x] = min( abs(xvec - cur_x) );
+%                 cur_x       = xvec( indx_x );
+%                 ii          = ii + 1;
+%                 
+%             end     % end for ii = 1:ncells
             
             
             % build final index distribution
@@ -1586,6 +1593,150 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             plot(x, y);
 %             xlabel('bot'); ylabel('top');
             
+            % match data points to desired alpha
+            obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+                                         bot_fills_high_dir, top_fills_high_dir, ...
+                                         offsets_high_dir, periods_high_dir, ...
+                                         angles_high_dir, scatter_strs_high_dir, ...
+                                         k_high_dir );
+
+%             % now match these data points to the desired alpha
+%             % starting point
+%             [~, indx_max_alpha] = max( alpha_des );
+%             start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
+%             [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
+%             cur_x               = xvec(indx_x);
+%             
+%             % final synthesized variables
+%             obj.synthesized_design.dir                  = [];
+%             obj.synthesized_design.bot_fill             = [];
+%             obj.synthesized_design.top_bot_fill_ratio   = [];
+%             obj.synthesized_design.top_fill             = [];
+%             obj.synthesized_design.period               = [];
+%             obj.synthesized_design.offset               = [];
+%             obj.synthesized_design.angles               = [];
+%             obj.synthesized_design.scatter_str          = [];
+%             obj.synthesized_design.k                    = [];
+%             obj.synthesized_design.GC                   = {};
+%             obj.synthesized_design.des_scatter          = [];
+%             
+%             
+%             % flag for switching to using max scattering strength
+%             saturate_scatter_str_to_max = false;
+%  
+%             ii = 1;
+%             while cur_x < xvec(end)
+%                 % build grating one cell at a time
+%                 
+%                 % pick design with scattering strength closest to desired
+%                 % alpha
+%                 des_scatter = alpha_des(indx_x);                            % desired alpha
+%                 if des_scatter  > max( scatter_strs_high_dir )
+%                     % desired scattering strength too high, gotta saturate
+%                     saturate_scatter_str_to_max = true;
+%                 end
+%                 if ~saturate_scatter_str_to_max
+%                     [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+%                 else
+%                     [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+%                 end
+%                 
+%                 % save parameters
+%                 obj.synthesized_design.dir(ii)                   = high_dirs( indx_closest_scatter );
+%                 obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.top_fill(ii)              = top_fills_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.top_bot_fill_ratio(ii)    = top_fills_high_dir( indx_closest_scatter ) ./ bot_fills_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.offset(ii)                = offsets_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.period(ii)                = periods_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.angles(ii)                = angles_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.scatter_str(ii)           = scatter_strs_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.k(ii)                     = k_high_dir( indx_closest_scatter );
+%                 obj.synthesized_design.des_scatter(ii)           = des_scatter;
+%                 
+%                 obj.synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
+%                                                        obj.discretization, ...
+%                                                        obj.units.name, ...
+%                                                        obj.lambda, ...
+%                                                        obj.background_index, ...
+%                                                        obj.y_domain_size, ...
+%                                                        obj.synthesized_design.period(ii), ...
+%                                                        obj.synthesized_design.top_fill(ii), ...
+%                                                        obj.synthesized_design.bot_fill(ii), ...
+%                                                        obj.synthesized_design.offset(ii)/obj.synthesized_design.period(ii) );
+% 
+%                 
+%                 % move onto next
+%                 cur_x       = cur_x + obj.synthesized_design.period(ii);
+%                 [~, indx_x] = min( abs(xvec - cur_x) );
+%                 cur_x       = xvec( indx_x );
+%                 ii          = ii + 1;
+%                 
+%             end     % end for ii = 1:ncells
+            
+            
+            % build final index distribution
+            obj = obj.build_final_index();
+%             obj.synthesized_design.N = [];
+%             for ii = 1:length(obj.synthesized_design.GC)
+%                
+%                 GC                          = obj.synthesized_design.GC{ii};
+%                 obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+%                 
+%             end
+            
+            % coordinates of index distribution
+            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
+            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
+            
+            
+        end     % end function generate_final_design_gaussian_topbot()
+        
+        
+        function obj = generate_final_design_uniform( obj )
+            
+        end
+        
+        
+        function obj = pick_final_datapoints( obj, xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir )
+            % Picks the final datapoints (cells) that make up the grating
+            %
+            % Inputs:
+            %     xvec
+            %         type: double, array
+            %         desc: coordinates of desired field profile
+            %     alpha_des
+            %         type: double, array
+            %         desc: desired scattering strength vs. x
+            %     high_dirs
+            %         type: double, array
+            %         desc: chosen highest directivity points
+            %     bot_fills_high_dir
+            %         type: double, array
+            %         desc: bottom fill value of chosen highest dir. points
+            %     top_fills_high_dir
+            %         type: double, array
+            %         desc: top fill value of chosen highest dir. points
+            %     offsets_high_dir
+            %         type: double, array
+            %         desc: offset values of chosen highest dir. points
+            %     periods_high_dir
+            %         type: double, array
+            %         desc: periods of chosen highest dir. points
+            %     angles_high_dir
+            %         type: double, array
+            %         desc: angle of chosen highest dir. points
+            %     scatter_strs_high_dir
+            %         type: double, array
+            %         desc: scattering strength (alpha) of chosen highest
+            %               dir. points
+            %     k_high_dir
+            %         type: double, array
+            %         desc: k of chosen highest dir. points
+            
             % now match these data points to the desired alpha
             % starting point
             [~, indx_max_alpha] = max( alpha_des );
@@ -1659,23 +1810,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 
             end     % end for ii = 1:ncells
             
-            
-            % build final index distribution
-            obj = obj.build_final_index();
-%             obj.synthesized_design.N = [];
-%             for ii = 1:length(obj.synthesized_design.GC)
-%                
-%                 GC                          = obj.synthesized_design.GC{ii};
-%                 obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
-%                 
-%             end
-            
-            % coordinates of index distribution
-            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
-            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
-            
-            
-        end     % end function generate_final_design_gaussian_topbot()
+        end     % end pick_final_datapoints()
+        
         
         function obj = build_final_index( obj )
         % build final index distribution
