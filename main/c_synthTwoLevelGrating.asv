@@ -1660,17 +1660,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % convert scatter str vs. cell into scatter str vs. x
             x_coords            = obj.synthesized_design.x_coords;
             scatter_str_vs_x    = zeros( size(x_coords) );
-            end_pos_vs_cell     = cumsum( obj.synthesized_design.period );
+            start_pos_vs_cell   = cumsum( obj.synthesized_design.period );  % t
+%             start_pos_vs_cell   = [ 0, start_pos_vs_cell(1:end-1) ];
             cur_cell            = 1;
             for ii = 1:length(x_coords)
-                
-                scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(cur_cell);
-                
-                if x_coords(ii) > end_pos_vs_cell( cur_cell )
-                    % move to next cell
-                    cur_cell = cur_cell + 1;
-                end
-                
+                scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(ii);
+                if x_coords(ii) > start_pos_vs_cell( cur_cell + 1 )
             end
                 
             % integrate the picked scatter strengths to get the predicted
