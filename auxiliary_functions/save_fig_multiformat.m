@@ -23,6 +23,9 @@ if save_on == true
 
     %save .eps color
     saveas(h_fig, name, 'epsc');
+    
+    %save .emf 
+    saveas(h_fig, name, 'emf');
 end
 
 end

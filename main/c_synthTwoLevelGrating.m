@@ -1284,7 +1284,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function generate_final_design_gaussian()
         
         
-        function obj = generate_final_design_gaussian_topbot( obj, MFD, input_wg_type, enforce_min_feat_size_func )
+        function obj = generate_final_design_gaussian_topbot( obj, MFD, input_wg_type, enforce_min_feat_size_func, start_alpha_des )
             % function for generating the final synthesized design
             % parameters
             %
@@ -1317,7 +1317,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %     obj.synthesized_design.k                  
             %     obj.synthesized_design.GC                 
             %     obj.synthesized_design.des_scatter        
-            
 
             % save input waveguide type
             obj.synthesized_design.input_wg_type = input_wg_type;      
@@ -1449,12 +1448,21 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             makeFigureNice();
             
             % match data points to desired alpha
-            obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-                                         bot_fills_high_dir, top_fills_high_dir, ...
-                                         offsets_high_dir, periods_high_dir, ...
-                                         angles_high_dir, scatter_strs_high_dir, ...
-                                         k_high_dir );
-            
+            if exist( 'start_alpha_des', 'var' )
+                % use user defined alpha start
+                obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+                                             bot_fills_high_dir, top_fills_high_dir, ...
+                                             offsets_high_dir, periods_high_dir, ...
+                                             angles_high_dir, scatter_strs_high_dir, ...
+                                             k_high_dir, start_alpha_des );
+            else
+                obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+                                             bot_fills_high_dir, top_fills_high_dir, ...
+                                             offsets_high_dir, periods_high_dir, ...
+                                             angles_high_dir, scatter_strs_high_dir, ...
+                                             k_high_dir );
+            end
+
             % build final index distribution
             obj = obj.build_final_index();
             
@@ -1475,7 +1483,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             
             
-        end
+        end     % end function generate_final_design_uniform()
         
         
         function [ obj, xvec, alpha_des ] = calculate_desired_scattering( obj, MFD )
@@ -1507,14 +1515,63 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             title('DEBUG scattering strength for gaussian');
             makeFigureNice();  
             
-        end
+        end     % end function calculate_desired_scattering()
+        
+        
+        function obj = optimize_start_alpha( obj, xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir )
+            
+            % pick the alphas to try:
+            alpha_powers    = linspace( -10, -4, 10 );
+            alpha_try       = 10.^( alpha_power );
+            
+            % pick the datapoints
+            obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir, alpha_try(1) );
+            
+            % convert scatter str vs. cell into scatter str vs. x
+            x_coords            = obj.synthesized_design.x_coords;
+            scatter_str_vs_x    = zeros( size(x_coords) );
+            end_pos_vs_cell     = cumsum( obj.synthesized_design.period );
+            cur_cell            = 1;
+            for ii = 1:length(x_coords)
+                
+                scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(cur_cell);
+                
+                if x_coords(ii) > end_pos_vs_cell( cur_cell )
+                    % move to next cell
+                    cur_cell = cur_cell + 1;
+                end
+                
+            end
+                
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            field_shape_prediction = zeros( size(xvec) );
+            A0 = 1;
+            dx = xvec(2) - xvec(1);
+            for ii = 1:length(xvec)
+               
+                field_shape_prediction(ii) = A0*(1 - exp( -obj.synthesized_design.scatter_str(ii)
+                
+            end
+            
+                                          
+                                          
+        end     % end function optimize_start_alpha()
         
         
         function obj = pick_final_datapoints( obj, xvec, alpha_des, high_dirs, ...
                                               bot_fills_high_dir, top_fills_high_dir, ...
                                               offsets_high_dir, periods_high_dir, ...
                                               angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir )
+                                              k_high_dir, start_alpha_des )
             % Picks the final datapoints (cells) that make up the grating
             %
             % Inputs:
@@ -1549,11 +1606,19 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %     k_high_dir
             %         type: double, array
             %         desc: k of chosen highest dir. points
+            %     start_alpha_des
+            %         type: double, scalar
+            %         desc: OPTIONAL, user defined starting alpha
+            
+            % default to weakest cell
+            if ~exist( 'start_alpha_des', 'var' )
+                start_alpha_des = min(scatter_strs_high_dir); %1e-5;
+            end
             
             % now match these data points to the desired alpha
             % starting point
             [~, indx_max_alpha] = max( alpha_des );
-            start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
+%             start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
             [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
@@ -1622,6 +1687,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 ii          = ii + 1;
                 
             end     % end for ii = 1:ncells
+            
+            % this may be temporary
+            % build final index distribution
+            obj = obj.build_final_index();
+            
+            % coordinates of index distribution
+            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
+            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
             
         end     % end pick_final_datapoints()
         
