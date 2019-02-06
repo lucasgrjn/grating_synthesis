@@ -621,6 +621,12 @@ classdef c_bloch_cell
                                                    'Position', [20, ax.Position(4) - 75, 100, 30], ...
                                                    'Callback', @toggle_index_overlay );   
 
+            % Create textbox for displaying the mode's eigenvalue
+            textbox_eigenval = uicontrol( 'Style', 'text', ...
+                                          'String', 'hello', ...
+                                          'Position', [20, ax.Position(4) - 100, 100, 30] );
+                                           
+                                               
 
             % Make figure visble after adding all components
             f.Visible = 'on';
@@ -676,27 +682,32 @@ classdef c_bloch_cell
 
                 hold off;
                 
+                % E field to plot
+                Ez_to_plot = Ez(:,:,mode_num);
+                Ez_to_plot = Ez_to_plot./max(abs(Ez_to_plot(:)));
+                
                 switch mode_comp
 
                     case 'real'
-                        imagesc( x_coords_all, obj.y_coords, real(Ez(:,:,mode_num)) );
+                        imagesc( x_coords_all, obj.y_coords, real(Ez_to_plot) );
                         title( sprintf( 'Mode %i, real component', mode_num ));
 
                     case 'imaginary'
-                        imagesc( x_coords_all, obj.y_coords, imag(Ez(:,:,mode_num)) );
+                        imagesc( x_coords_all, obj.y_coords, imag(Ez_to_plot) );
                         title( sprintf( 'Mode %i, imaginary component', mode_num ));
 
                     case 'amplitude'
-                        imagesc( x_coords_all, obj.y_coords, abs(Ez(:,:,mode_num)) );
+                        imagesc( x_coords_all, obj.y_coords, abs(Ez_to_plot) );
                         title( sprintf( 'Mode %i, amplitude', mode_num ));
 
                     case 'intensity'
-                        imagesc( x_coords_all, obj.y_coords, abs(Ez(:,:,mode_num)).^2 );
+                        imagesc( x_coords_all, obj.y_coords, abs(Ez_to_plot).^2 );
                         title( sprintf( 'Mode %i, intensity', mode_num ));
 
                 end
                 set( gca, 'ydir', 'normal' );
                 colormap('redbluehilight');
+                caxis( [-1,1] .* max(abs(Ez_to_plot(:))) );                 % get the color limits, center white = 0
                 xlabel(['x (' obj.units.name ')']); ylabel(['y (' obj.units.name ')']);
                 colorbar;
 
