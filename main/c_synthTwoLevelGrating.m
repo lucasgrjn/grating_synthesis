@@ -1453,21 +1453,21 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                               angles_high_dir, scatter_strs_high_dir, ...
                                               k_high_dir, desired_field );
             
-            % match data points to desired alpha
-            if exist( 'start_alpha_des', 'var' )
-                % use user defined alpha start
-                obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-                                             bot_fills_high_dir, top_fills_high_dir, ...
-                                             offsets_high_dir, periods_high_dir, ...
-                                             angles_high_dir, scatter_strs_high_dir, ...
-                                             k_high_dir, start_alpha_des );
-            else
-                obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-                                             bot_fills_high_dir, top_fills_high_dir, ...
-                                             offsets_high_dir, periods_high_dir, ...
-                                             angles_high_dir, scatter_strs_high_dir, ...
-                                             k_high_dir );
-            end
+%             % match data points to desired alpha
+%             if exist( 'start_alpha_des', 'var' )
+%                 % use user defined alpha start
+%                 obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+%                                              bot_fills_high_dir, top_fills_high_dir, ...
+%                                              offsets_high_dir, periods_high_dir, ...
+%                                              angles_high_dir, scatter_strs_high_dir, ...
+%                                              k_high_dir, start_alpha_des );
+%             else
+%                 obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
+%                                              bot_fills_high_dir, top_fills_high_dir, ...
+%                                              offsets_high_dir, periods_high_dir, ...
+%                                              angles_high_dir, scatter_strs_high_dir, ...
+%                                              k_high_dir );
+%             end
 
             % build final index distribution
             obj = obj.build_final_index();
@@ -1546,67 +1546,121 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %         type: double, array
             %         desc: desired field vs. xvec
             
-            % pick the alphas to try:
-            alpha_powers    = linspace( -6, -3, 100 );
-            alpha_try       = 10.^( alpha_powers );
+%             % pick the alphas to try:
+%             alpha_power_max = log10( min( scatter_strs_high_dir ) );
+%             alpha_powers    = linspace( -6, alpha_power_max, 100 );
+%             alpha_try       = 10.^( alpha_powers );
             
-            % save max overlap, dimensions overlap vs. alpha
-            max_overlap = zeros( size( alpha_try ) );
+%             % save max overlap, dimensions overlap vs. alpha
+%             max_overlap = zeros( size( alpha_try ) );
             
-            for i_alpha = 1:length(alpha_try)
+%             % brute force optimize
+%             for i_alpha = 1:length(alpha_powers)
+%                 
+%                 max_overlap(i_alpha) = obj.predict_overlap_for_optimization( ...
+%                                               xvec, alpha_des, high_dirs, ...
+%                                               bot_fills_high_dir, top_fills_high_dir, ...
+%                                               offsets_high_dir, periods_high_dir, ...
+%                                               angles_high_dir, scatter_strs_high_dir, ...
+%                                               k_high_dir, desired_field, alpha_powers(i_alpha) );
+%                 
+%             end     % end for i_alpha = 1:length(alpha_try)
+           
+            % using matlab's fminsearch
+            f = @(alpha_power)( 1 - obj.predict_overlap_for_optimization( ...
+                                              xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir, desired_field, alpha_power ) );
             
-                % pick the datapoints
-                obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
-                                                  bot_fills_high_dir, top_fills_high_dir, ...
-                                                  offsets_high_dir, periods_high_dir, ...
-                                                  angles_high_dir, scatter_strs_high_dir, ...
-                                                  k_high_dir, alpha_try(i_alpha) );
-
-                % convert scatter str vs. cell into scatter str vs. x
-                xvec                = xvec - xvec(1);
-                scatter_str_vs_x    = zeros( size( xvec ) );
-                end_pos_vs_cell     = cumsum( obj.synthesized_design.period );
-                cur_cell            = 1;
-                for ii = 1:length(xvec)
-                
-                    scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(cur_cell);
-
-                    if xvec(ii) > end_pos_vs_cell( cur_cell ) && cur_cell < length(end_pos_vs_cell)
-                        % move to next cell
-                        cur_cell = cur_cell + 1;
-                    end
-
-                end
-                
-                % integrate the picked scatter strengths to get the predicted
-                % field shape
-                field_shape_prediction = zeros( size(xvec) );
-                A0 = 1;
-                dx = xvec(2) - xvec(1);
-                for ii = 1:length(xvec)
-
-                    % update radiation
-                    field_shape_prediction(ii) = A0.*(1 - exp( -scatter_str_vs_x(ii) * dx ) );
-
-                    % update guided power
-                    A0 = A0.*exp( -scatter_str_vs_x(ii) * dx );
-
-                end
+            % options
+%             opts = optimset( 'Display', 'iter' );
+                                          
+            % for debuggging
+%             [ best_alpha_power, best_val] = fminsearch( f, log10(min( scatter_strs_high_dir )), opts );
             
-                % calculate overlap with desired field
-                [ obj, overlap ]        = obj.xcorr_normalized( desired_field, field_shape_prediction );
-                max_overlap(i_alpha)    = max( abs(overlap) );
-                
-            end     % end for i_alpha = 1:length(alpha_try)
-                                  
-            % DEBUG plot max overlap vs. alpha
-            figure;
-            plot( alpha_powers, max_overlap, '-o' );
-            xlabel('alpha power'); ylabel('max overlap');
-            title('DEBUG max overlap vs. start alpha (in power)');
-            makeFigureNice();
+            best_alpha_power = fminsearch( f, log10(min( scatter_strs_high_dir )) );
+            
+%             best_overlap_fminsearch = 1 - best_val;
+            
+%             % DEBUG plot max overlap vs. alpha
+%             figure;
+%             plot( alpha_powers, max_overlap, '-o' );
+%             xlabel('alpha power'); ylabel('max overlap');
+%             title('DEBUG max overlap vs. start alpha (in power)');
+%             makeFigureNice();
+            
+            % now save the final design with the best predicted overlap
+            obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir, 10.^(best_alpha_power) );
                                           
         end     % end function optimize_start_alpha()
+        
+        
+        function [ max_overlap ] = predict_overlap_for_optimization( ...
+                                              obj, xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir, desired_field, start_alpha_power )
+            % merit function used in optimize_start_alpha for predicting
+            % overlap
+            %
+            % Inputs:
+            %   start_alpha_power:
+            %       type: double, scalar
+            %       desc: alpha to try = 10^(start_alpha_power)
+            %
+            % returns max overlap
+            
+            % pick the datapoints
+            obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
+                                              bot_fills_high_dir, top_fills_high_dir, ...
+                                              offsets_high_dir, periods_high_dir, ...
+                                              angles_high_dir, scatter_strs_high_dir, ...
+                                              k_high_dir, 10.^(start_alpha_power) );
+
+            % convert scatter str vs. cell into scatter str vs. x
+            xvec                = xvec - xvec(1);
+            scatter_str_vs_x    = zeros( size( xvec ) );
+            end_pos_vs_cell     = cumsum( obj.synthesized_design.period );
+            cur_cell            = 1;
+            for ii = 1:length(xvec)
+
+                scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(cur_cell);
+
+                if xvec(ii) > end_pos_vs_cell( cur_cell ) && cur_cell < length(end_pos_vs_cell)
+                    % move to next cell
+                    cur_cell = cur_cell + 1;
+                end
+
+            end
+
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            field_shape_prediction = zeros( size(xvec) );
+            A0 = 1;
+            dx = xvec(2) - xvec(1);
+            for ii = 1:length(xvec)
+
+                % update radiation
+                field_shape_prediction(ii) = A0.*(1 - exp( -scatter_str_vs_x(ii) * dx ) );
+
+                % update guided power
+                A0 = A0.*exp( -scatter_str_vs_x(ii) * dx );
+
+            end
+
+            % calculate overlap with desired field
+            [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
+            max_overlap     = max( abs(overlap) );
+            
+        end     % end function predict_overlap_for_optimization()
+        
         
         function [ obj, overlap_12 ] = xcorr_normalized( obj, field1, field2 )
             % very simple function that just computes normalized cross correlation of two vectors, 
@@ -1620,13 +1674,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             norm_factor_1   = field1' * field1;
             norm_factor_2   = field2' * field2;
             
-            % calculate E1 and H2 xcorr
+            % calculate field1 and field2 xcorr
             overlap_12 = ifftshift( ifft( fft( fftshift( field1 ) ) .* conj( fft( fftshift( field2 ) ) ) ) );
             overlap_12 = overlap_12./sqrt( ( norm_factor_1 .* norm_factor_2 ) );
-
-%             % calculate overlap function
-%             % field_overlap = (1/4) * abs( overlaps_E1_H2 + overlaps_H1_E2 ).^2 ./ abs( real(norm_factor_1) .* real(norm_factor_2) );
-%             field_overlap = (1/4) * abs( abs(overlaps_E1_H2) + abs(overlaps_H1_E2) ).^2 ./ ( abs(norm_factor_1) .* abs(norm_factor_2) );
             
         end     % end function xcorr_normalized()
         
