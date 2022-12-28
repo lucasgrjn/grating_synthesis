@@ -33,7 +33,7 @@ function [Phi_all, k_all, A, B] = complexk_mode_solver_2D_PML( N, disc, k0, num_
 %       type: 1x4 array
 %       desc: PML options
 %               PML_options(1): PML in y direction (yes=1 or no=0)
-%               PML_options(2): length of PML layer in nm
+%               PML_options(2): length of PML layer
 %               PML_options(3): strength of PML in the complex plane
 %               PML_options(4): PML polynomial order (1, 2, 3...)
 %       TEMPORARY: adding a 5th option to the PML, which is to use type 1
@@ -67,12 +67,12 @@ er = N.^2;
 if PML_options(1) == 1
     
     % grab params
-    pml_len_nm  = PML_options(2);   % length of pml in nm
+    pml_len     = PML_options(2);   % length of pml
     pml_str     = PML_options(3);   % strength of pml in complex plane
     pml_order   = PML_options(4);   % pml polynomial order
     
     % setup discretizations
-    ny_pml = 2 * round(pml_len_nm/disc);                                             % number of discretizations that pml spans, double sampled grid
+    ny_pml = 2 * round(pml_len/disc);                                             % number of discretizations that pml spans, double sampled grid
     if abs(ny_pml - round(ny_pml)) >= 1e-5
         % discretization was not integer value
         error('Integer # of discretizations did not fit into the PML');
@@ -80,15 +80,12 @@ if PML_options(1) == 1
     y_indx = 1:ny_pml;
         
     % using polynomial strength pml
-%     c       = (3e8) * (1e9);                    % nm/s
-%     eps0    = (8.854187817e-12) * (1e-9);       % F/nm
-%     omega   = k0*c;                             % rad/s
     pml_y   = (1 + 1i * pml_str * ( y_indx./ny_pml ).^( pml_order )).';
         
     
     % draw stretched coordinate pml
     pml_y_all                           = ones( 2*size(N,1), size(N,2) );
-    pml_y_all( 1:ny_pml-1, : )          = repmat( flipud( pml_y(1:end-1) ), 1, nx );
+    pml_y_all( 1:ny_pml-1, : )          = repmat( flipud( pml_y(1:end-1) ), 1, nx );  % why does this seem to draw to pml end-1?
     pml_y_all( end-ny_pml+1:end, : )    = repmat( pml_y, 1, nx );
     
     % stretched coordinate operator

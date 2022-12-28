@@ -52,9 +52,9 @@ classdef c_bloch_cell
         %> discretization in y (transverse direction)
         dy;
         %> name and scaling of spatial units, supports 'm', 'mm', 'um', 'nm'
-        units;
+%         units;
         %> free space wavelength, units 'units'
-        lambda;
+%         lambda;
         %> [ max_y, max_x ], where y = transverse and x = direction of propagation
         domain_size;
         %> vector of x coordinates (dir of prop)
@@ -99,6 +99,7 @@ classdef c_bloch_cell
         %>                   Sx, Sy, P_per_y_slice, P_per_x_slice
         %>   Some of the above fields may have been removed.
         debug;
+        background_index
         
     end     % end properties
     
@@ -110,9 +111,14 @@ classdef c_bloch_cell
         function obj = c_bloch_cell( varargin )
             
             % parse inputs
+%             inputs = {  'discretization',   'none', ...
+%                         'units',            'um',   ...
+%                         'lambda',           'none', ...
+%                         'background_index', 1.0,    ...
+%                         'domain_size',      'none', ...
+%                         'numcells',         10 ...
+%                      }; 
             inputs = {  'discretization',   'none', ...
-                        'units',            'um',   ...
-                        'lambda',           'none', ...
                         'background_index', 1.0,    ...
                         'domain_size',      'none', ...
                         'numcells',         10 ...
@@ -134,19 +140,19 @@ classdef c_bloch_cell
                 error('Input ''discretization'' must either be a scaler or a 1x2 vector');
             end
 
-            obj.units.name  = p.units;
-            switch( obj.units.name )
-                case 'm'
-                    obj.units.scale = 1;
-                case 'mm'
-                    obj.units.scale = 1e-3;
-                case 'um'
-                    obj.units.scale = 1e-6;
-                case 'nm'
-                    obj.units.scale = 1e-9;
-            end
+%             obj.units.name  = p.units;
+%             switch( obj.units.name )
+%                 case 'm'
+%                     obj.units.scale = 1;
+%                 case 'mm'
+%                     obj.units.scale = 1e-3;
+%                 case 'um'
+%                     obj.units.scale = 1e-6;
+%                 case 'nm'
+%                     obj.units.scale = 1e-9;
+%             end
 
-            obj.lambda = p.lambda;
+%             obj.lambda = p.lambda;
             
             % new version of creating background dielectric that rounds
             % the dimensions
@@ -156,6 +162,7 @@ classdef c_bloch_cell
             ny              = round( obj.domain_size(1)/obj.dy );                                           % number of y samples
             obj.y_coords    = 0 : obj.dy : ( (ny-1) * obj.dy );
             obj.N           = p.background_index * ones( length( obj.y_coords ), length( obj.x_coords ) );  % dimensions of y vs. x
+            obj.background_index = p.background_index;
             
             % check discretization fits in integer amt
             if abs(obj.x_coords(end) - (obj.domain_size(2) - obj.dx)) >= 1e-10
@@ -230,21 +237,6 @@ classdef c_bloch_cell
             % cut off before end of grid
             obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
                     x > (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
-%             % cut off after end of grid
-%             obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y - obj.dy/2), ...
-%                     x > (min_x - obj.dx/2) & x < (min_x + width_x - obj.dx/2) ) = index; 
-%             % cut off right before grid
-%             obj.N( y > (min_y - obj.dy/2) & y < (min_y + height_y), ...
-%                     x > (min_x - obj.dx/2) & x < (min_x + width_x) ) = index; 
-%             % cut off on grid
-%             obj.N( y > (min_y - obj.dy/2) & y <= (min_y + height_y), ...
-%                     x > (min_x - obj.dx/2) & x <= (min_x + width_x) ) = index; 
-%             % cut off on grid, both ends
-%             obj.N( y >= (min_y) & y <= (min_y + height_y), ...
-%                     x >= (min_x) & x <= (min_x + width_x) ) = index; 
-%             % cut off on grid on left, right before grid on right
-%             obj.N( y >= (min_y) & y < (min_y + height_y), ...
-%                     x >= (min_x) & x < (min_x + width_x) ) = index; 
             
         end     % end function addRect()
         
@@ -293,80 +285,25 @@ classdef c_bloch_cell
         %>       field repeated, i can't remember why or if i use this
         %>   obj.directivity
         %>       up/down power ratio
-        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk, OPTS )
+        function obj = runSimulation( obj, num_modes, BC, pml_options, k0, guessk, OPTS )
 
             % default OPTS
-            if nargin < 6
+            if nargin < 7
                 OPTS = struct();
             end
-            
-            % spatial variables, in units nm
-            nm          = 1e9;
-            a           = obj.domain_size(2) * obj.units.scale * nm;
-            lambda_nm   = obj.lambda * obj.units.scale * nm;
-            dx_nm       = obj.dx * obj.units.scale * nm;
-            guessk_nm   = guessk / ( obj.units.scale * nm );                % units rad/nm
 
             % store options
-            obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'pml_options', pml_options, 'OPTS', OPTS );
-
-            % set guessk if not entered
-            if nargin < 5
-                guessk = pi/(2*a);
-            end
+            obj.sim_opts = struct( 'num_modes', num_modes, 'BC', BC, 'k0', k0, 'pml_options', pml_options, 'OPTS', OPTS );
             
             % run solver
-            k0_nm           = 2*pi/lambda_nm;
-            [Phi_all, k_nm] = complexk_mode_solver_2D_PML( obj.N, ...
-                                                       dx_nm, ...
-                                                       k0_nm, ...
+            [obj.Phi_vs_mode, obj.k_vs_mode] = complexk_mode_solver_2D_PML( obj.N, ...
+                                                       obj.dx, ...
+                                                       k0, ...
                                                        num_modes, ...
-                                                       guessk_nm, ...
+                                                       guessk, ...
                                                        BC, ...
                                                        pml_options );
-                                                   
-            % re-scale k to units 'units'
-            k_vs_mode = k_nm * nm * obj.units.scale;
-            
-            % save k and phi vs mode #
-            obj.k_vs_mode   = k_vs_mode;
-            obj.Phi_vs_mode = Phi_all;
-            
-            % The stuff below will be moved to grating cell
-%             % pick which mode to keep
-%             if isfield( OPTS, 'mode_to_overlap' )
-%                 % pick mode with best overlap
-%                 obj = obj.choose_mode( OPTS.mode_to_overlap );
-%             else
-%                 % pick mode guided mode
-%                 obj = obj.choose_mode(); 
-%             end
-            
-%             % stitch together full e field, with the request number of
-%             % periods
-%             [obj, E_z]  = obj.stitch_E_field( obj.Phi, obj.k, obj.numcells );
-%             obj.E_z     = E_z;
-            
-%             % for mode overlapping, stitch together single unit cell of E
-%             % field, using only real(k)
-%             [obj, E_z_for_overlap]  = obj.stitch_E_field( obj.Phi, real(obj.k), 1 );
-%             obj.E_z_for_overlap     = E_z_for_overlap;
-            
-%             % pick slices of field to compute directivity, angle, etc.
-%             h_pml_d = round( pml_options(2)/obj.dy );                       % size of pml in discretizations
-%             y_up    = size( obj.E_z, 1 ) - h_pml_d - 1;
-%             y_down  = h_pml_d+2;
-            
-%             % calculate output angle
-%             obj = obj.calc_output_angle( y_up, y_down );
-%             
-%             % calculate up/down directivity
-%             obj             = obj.calc_radiated_power();
-%             obj.directivity = obj.P_rad_up/obj.P_rad_down;
-%                     
-%             % calculate power scattering strength
-%             obj = obj.calc_scattering_strength();
-                
+                           
         end     % end function runSimulation()
         
         
@@ -438,7 +375,6 @@ classdef c_bloch_cell
                 this_mode   = obj.Phi_vs_mode(:,:,mode_num) .* repmat( exp( 1i * obj.x_coords * real(obj.k_vs_mode( mode_num ) )), ny_this_mode, 1 );
             
                 % zero pad
-%                 total_ny            = ny_this_mode + ny_mode_to_overlap;
                 mode_to_overlap_pad = padarray( mode_to_overlap, [ floor(ny_this_mode/2), floor(nx_this_mode/2) ], 0, 'pre' );
                 mode_to_overlap_pad = padarray( mode_to_overlap_pad, [ ceil(ny_this_mode/2), ceil(nx_this_mode/2) ], 0, 'post' );
                 this_mode_pad       = padarray( this_mode, [ floor(ny_mode_to_overlap/2), floor(nx_mode_to_overlap/2) ], 0, 'pre' );
@@ -506,8 +442,9 @@ classdef c_bloch_cell
             imagesc( obj.x_coords, obj.y_coords, obj.N );
             colorbar;
             set( gca, 'YDir', 'normal' );
-            xlabel(['x (', obj.units.name, ')']);
-            ylabel(['y (', obj.units.name, ')']);
+            xlabel('x');
+            ylabel('y');
+            axis image;
             title('Plot of index distribution');
             
         end     % end function plotIndex()
@@ -623,7 +560,7 @@ classdef c_bloch_cell
 
             % Create textbox for displaying the mode's eigenvalue
             textbox_eigenval = uicontrol( 'Style', 'text', ...
-                                          'String', 'hello', ...
+                                          'String', '', ...
                                           'Position', [20, ax.Position(4) - 100, 100, 30] );
                                            
                                                
@@ -708,7 +645,8 @@ classdef c_bloch_cell
                 set( gca, 'ydir', 'normal' );
                 colormap('redbluehilight');
                 caxis( [-1,1] .* max(abs(Ez_to_plot(:))) );                 % get the color limits, center white = 0
-                xlabel(['x (' obj.units.name ')']); ylabel(['y (' obj.units.name ')']);
+                axis image;
+                xlabel('x'); ylabel('y');
                 colorbar;
 
                 if index_overlay_on == true
@@ -716,6 +654,7 @@ classdef c_bloch_cell
                     
                     % first things first, edge detection:
                     filt    = 'roberts';            % filter
+                    filt    = 'Canny';
                     N_edges = edge( N_repmat, filt );
                     
                     % overplot the detected edges

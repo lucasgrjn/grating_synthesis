@@ -12,29 +12,13 @@ classdef c_synthGrating
 %   drawing function.
 %   HOWEVER, this function MUST have the following inputs and outputs, IN
 %   ORDER:
-%       function GC = your_makeGratingCell_function( dxy, units, lambda, background_index, domain_size, fill_ratio )
+%       function GC = your_makeGratingCell_function( dxy, units, lambda, background_index, y_domain_size, period, fill_ratio )
 %           % makes and returns a c_gratingCell object (or subclass of one)
 % 
-%           inputs:
-%               synth_obj
-%               type: c_synthGrating object AS STRUCT
-%               desc: c_synthGrating object AS STRUCT
-%           period
-%               type: double, scalar
-%               desc: period of the grating cell
-%           fill_top
-%               type: double, scalar
-%               desc: ratio of top layer to period
-%           fill_bot
-%               type: double, scalar
-%               desc: ratio of bottom layer to period
-%           offset_ratio
-%               type: double, scalar
-%               desc: ratio of bottom layer offset to period
 %       outputs:
 %           GC
-%               type: c_twoLevelGratingCell object
-%               desc: two level grating cell object
+%               type: c_gratingCell object
+%               desc: single level grating cell object
 %
 %   As an example:
 %       see the default makeGratingCell() function that's included at the
@@ -122,6 +106,7 @@ classdef c_synthGrating
         units;              % units, verbose, 'm' or 'mm', or 'um', or 'nm'
                             % has fields 'name' and 'scale'
         lambda;             % center wavelength
+        k0;                 % center wavenumber
         background_index;   % background index
         y_domain_size;      % transverse domain size (y coordinate aka vertical dimension)
         inputs;             % saves input settings for user reference
@@ -143,6 +128,7 @@ classdef c_synthGrating
         % periods_vs_fill
         % k_vs_fill
         % GC_vs_fill
+        % overlap_predict_vs_fill - if uniform design is run
         sweep_variables;
         
         % struct that stores final design parameters
@@ -176,12 +162,12 @@ classdef c_synthGrating
 
             % inputs and defaults
             inputs = {  'discretization',   'none', ...
-                        'units',            'nm',   ...
                         'lambda',           'none', ...
                         'background_index', 1.0,    ...
                         'y_domain_size',    'none', ...
                         'optimal_angle',    'none', ...
                         'data_notes',       '', ...
+                        'coupling_direction',   'none', ...
                         'h_makeGratingCell', @makeGratingCell ...
                      }; 
             obj.inputs = inputs;
@@ -193,21 +179,22 @@ classdef c_synthGrating
             obj.start_time = datestr( datetime('now'), 'yyyy_mm_dd_HH_MM_SS_' );
 
             % set units
-            obj.units.name  = p.units;
-            switch( obj.units.name )
-                case 'm'
-                    obj.units.scale = 1;
-                case 'mm'
-                    obj.units.scale = 1e-3;
-                case 'um'
-                    obj.units.scale = 1e-6;
-                case 'nm'
-                    obj.units.scale = 1e-9;
-            end
+%             obj.units.name  = p.units;
+%             switch( obj.units.name )
+%                 case 'm'
+%                     obj.units.scale = 1;
+%                 case 'mm'
+%                     obj.units.scale = 1e-3;
+%                 case 'um'
+%                     obj.units.scale = 1e-6;
+%                 case 'nm'
+%                     obj.units.scale = 1e-9;
+%             end
 
             % set other properties
             obj.discretization      = p.discretization;
             obj.lambda              = p.lambda;
+            obj.k0                  = 2*pi/p.lambda;
             obj.background_index    = p.background_index;
             obj.y_domain_size       = p.y_domain_size;
             obj.optimal_angle       = p.optimal_angle;
@@ -301,32 +288,32 @@ classdef c_synthGrating
 
 
             % Constants, in units of meters
-            lambda  = obj.lambda * obj.units.scale / nclad;     % wavelength in cladding, units m
+            lambda  = obj.lambda/nclad; % * obj.units.scale / nclad;     % wavelength in cladding, units m
             k0      = 2*pi/lambda;                              % 1/m
-            w0      = w0 * obj.units.scale;                     % [meters] radius
-            d0      = d0 * obj.units.scale;                     % [meters] offset
+%             w0      = w0; % * obj.units.scale;                     % [meters] radius
+%             d0      = d0; % * obj.units.scale;                     % [meters] offset
             
             % Convert to radians
             theta = (pi/180)*theta;
             
             % Scale coordinates
-            xvec = xvec * obj.units.scale;                                              % units m
+%             xvec = xvec * obj.units.scale;                                              % units m
             yvec = xvec;
-            zvec = zvec * obj.units.scale;                                              % units m
+%             zvec = zvec * obj.units.scale;                                              % units m
             
-            % try just plotting this slice of data
+            % dimensions in frame of gaussian beam optical axis 
             xprime = xvec.*cos(-theta) + d0*sin(-theta);
             zprime = -xvec.*sin(-theta) + d0*cos(-theta);
 
             % b (confocal parameters) is used instead of z0 so that z0 = -1j.*b removes the singularity of the solution on the real z axis (see Haus pg 109)
             b = k0*w0^2/2;                                                                                   
 
-            % Equation (5.2) in Haus [1/meters]
+            % Equation (5.2) in Haus
             u00_slice =   1j .* sqrt(k0*b/pi) .* ( 1./(zprime + 1j.*b) ).*...
                 exp( -1j.*k0.*( xprime.^2 )./( 2*(zprime + 1j.*b) ) );     
             
             % normalize the slice to intensity
-            dx          = obj.discretization * obj.units.scale;                 % disc. in m
+            dx          = obj.discretization; % * obj.units.scale;                 % disc. in m
             u00_slice   = u00_slice/sqrt( dx * sum( abs( u00_slice ).^2 ) );
             
             % return and save data
@@ -336,27 +323,38 @@ classdef c_synthGrating
         end     % end fiber_mode_gaussian()
         
         
-        function obj = generate_design_space( obj )
+        function obj = generate_design_space( obj, fill_ratios_to_sweep )
             % sweep fills, optimize period for a single output angle
+            %
+            % Inputs:
+            %   fill_ratios_to_sweep
+            %       type: double, array
+            %       desc: OPTIONAL fill ratios to sweep
+            
+            % default fills
+            if nargin < 2
+                fill_ratios_to_sweep = fliplr( 0.02:0.02:0.98 );
+            end
+            
+            % sort fills so they are in descending order
+            fill_ratios_to_sweep = sort( fill_ratios_to_sweep, 'descend' );
             
             % make waveguide cell
-            waveguide = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
+            waveguide = obj.h_makeGratingCell( obj.discretization, .....
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
-                                               1.0, ...
-                                               2*obj.discretization );
+                                               2*obj.discretization, ...
+                                               1.0 );
             
             % run waveguide simulation
             % sim settings
-            guess_n             = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
+            guess_n             = 1.0 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
             guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
             num_wg_modes        = 5;
             BC                  = 0;                                                                % 0 = PEC
             pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
             % run sim
-            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, guessk );
+            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, obj.k0, guessk );
             
             % update guessk (units rad/'units')
             guessk = waveguide.k;
@@ -370,7 +368,7 @@ classdef c_synthGrating
             
             % calculate analytical period which would approximately phase
             % match to desired output angle
-            k0              = obj.background_index * ( 2*pi/obj.lambda );
+            k0              = obj.background_index * obj.k0;
             kx              = k0 * sin( (pi/180) * obj.optimal_angle );
             guess_period    = 2*pi/(waveguide_k - kx);                              % units of 'units'
             
@@ -390,12 +388,9 @@ classdef c_synthGrating
             BC          = 0;                                                % 0 = PEC
             pml_options = [1, 100, 20, 2]; 
             OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
-            
-            % pick fill ratios to sweep
-            fill_ratios_to_sweep                        = fliplr( 0.20:0.02:0.98 );
-            obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
-            
+     
             % initialize saving variables
+            obj.sweep_variables.fill_ratios_to_sweep    = fill_ratios_to_sweep;
             obj.sweep_variables.directivities_vs_fill   = zeros( size(fill_ratios_to_sweep) );
             obj.sweep_variables.angles_vs_fill          = zeros( size(fill_ratios_to_sweep) );
             obj.sweep_variables.scatter_str_vs_fill     = zeros( size(fill_ratios_to_sweep) );
@@ -411,25 +406,12 @@ classdef c_synthGrating
                 
                 % simulate the grating, get the angle
                 GC = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
-                                               fill_ratios_to_sweep(ii), ...
-                                               guess_period );
-                GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
+                                               guess_period, ...
+                                               fill_ratios_to_sweep(ii) );
+                GC = GC.runSimulation( num_modes, BC, pml_options, obj.k0, guessk, OPTS );
                 
-                % decide whether to sweep larger or smaller periods
-                % based on the angle
-                % for now, assuming we're coupling upwards
-                if GC.max_angle_up > obj.optimal_angle
-                    % only sweep smaller periods
-                    decrease_periods = true;
-                else
-                    % only sweep larger periods
-                    decrease_periods = false;
-                end
-
                 % init saving variables
                 angles_vs_period    = [];
                 k_vs_period         = [];
@@ -449,27 +431,34 @@ classdef c_synthGrating
                 end
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-            
-                % set while loop exit flag
-                angle_err_sign_flip = false;
+                
+                % decide whether to sweep larger or smaller periods
+                % based on the angle
+                if angles_vs_period(1) > obj.optimal_angle
+                    % only sweep smaller periods
+                    delta_period = -obj.discretization;
+                else
+                    % only sweep larger periods
+                    delta_period = obj.discretization;
+                end
             
                 i_period = 2;
-                while ~angle_err_sign_flip
-
+                while true
                    
                     fprintf('Period iteration %i\n', i_period );
+                    
+                    % update period
+                    guess_period = guess_period + delta_period;
 
                     % make grating cell
                     GC = obj.h_makeGratingCell( obj.discretization, ...
-                                                   obj.units.name, ...
-                                                   obj.lambda, ...
                                                    obj.background_index, ...
                                                    obj.y_domain_size, ...
-                                                   fill_ratios_to_sweep(ii), ...
-                                                   guess_period );
+                                                   guess_period, ...
+                                                   fill_ratios_to_sweep(ii) );
 
                     % run sim
-                    GC = GC.runSimulation( num_modes, BC, pml_options, guessk, OPTS );
+                    GC = GC.runSimulation( num_modes, BC, pml_options, obj.k0, guessk, OPTS );
 
                     if strcmp( obj.coupling_direction, 'up' )
                         % coupling direction is upwards
@@ -486,35 +475,18 @@ classdef c_synthGrating
                     guessk                      = GC.k;
                     OPTS.mode_to_overlap        = GC.E_z_for_overlap;
                     
-                    % update period
-                    if decrease_periods == true
-
-                        % check for exit condition (error of angle switches
-                        % sign)
-                        if angles_vs_period(i_period) < obj.optimal_angle
-                            angle_err_sign_flip = true;
-                        else
-                            % decrease the period
-                            guess_period = guess_period - obj.discretization;
-                        end
-
-                    else
-
-                        % check for exit condition (error of angle switches
-                        % sign)
-                        if angles_vs_period(i_period) > obj.optimal_angle
-                            angle_err_sign_flip = true;
-                        else
-                            % increase the period
-                            guess_period = guess_period + obj.discretization;
-                        end
-
-                    end     % end updating period if else
+                    % check for exit condition (if error in angle gets worse)
+                    cur_angle_err   = abs( angles_vs_period( i_period ) - obj.optimal_angle );
+                    prev_angle_err  = abs( angles_vs_period( i_period-1 ) - obj.optimal_angle );
+                    if cur_angle_err > prev_angle_err
+                        % optimization over, break
+                        break;
+                    end
                 
                     i_period = i_period + 1;
                     
                     toc;
-
+                    
                 end     % end period sweep
 
                 % pick best period
@@ -527,6 +499,7 @@ classdef c_synthGrating
                     obj.sweep_variables.directivities_vs_fill( ii )    = best_GC.directivity;
                     obj.sweep_variables.angles_vs_fill( ii )           = best_GC.max_angle_up;
                     obj.sweep_variables.scatter_str_vs_fill( ii )      = best_GC.alpha_up;
+%                     obj.sweep_variables.scatter_str_vs_fill_srad( ii )      = best_GC.alpha_up_from_srad;
                 else
                     % coupling direction is downwards
                     obj.sweep_variables.directivities_vs_fill( ii )    = 1./best_GC.directivity;
@@ -535,7 +508,13 @@ classdef c_synthGrating
                 end
                 obj.sweep_variables.periods_vs_fill( ii )          = best_GC.domain_size(2);
                 obj.sweep_variables.k_vs_fill( ii )                = best_GC.k;
-                obj.sweep_variables.GC_vs_fill{ ii }               = best_GC;
+                
+                % going to save this without the field to save memory
+                obj.sweep_variables.GC_vs_fill{ ii } = obj.h_makeGratingCell( obj.discretization, ...
+                                                   obj.background_index, ...
+                                                   best_GC.domain_size(1), ...
+                                                   best_GC.domain_size(2), ...
+                                                   fill_ratios_to_sweep(ii) );
                 
                 % update guess period for next iteration
                 guess_period = best_GC.domain_size(2);
@@ -546,71 +525,681 @@ classdef c_synthGrating
             
         end     % end generateDesignSpace()
         
+       
         
-        
-        function obj = synthesize_grating( obj, field_profile )
-            % Synthesizes grating that has amplitude matching field_profile
+        function obj = generate_final_design_uniform( obj, desired_field, input_wg_type, enforce_min_feat_size_func )
+            % Synthesizes a uniform grating that has amplitude matching field_profile
             %
             % inputs:
-            %   field_profile
+            %   desired_field
             %       type: double, array
             %       desc: field profile to amplitude match to. dimensions
             %             are amplitude vs. x coordinates
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: OPTIONAL user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )  
             
-            % coordinates
-            x = obj.discretization * ( 0:(length(field_profile)-1) );
+            % first choose which half of the design space to use
+            [ obj, chosen_fills, chosen_periods, ...
+                    chosen_angles, chosen_scatter_str, ...
+                    chosen_ks ] = obj.pick_design_half( input_wg_type );
             
-            % first normalize field integral
-            field_int       = sum( abs( field_profile ).^2 ) * obj.discretization * obj.units.scale;
-            field_profile   = field_profile./sqrt( field_int );
+            % enforce min feature size
+            obj.synthesized_design.use_min_feat_size = false;                   % default to false
+            if exist( 'enforce_min_feat_size_func', 'var' )
+                obj.synthesized_design.use_min_feat_size = true;
+                
+                [ obj, chosen_fills, chosen_periods, ... 
+                chosen_angles, chosen_scatter_str, chosen_ks ]...
+                = enforce_min_feat_size( obj, enforce_min_feat_size_func, ... 
+                                            chosen_fills, ... 
+                                            chosen_periods, ... 
+                                            chosen_angles, ... 
+                                            chosen_scatter_str, ... 
+                                            chosen_ks );
+            end
+                
+            % init saving vars
+            overlap_predict_vs_fill = zeros( size( chosen_fills ) );
             
+            % for each fill
+            for i_fill = 1:length(chosen_fills)
+                
+                % grab current alpha
+                cur_alpha = chosen_scatter_str(i_fill);
+                
+                % calc length of grating to scatter 99% of light (1/e^4 power)
+                grat_len = 2/cur_alpha;     % in 'units'
+                
+                % gen x coords
+                xvec = 0 : obj.discretization : grat_len - obj.discretization;
+                
+                % calculate the predicted field shape, which is simply an exponential decay
+                field_shape_prediction = exp( -cur_alpha .* xvec );
+                
+                % calculate overlap with desired field (simple xcorr)
+                [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
+                overlap_predict_vs_fill(i_fill) = max( abs(overlap) );
+                
+            end
+            
+            % pick best overlap and synthesize final design with it
+            [~, indx_best_overlap]  = max(abs(overlap_predict_vs_fill));
+            final_grat_len          = 2 ./ chosen_scatter_str( indx_best_overlap );
+            xvec                    = 0 : obj.discretization : final_grat_len - obj.discretization;
+            alpha_des               = chosen_scatter_str( indx_best_overlap ) .* ones( size( xvec ) );
+            
+            [ obj, synthesized_design ] = obj.pick_final_datapoints( ...
+                                      xvec, alpha_des, ...
+                                      chosen_fills( indx_best_overlap ), ...
+                                      chosen_periods( indx_best_overlap ), ...
+                                      chosen_angles( indx_best_overlap ), ...
+                                      chosen_scatter_str( indx_best_overlap ), ...
+                                      chosen_ks( indx_best_overlap ) );
+                                  
+            obj.synthesized_design = catstruct( obj.synthesized_design, synthesized_design );   % combine structs
+            obj.synthesized_design.input_wg_type = input_wg_type;
+            
+            % build final index distribution
+            obj = obj.build_final_index();
+            
+        end     % end generate_final_design_uniform()
+        
+                
+        function obj = generate_final_design_uniform_gaussian( obj, MFD, input_wg_type, enforce_min_feat_size_func )
+            % Synthesizes an apodized grating that radiates desired Gaussian field profile
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter of gaussian, defined as 1/e^2 width of intensity
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full', 'bottom' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )   
+            %             i guess this is optional
+            
+            % generate a fiber gaussian mode
+            [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
+            
+            % generate final design, apodized
+            if exist( 'enforce_min_feat_size_func', 'var' )
+                obj = obj.generate_final_design_uniform( field_profile, input_wg_type, enforce_min_feat_size_func );
+            else
+                obj = obj.generate_final_design_uniform( field_profile, input_wg_type );
+            end
+            
+            % save MFD
+            obj.synthesized_design.MFD = MFD;
+            
+        end     % end generate_final_design_uniform_gaussian()
+        
+        
+        function obj = generate_final_design_apodized( obj, desired_field, input_wg_type, enforce_min_feat_size_func )
+            % Synthesizes an apodized grating that radiates desired field profile
+            %
+            % inputs:
+            %   desired_field
+            %       type: double, array
+            %       desc: field profile to amplitude match to. dimensions
+            %             are amplitude vs. x coordinates
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: OPTIONAL, user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )
+            
+            % calculate desired alpha
+            [ obj, xvec, alpha_des, desired_field ] = obj.calculate_desired_scattering( desired_field );
+            
+            % first choose which half of the design space to use
+            [ obj, chosen_fills, chosen_periods, ...
+                    chosen_angles, chosen_scatter_str, ...
+                    chosen_ks ] = obj.pick_design_half( input_wg_type );
+            
+            % enforce min feature size
+            obj.synthesized_design.use_min_feat_size = false;                   % default to false
+            if nargin > 3 %exist( 'enforce_min_feat_size_func', 'var' )
+                % loop through each cell and discard any that violate
+                % feature size rules
+                obj.synthesized_design.use_min_feat_size = true;
+                
+                [ obj, chosen_fills, chosen_periods, ... 
+                chosen_angles, chosen_scatter_str, chosen_ks ]...
+                = enforce_min_feat_size( obj, enforce_min_feat_size_func, ... 
+                                            chosen_fills, ... 
+                                            chosen_periods, ... 
+                                            chosen_angles, ... 
+                                            chosen_scatter_str, ... 
+                                            chosen_ks );
+                 
+            end
+            
+            % optimize for best starting alpha
+            [ obj, best_alpha_power ] = obj.optimize_start_alpha( xvec, alpha_des,  ...
+                                                chosen_fills, ...
+                                                chosen_periods, ...
+                                                chosen_angles, ...
+                                                chosen_scatter_str, ...
+                                                chosen_ks, ...
+                                                desired_field );
+            
+            % synthesize final design
+            [ obj, synthesized_design ] = obj.pick_final_datapoints( xvec, alpha_des, ...
+                                      chosen_fills, ...
+                                      chosen_periods, ...
+                                      chosen_angles, ...
+                                      chosen_scatter_str, ...
+                                      chosen_ks, ...
+                                      10.^(best_alpha_power) );
+            obj.synthesized_design = catstruct( obj.synthesized_design, synthesized_design );   % combine structs
+            obj.synthesized_design.input_wg_type = input_wg_type;
+            
+            % build final index distribution
+            obj = obj.build_final_index();
+            
+        end     % end generate_final_design_apodized()
+        
+        
+        function obj = generate_final_design_apodized_gaussian( obj, MFD, input_wg_type, enforce_min_feat_size_func )
+            % Synthesizes an apodized grating that radiates desired Gaussian field profile
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter of gaussian, defined as 1/e^2 width of intensity
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )   
+            
+            % generate a fiber gaussian mode
+            [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
+            
+            % generate final design, apodized
+            if nargin > 3
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func );
+            else
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type );
+            end
+            
+            % save MFD
+            obj.synthesized_design.MFD = MFD;
+            
+        end     % end generate_final_design_apodized_gaussian()
+        
+        
+        function [ obj, chosen_fills, chosen_periods, ...
+                    chosen_angles, chosen_scatter_str, ...
+                    chosen_ks ] = pick_design_half( obj, input_wg_type )
+            % Pick the half of the design space to use depending on whether 
+            % input waveguide is full or none
+            % 
+            % inputs:
+            %   input_wg_type
+            %       supported options: 'full', 'bottom', 'none' (bottom and
+            %       none default to same behavior)
+            
+            % pick maximum scattering cell and select cells that have larger fill
+            % remember fill is sorted in descending order
+            [ ~, indx_max_scatter ] = max( obj.sweep_variables.scatter_str_vs_fill );
+            
+            % choose which half of design space to use, depending on input wg
+            switch input_wg_type
+                case 'full'
+                    % waveguide is full and grating will be etched, so start with smallest gaps (largest fills)
+                    chosen_fills        = obj.sweep_variables.fill_ratios_to_sweep( 1:indx_max_scatter );
+                    chosen_periods      = obj.sweep_variables.periods_vs_fill( 1:indx_max_scatter );
+                    chosen_angles       = obj.sweep_variables.angles_vs_fill( 1:indx_max_scatter );
+                    chosen_scatter_str  = obj.sweep_variables.scatter_str_vs_fill( 1:indx_max_scatter );
+                    chosen_ks           = obj.sweep_variables.k_vs_fill( 1:indx_max_scatter );
+                case {'bottom', 'none'}
+                    % grating will be deposited on top of grating, so start with smallest teeth sizes (smallest fills)
+                    chosen_fills        = obj.sweep_variables.fill_ratios_to_sweep( indx_max_scatter:end );
+                    chosen_periods      = obj.sweep_variables.periods_vs_fill( indx_max_scatter:end );
+                    chosen_angles       = obj.sweep_variables.angles_vs_fill( indx_max_scatter:end );
+                    chosen_scatter_str  = obj.sweep_variables.scatter_str_vs_fill( indx_max_scatter:end );
+                    chosen_ks           = obj.sweep_variables.k_vs_fill( indx_max_scatter:end );
+            end
+            
+        end     % end pick_design_half()
+        
+        
+        function [ obj, chosen_fills, chosen_periods, ... 
+                chosen_angles, chosen_scatter_str, chosen_ks ]...
+                = enforce_min_feat_size( obj, enforce_min_feat_size_func, ... 
+                                            chosen_fills, ... 
+                                            chosen_periods, ... 
+                                            chosen_angles, ... 
+                                            chosen_scatter_str, ... 
+                                            chosen_ks )
+            % Enforces minimum feature size
+            %
+            % Inputs:
+            %   enforce_min_feat_size_func
+            %       function handle
+            
+            indices_to_keep = [];
+            for ii = 1:length( chosen_periods )
+                if enforce_min_feat_size_func( chosen_periods(ii), chosen_fills(ii) ) == true
+                    indices_to_keep(end+1) = ii;
+                end
+            end
+
+            chosen_fills        = chosen_fills(indices_to_keep);
+            chosen_periods      = chosen_periods(indices_to_keep);
+            chosen_angles       = chosen_angles(indices_to_keep);
+            chosen_scatter_str  = chosen_scatter_str(indices_to_keep);
+            chosen_ks           = chosen_ks(indices_to_keep);                     
+            
+        end     % end enforce_min_feat_size()
+      
+        
+        function [ obj, field_profile ] = make_gaussian_profile( obj, MFD )
+            % Makes gaussian field profile for generate final designs
+            % generate a fiber gaussian mode
+            w0          = MFD/2;                                                       
+            zvec        = 0;                                                            % this is unused
+            d0          = 0;                                                            % take slice at waist
+            % generate x coordinates for the gaussian mode
+            % must be large enough to fit mode
+            xvec_fib        = 0 : obj.discretization : MFD*4.5 - obj.discretization;
+            xvec_fib        = xvec_fib - xvec_fib(round(end/2));                                % shift origin over to middle
+            [obj, field_profile]  = obj.fiber_mode_gaussian(  w0, zvec, xvec_fib, obj.optimal_angle, d0, obj.background_index );
+            field_profile         = field_profile./max( abs(field_profile) );
+            
+        end     % end make_gaussian_profile()
+        
+        
+        function [ obj, overlap_12 ] = xcorr_normalized( obj, field1, field2 )
+            % very simple function that just computes normalized cross correlation of two vectors, 
+            % field1 and field2
+            
+            % transpose fields so they are nx1
+            field1 = reshape( field1, [ length(field1), 1 ] );
+            field2 = reshape( field2, [ length(field2), 1 ] );
+            
+            % first normalize both fields
+            norm_factor_1   = field1' * field1;
+            norm_factor_2   = field2' * field2;
+            
+            % fft may require padding, get length of the longer of the 2 arrays
+            array_len = max( [ length(field1), length(field2) ] );
+            
+            % calculate field1 and field2 xcorr
+            overlap_12 = ifftshift( ifft( fft( fftshift( field1 ), array_len ) .* conj( fft( fftshift( field2 ), array_len ) ) ) );
+%             overlap_12 = overlap_12./sqrt( ( norm_factor_1 .* norm_factor_2 ) );
+            overlap_12 = ( abs(overlap_12).^2 )./( norm_factor_1 .* norm_factor_2 );
+            
+        end     % end function xcorr_normalized()
+        
+        
+        function [obj, field_shape_prediction] = predict_field_shape( obj, xvec, scatter_str_vs_x )
+            % Calculates predicted field amplitude profile by integrating the scattering strength
+            %
+            % Inputs:
+            %   xvec
+            %       type: double, array
+            %       desc: x vector coordinates 
+            %   scatter_str_vs_x
+            %       type: double, array
+            %       desc: alpha at each x vector coordinate
+            %
+            % Outputs:
+            %   field_shape_prediction
+            %       type: double, array
+            %       desc: predicted field amplitude profile vs. xvec
+            
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            field_shape_prediction = zeros( size(xvec) );
+            A0 = 1;
+            for ii = 1:length(xvec)
+
+                % update radiation
+                field_shape_prediction(ii) = A0.*(1 - exp( -scatter_str_vs_x(ii) * obj.discretization ) );
+
+                % update guided power
+                A0 = A0.*exp( -scatter_str_vs_x(ii) * obj.discretization );
+
+            end
+                
+        end     % end predict_field_shape()
+        
+        function [obj, field_shape_prediction] = predict_field_shape_v2( obj, xvec, scatter_str_vs_x, imag_k_vs_x )
+            % Calculates predicted field amplitude profile by integrating the scattering strength
+            % updated to use imag(k) to update loss
+            %
+            % Inputs:
+            %   xvec
+            %       type: double, array
+            %       desc: x vector coordinates 
+            %   scatter_str_vs_x
+            %       type: double, array
+            %       desc: alpha at each x vector coordinate
+            %
+            % Outputs:
+            %   field_shape_prediction
+            %       type: double, array
+            %       desc: predicted field amplitude profile vs. xvec
+            
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            field_shape_prediction = zeros( size(xvec) );
+            A0 = 1;
+            for ii = 1:length(xvec)
+
+                % update radiation
+                field_shape_prediction(ii) = A0.*(1 - exp( -scatter_str_vs_x(ii) * obj.discretization ) );
+
+                % update guided power
+                A0 = A0.*exp( -imag_k_vs_x(ii) * obj.discretization );
+
+            end
+                
+        end     % end predict_field_shape()
+        
+        
+        function [ obj, xvec, alpha_des, field_profile ] = calculate_desired_scattering( obj, field_profile )
+            % Calculates desired scattering profile for an arbitrary field profile
+            %
+            % Right now, this function also makes the xvec for you
+            %
+            % Inputs:
+            %   field_profile
+            %       type:
+            %       desc:
+            %
+            % Outputs:
+            %   xvec
+            %   alpha_des
+           
+            % normalize the field to intensity
+            field_profile = field_profile/sqrt( obj.discretization * sum( abs( field_profile ).^2 ) );
+            
+            % generate x coordinates for the field profile, is this the right place to do this?
+            xvec = obj.discretization .* ( 0:length(field_profile)-1 );
+            xvec = xvec - xvec(round(end/2));                                % shift origin over to middle
+                                              
             % calculate desired scattering strength vs. x
-            field_int   = cumsum( abs(field_profile).^2 ) * obj.discretization * obj.units.scale;
-            alpha_des   = (1/2)*( abs(field_profile).^2 ) ./ ( 1 + 1e-5 - field_int );                  % in units 1/m
-            alpha_des   = alpha_des * obj.units.scale;                                                  % in units 1/units
-            obj.synthesized_design.alpha_des = alpha_des;
+            integral_f      = cumsum( abs(field_profile).^2 ) * obj.discretization;
+%             alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_f );             % in units 1/m
+            alpha_des       = (1/2)*( abs(field_profile).^2 ) ./ ( 1 - integral_f );             % in units 1/units
+%             alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
             
-            % initialize final design saving variables
-            obj.synthesized_design.GC_synth            = {};
-            obj.synthesized_design.scatter_str_synth   = [];
-            obj.synthesized_design.fill_synth          = [];
-            x_cell_positions        = [];                                   % for saving where each loop starts
+            % limit the xvec and alpha to certain radiated output threshold
+            threshold   = 1 - 1e-6;
+            xvec        = xvec( integral_f <= threshold );
+            alpha_des   = alpha_des( integral_f <= threshold );
+            field_profile = field_profile( integral_f <= threshold );
             
-            % pick design points
-            cur_x = x(1);
-            while cur_x < x(end)
-                
-                x_cell_positions(end+1) = cur_x;
-                
-                % current index in the array
-                [~, cur_indx] = min( abs(x - cur_x) );
-                
-                % grab datapoint closest to desired alpha
-                [~, indx_closest_alpha] = min( abs( alpha_des(cur_indx) - obj.sweep_variables.scatter_str_vs_fill ) );
-                
-                % save
-                obj.synthesized_design.GC_synth{end+1}             = obj.sweep_variables.GC_vs_fill{ indx_closest_alpha };
-                obj.synthesized_design.scatter_str_synth(end+1)    = obj.sweep_variables.scatter_str_vs_fill( indx_closest_alpha );
-                obj.synthesized_design.fill_synth(end+1)           = obj.sweep_variables.fill_ratios_to_sweep( indx_closest_alpha );
-                
-                % move to next position
-                cur_x = cur_x + obj.synthesized_design.GC_synth{end}.domain_size(2);
-                
-            end     % end while cur_x < x(end)
-            
-%             % DEBUG plot desired alpha and synthesized
+            % save the xvec, alpha, and field as variables of final
+            % syntheiszed design
+            obj.synthesized_design.xvec         = xvec;
+            obj.synthesized_design.alpha_des    = alpha_des;
+            obj.synthesized_design.field_profile = field_profile;
+
+%             % DEBUG plot alpha desired
 %             figure;
-%             plot( x, alpha_des ); hold on;
-%             plot( x_cell_positions, obj.synthesized_design.scatter_str_synth, '-o' );
-%             xlabel('position'); ylabel('scatter str');
-%             title('DEBUG scatter str vs x');
-%             makeFigureNice(); 
+%             plot( xvec, alpha_des, xvec, abs(u).*max(alpha_des)./max(u) );
+%             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
+%             legend('desired scattering strength', 'fiber mode');
+%             title('DEBUG scattering strength for gaussian');
+%             makeFigureNice();  
             
+        end     % end function calculate_desired_scattering()
+        
+        function [ obj, synthesized_design ] = pick_final_datapoints( obj, ...
+                                      xvec, alpha_des, ...
+                                      chosen_fills, ...
+                                      chosen_periods, ...
+                                      chosen_angles, ...
+                                      chosen_scatter_strs, ...
+                                      chosen_ks, ...
+                                      start_alpha_des )
+            % Picks the final datapoints (cells) that make up the grating
+            %
+            % Inputs:
+            %     xvec
+            %         type: double, array
+            %         desc: coordinates of desired field profile
+            %     alpha_des
+            %         type: double, array
+            %         desc: desired scattering strength vs. x
+            %     chosen_fills
+            %         type: double, array
+            %         desc: swept fills
+            %     chosen_periods
+            %         type: double, array
+            %         desc: period vs. fill from generated design space
+            %     chosen_angles
+            %         type: double, array
+            %         desc: angle vs fill from generated design space
+            %     chosen_scatter_strs
+            %         type: double, array
+            %         desc: scattering strength (alpha) from generated design space
+            %     chosen_ks
+            %         type: double, array
+            %         desc: k from generated design space
+            %     start_alpha_des
+            %         type: double, scalar
+            %         desc: OPTIONAL starting alpha
+            %
+            % Outputs:
+            %   synthesized_design:
+            %       type: struct
+            %       desc: a struct that holds the synthesized cells
             
-        end     % end synthesize_grating()
+            % default to start from weakest cell
+            if ~exist( 'start_alpha_des', 'var' )
+                start_alpha_des = min(chosen_scatter_strs);
+            end
+
+            % now match these data points to the desired alpha
+            % starting point
+            [~, indx_max_alpha] = max( alpha_des );
+            [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
+            cur_x               = xvec(indx_x);
+            
+            % final synthesized variables
+            synthesized_design.fill         = [];
+            synthesized_design.period       = [];
+            synthesized_design.angles       = [];
+            synthesized_design.scatter_str  = [];
+            synthesized_design.k            = [];
+            synthesized_design.GC           = {};
+            synthesized_design.des_scatter  = [];
+            
+            % flag for switching to using max scattering strength
+            saturate_scatter_str_to_max = false;
+ 
+            ii = 1;
+            while cur_x < xvec(end)
+                % build grating one cell at a time
+                
+                % pick design with scattering strength closest to desired
+                % alpha
+                des_scatter = alpha_des(indx_x);                            % desired alpha
+                if des_scatter  > max( chosen_scatter_strs )
+                    % desired scattering strength too high, gotta saturate
+                    saturate_scatter_str_to_max = true;
+                end
+                if ~saturate_scatter_str_to_max
+                    [~, indx_closest_scatter]   = min( abs(chosen_scatter_strs - des_scatter) );          % index of closest scatter design 
+                else
+                    [~, indx_closest_scatter]   = max( chosen_scatter_strs );                             % saturate to max
+                end
+                
+                % save parameters
+                synthesized_design.fill(ii)         = chosen_fills( indx_closest_scatter );
+                synthesized_design.period(ii)       = chosen_periods( indx_closest_scatter );
+                synthesized_design.angles(ii)       = chosen_angles( indx_closest_scatter );
+                synthesized_design.scatter_str(ii)  = chosen_scatter_strs( indx_closest_scatter );
+                synthesized_design.k(ii)            = chosen_ks( indx_closest_scatter );
+                synthesized_design.des_scatter(ii)  = des_scatter;
+                
+                % save a grating cell object for each cell
+                synthesized_design.GC{ii} = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               synthesized_design.period(ii), ...
+                                               synthesized_design.fill(ii) );
+                
+                % move onto next
+                cur_x       = cur_x + synthesized_design.period(ii);
+                [~, indx_x] = min( abs(xvec - cur_x) );
+                cur_x       = xvec( indx_x );
+                ii          = ii + 1;
+                
+            end     % end for ii = 1:ncells
+            
+        end     % end pick_final_datapoints()
+        
+        
+        function obj = build_final_index( obj )
+            % build final index distribution
+            % to be run after a design has been synthesized
+            %
+            % currently directly modifies obj.synthesized_design
+        
+            obj.synthesized_design.N = [];
+            for ii = 1:length(obj.synthesized_design.GC)
+
+                GC                          = obj.synthesized_design.GC{ii};
+                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+
+            end
+            
+            % coordinates of index distribution
+            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
+            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
+            
+        end     % end build_final_index()
+        
+        
+        function [ obj, best_alpha_power ] = optimize_start_alpha( obj, xvec, alpha_des,  ...
+                                                chosen_fills, ...
+                                                chosen_periods, ...
+                                                chosen_angles, ...
+                                                chosen_scatter_strs, ...
+                                                chosen_ks, ...
+                                                desired_field )
+            % Optimizes the starting alpha, based on predicted field overlap
+            %
+            % Inputs:
+            %     desired_field
+            %         type: double, array
+            %         desc: desired field vs. xvec
+           
+            % using matlab's fminsearch
+            f = @(alpha_power)( 1 - obj.predict_overlap_for_optimization( ...
+                                              xvec, alpha_des,  ...
+                                                chosen_fills, ...
+                                                chosen_periods, ...
+                                                chosen_angles, ...
+                                                chosen_scatter_strs, ...
+                                                chosen_ks, ...
+                                                desired_field, alpha_power ) );
+            
+            % options
+%             opts = optimset( 'Display', 'iter' );
+                                          
+            % for debuggging
+%             [ best_alpha_power, best_val] = fminsearch( f, log10(min( scatter_strs_high_dir )), opts );
+            
+            best_alpha_power = fminsearch( f, log10(min( chosen_scatter_strs )) );
+            
+%             best_overlap_fminsearch = 1 - best_val;
+            
+%             % DEBUG plot max overlap vs. alpha
+%             figure;
+%             plot( alpha_powers, max_overlap, '-o' );
+%             xlabel('alpha power'); ylabel('max overlap');
+%             title('DEBUG max overlap vs. start alpha (in power)');
+%             makeFigureNice();
+            
+%             % now save the final design with the best predicted overlap
+%             obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
+%                                               bot_fills_high_dir, top_fills_high_dir, ...
+%                                               offsets_high_dir, periods_high_dir, ...
+%                                               angles_high_dir, scatter_strs_high_dir, ...
+%                                               k_high_dir, 10.^(best_alpha_power) );
+                                          
+        end     % end function optimize_start_alpha()
+        
+        
+        function [ max_overlap, field_shape_prediction ] = predict_overlap_for_optimization( ...
+                                              obj, xvec, alpha_des, ...
+                                                chosen_fills, ...
+                                                chosen_periods, ...
+                                                chosen_angles, ...
+                                                chosen_scatter_strs, ...
+                                                chosen_ks, desired_field, start_alpha_power )
+            % merit function used in optimize_start_alpha for predicting
+            % overlap
+            %
+            % Inputs:
+            %   start_alpha_power:
+            %       type: double, scalar
+            %       desc: alpha to try = 10^(start_alpha_power)
+            %
+            % Outputs:
+            %     max_overlap
+            %     field_shape_prediction
+            %         type: double, array
+            %         desc: predicted field shape vs. x, mostly for debugging
+            
+            % pick the datapoints
+            [ obj, synthesized_design ] = obj.pick_final_datapoints( xvec, alpha_des, ...
+                                              chosen_fills, ...
+                                              chosen_periods, ...
+                                              chosen_angles, ...
+                                              chosen_scatter_strs, ...
+                                              chosen_ks, ...
+                                              10.^(start_alpha_power));
+
+            % convert scatter str vs. cell into scatter str vs. x
+            xvec                = xvec - xvec(1);
+            scatter_str_vs_x    = zeros( size( xvec ) );
+            end_pos_vs_cell     = cumsum( synthesized_design.period );
+            cur_cell            = 1;
+            for ii = 1:length(xvec)
+
+                scatter_str_vs_x(ii) = synthesized_design.scatter_str(cur_cell);
+
+                if xvec(ii) > end_pos_vs_cell( cur_cell ) && cur_cell < length(end_pos_vs_cell)
+                    % move to next cell
+                    cur_cell = cur_cell + 1;
+                end
+
+            end
+
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            [obj, field_shape_prediction]   = obj.predict_field_shape( xvec, scatter_str_vs_x );
+                
+            % calculate overlap with desired field (simple xcorr)
+            [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
+            max_overlap     = max( abs(overlap) );
+            
+        end     % end function predict_overlap_for_optimization()
         
 
         function obj = run_final_design_eme(obj)
+            % PROBABLY DEPRECATED
+            %
             % runs the final design's index distribution in EME and saves
             % some coupling parameters
             %

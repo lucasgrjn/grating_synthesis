@@ -1,4 +1,4 @@
-function [Ez, Hx] = f_fiberModeGaussian( w0, lambda0, xvec, unit_scale, theta, d0, nclad )
+function [Ez, Hx, E_tm, H_tm, mfd] = f_fiberModeGaussian( w0, lambda0, xvec, unit_scale, theta, d0, nclad )
 % somewhat adapted from Cale's code
 %
 % Generate Gaussian-beam mode profile at a plane through y = d0 at angle of
@@ -9,7 +9,7 @@ function [Ez, Hx] = f_fiberModeGaussian( w0, lambda0, xvec, unit_scale, theta, d
 % the downwards normal) is actually a negative theta with respect to the
 % positive y axis.
 %
-% currently solving for TE mode only
+% now solves for TM too, but is kind of hacky
 %
 % (using H.A. Haus, Waves & Fields, Chapter 5)
 % CMG November 21st, 2014
@@ -47,6 +47,10 @@ function [Ez, Hx] = f_fiberModeGaussian( w0, lambda0, xvec, unit_scale, theta, d
 %   nclad 
 %       type: double, scalar
 %       desc: cladding index
+%   pol
+%       type: str
+%       desc: either 'TE' or 'TM'
+%             optional for now, and defaults to TE
 %
 %
 % Outputs: 
@@ -54,6 +58,14 @@ function [Ez, Hx] = f_fiberModeGaussian( w0, lambda0, xvec, unit_scale, theta, d
 %       type: double, array
 %       desc: returned slice of gaussian beam, normalized to total
 %             power
+%   E_tm and H_tm
+%       this is a new addition - saves E and H fields for "TM" fiber
+%
+
+% % default polarization to TE
+% if nargin < 8
+%     pol = 'TE';
+% end
 
 
 % Constants, in units of meters
@@ -95,6 +107,31 @@ H_zprime = ( -xprime./( zprime + 1i*b ) ) .* H_xprime;
 % project fields back into original coordinates
 Ez = E_yprime;                                                              % this one is used (TE pol grating)
 Hx = H_xprime * cos(theta) + H_zprime * sin(theta) ;
+
+% if TM, project fields differently
+% pretty damn confusing, but check 2019 10 - clo / 2019 10 07 - tm grating
+% for derivation
+E_tm.x = E_yprime * cos(theta);
+E_tm.y = E_yprime * sin(theta); 
+H_tm.z = H_xprime;
+H_tm.x = H_zprime * sin(theta);
+H_tm.y = H_zprime * cos(theta);
+
+% TEMP using formula to calc MFD
+r       = xprime(xprime >= 0);
+E_temp  = E_yprime(xprime >= 0);
+dr      = r(2:end)-r(1:end-1);      % calc dr for integral
+r       = r(1:end-1);               % put on dr grid
+E_temp  = E_temp(1:end-1);          % put on dr grid
+
+% calc numerator
+numer = sum( (E_temp.^2) .* (r.^3) .* dr );
+
+% calc denom
+denom = sum( (E_temp.^2) .* r .* dr );
+
+% calc mfd
+mfd = 2*sqrt(2*(numer/denom));
 
 
 

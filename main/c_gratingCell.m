@@ -70,6 +70,14 @@ classdef c_gratingCell < c_bloch_cell
         P_per_x_slice;      % x traveling power per x slice vs. x(2:end-1)
         Sy;                 % Y component of poynting vector (dims y(2:end-1) vs x)
         P_per_y_slice;      % Y traveling (upwards) power per y slice vs. y(2:end-1)
+        % some new additions, 8/18/19
+        Sy_up           
+        Sy_down      
+        P_thru      
+        alpha_up_from_srad
+        % added 12/5/20
+        n_top;
+        n_bot;
         
     end     % end properties
     
@@ -89,7 +97,7 @@ classdef c_gratingCell < c_bloch_cell
         % -----------------------------------------------------------------
         % Running simulations
         
-        function obj = runSimulation( obj, num_modes, BC, pml_options, guessk, OPTS )
+        function obj = runSimulation( obj, num_modes, BC, pml_options, k0, guessk, OPTS )
             % Runs new mode solver
             %
             % Description:
@@ -111,6 +119,9 @@ classdef c_gratingCell < c_bloch_cell
             %               PML_options(2): length of PML layer in nm
             %               PML_options(3): strength of PML in the complex plane
             %               PML_options(4): PML polynomial order (1, 2, 3...)
+            %   k0
+            %       type: scalar, double
+            %       desc: free-space wavenumber
             %   guessk
             %       type: scalar, double (can be complex)
             %       desc: guess k value. Works best when closest to desired
@@ -119,8 +130,9 @@ classdef c_gratingCell < c_bloch_cell
             %       type: struct
             %       desc: optional options with the following fields
             %           'mode_to_overlap'
-            %               type: matrix, double
-            %               desc: mode to overlap
+            %               type: EITHER a matrix, double, or a scalar, int
+            %               desc: mode to overlap (if matrix), or # of mode
+            %                       to pick if scalar
             %
             % Sets these properties:
             %   obj.k
@@ -137,12 +149,12 @@ classdef c_gratingCell < c_bloch_cell
             %   calls obj.calc_scattering_strength()
             
             % default OPTS
-            if nargin < 6
+            if nargin < 7
                 OPTS = struct();
             end
             
             % first run the bloch cell simulation function
-            obj = runSimulation@c_bloch_cell( obj, num_modes, BC, pml_options, guessk, OPTS );
+            obj = runSimulation@c_bloch_cell( obj, num_modes, BC, pml_options, k0, guessk, OPTS );
             
             % pick which mode to keep
             if isfield( OPTS, 'mode_to_overlap' )
@@ -170,188 +182,39 @@ classdef c_gratingCell < c_bloch_cell
             y_down  = h_pml_d+2;
             
             % calculate output angle
-            obj = obj.calc_output_angle( y_up, y_down );
+            obj = obj.calc_output_angle(k0);
             
             % calculate up/down directivity
-            obj             = obj.calc_radiated_power();
+            obj             = obj.calc_radiated_power(k0);
             obj.directivity = obj.P_rad_up/obj.P_rad_down;
                     
             % calculate power scattering strength
-            obj = obj.calc_scattering_strength();
+            % alpha is imaginary k
+            obj.alpha_up    = imag(obj.k);
+            obj.alpha_down  = imag(obj.k);
             
         end     % end runSimulation
         
         
-        function obj = calc_output_angle(obj, y_up, y_down, plot_k_distribution )
+        function obj = calc_output_angle(obj, k0)
             % Calculates output angle of radiation
             % To be run only AFTER mode solver has been run
-            %
-            % Inputs:
-            %   y_up    
-            %       type: int, scalar
-            %       desc: index of row of top slice of E field to take
-            %   y_down
-            %       type: int, scalar
-            %       desc: index of row of bottom slice of E field to take
-            %   plot_k_distribution
-            %       type: bool
-            %       desc: OPTIONAL, set to true to plot k distributions
-            
-            if nargin < 4
-                plot_k_distribution = false;
-            end
-            
-            % load stuff
-%             E_z = obj.E_z;
-            f0  = 1/obj.lambda;     % spatial freq
-            
-            % generate field, without the exponential growth or decay
-            numcells        = 2000;                                                  % i'm purposefully setting my own number of cells here
-%             nx              = round( numcells*obj.domain_size(2)/obj.dx );
-%             x_coords_all    = 0 : obj.dx : ( (nx-1) * obj.dx );
-%             phase_all       = repmat( exp( 1i*real(obj.k)*x_coords_all ), size(obj.Phi,1), 1 );
-%             E_z_no_decay    = repmat( obj.Phi, 1, numcells ).*phase_all;
-            [obj, E_z_no_decay]    = obj.stitch_E_field( obj.Phi, real(obj.k), numcells );
-            
-            % grab slices
-            E_z_up          = E_z_no_decay( y_up, : );
-            E_z_down        = E_z_no_decay( y_down, : );
-            
-            % do some zero padding and repeating
-            % currently zero padding is turned off.
-%             pad_factor  = 0;
-%             E_z_up      = [ zeros( 1, pad_factor*length(E_z_up) ), E_z_up, zeros( 1, pad_factor*length(E_z_up) ) ];
-%             E_z_down    = [ zeros( 1, pad_factor*length(E_z_down) ), E_z_down, zeros( 1, pad_factor*length(E_z_down) ) ];
-            
-            % index of refraction of top and bottom cladding
-            n_top = obj.N( y_up, 1 );
-            n_bot = obj.N( y_down, 1 );
-                 
-            % create space and frequency vectors
-            Nx      = length( E_z_up );
-            fx_vec  = (-Nx/2:(Nx/2-1) ).*(1/(obj.dx*Nx));      % spatial freq vector
 
-            % vectors that relate fz to angle, in deg
-            angle_vec_bot               = (180/pi) * asin( fx_vec./(n_bot*f0) );    % draw a circ
-            real_a_indices_bot          = abs(imag(angle_vec_bot)) < 1e-6 ;         % use this to index the range of allowed free space modes
-            angle_vec_top               = (180/pi) * asin( fx_vec./(n_top*f0) );    % draw a circ
-            real_a_indices_top          = abs(imag(angle_vec_top)) < 1e-6 ;         % use this to index the range of allowed free space modes
-
-            % take FFT
-            E_z_fx_up       = fftshift( fft( ifftshift( E_z_up ) ) );
-            E_z_fx_down     = fftshift( fft( ifftshift( E_z_down ) ) );
+            pml_size        = round(obj.sim_opts.pml_options(2)/obj.dy);
             
-            % DEBUG plot E_fz if desired
-            if plot_k_distribution
-                
-%                 % first normalize E fields
-%                 E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-%                 E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-% 
-%                 % DEBUG plot E_fz down
-%                 figure;
-%                 plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-%                 xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%                 title('DEBUG abs(E(f_x)) down, no decay, within radiation window');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz down
-%                 fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-%                 fy_down     = fy_down./max(abs(fy_down));
-%                 figure;
-%                 plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-%                 plot( fx_vec, fy_down, '--' );
-%                 xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%                 legend('E_z', 'rad. circle');
-%                 title('DEBUG abs(E(f_x)) down, no decay, ALL');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz up
-%                 figure;
-%                 plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-%                 xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-%                 title('DEBUG abs(E(f_x)) up, no decay, within radiation window');
-%                 makeFigureNice();
-% 
-%                 % DEBUG plot E_fz up
-%                 fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-%                 fy_up     = fy_up./max(abs(fy_up));
-%                 figure;
-%                 plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-%                 plot( fx_vec, fy_up, '--' );
-%                 xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-%                 legend('E_z', 'rad. circle');
-%                 title('DEBUG abs(E(f_x)) up, no decay, ALL');
-%                 makeFigureNice();
-                
-                % now do the same but with decay
-                [obj, E_z_w_decay] = obj.stitch_E_field( obj.Phi, obj.k, numcells );
-                % grab slices
-                E_z_up      = E_z_w_decay( y_up, : );
-                E_z_down    = E_z_w_decay( y_down, : );
-                % take FFT
-                E_z_fx_up   = fftshift( fft( ifftshift( E_z_up ) ) );
-                E_z_fx_down = fftshift( fft( ifftshift( E_z_down ) ) );
-                % normalize E fields NOT
-%                 E_z_fx_down_norm    = E_z_fx_down./max(abs(E_z_fx_down(:)));
-%                 E_z_fx_up_norm      = E_z_fx_up./max(abs(E_z_fx_up(:)));
-                E_z_fx_down_norm    = E_z_fx_down;
-                E_z_fx_up_norm      = E_z_fx_up;
-                
-                % DEBUG plot E_fz down
-                figure;
-                plot( angle_vec_bot(real_a_indices_bot), abs(E_z_fx_down_norm(real_a_indices_bot)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) down, with decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz down
-                fy_down     = real(sqrt( (f0*n_bot)^2 - fx_vec.^2 ));     % fy component
-                fy_down     = fy_down./max(abs(fy_down));
-                figure;
-                plot( fx_vec, abs(E_z_fx_down_norm) ); hold on;
-                plot( fx_vec, fy_down, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) down, with decay, ALL');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                figure;
-                plot( angle_vec_top(real_a_indices_top), abs(E_z_fx_up_norm(real_a_indices_top)) );
-                xlabel('Rad. angle (deg)'); ylabel('E_z(f_x)');
-                title('DEBUG abs(E(f_x)) up, with decay, within radiation window');
-                makeFigureNice();
-
-                % DEBUG plot E_fz up
-                fy_up     = real(sqrt( (f0*n_top)^2 - fx_vec.^2 ));     % fy component
-                fy_up     = fy_up./max(abs(fy_up));
-                figure;
-                plot( fx_vec, abs(E_z_fx_up_norm) ); hold on;
-                plot( fx_vec, fy_up, '--' );
-                xlabel('f_x (1/\lambda)'); ylabel('E_z(f_x)');
-                legend('E_z', 'rad. circle');
-                title('DEBUG abs(E(f_x)) up, with decay, ALL');
-                makeFigureNice();
-                
-            end     % end plotting k distribution
-            
-            % calc and save max output angle
-            % going up
-            E_z_fx_up           = E_z_fx_up(real_a_indices_top);
-            angle_vec_top       = angle_vec_top(real_a_indices_top);
-            [~, indx_max_up]    = max( abs( E_z_fx_up ) );
-            obj.max_angle_up    = angle_vec_top(indx_max_up);
-            % going down
-            E_z_fx_down         = E_z_fx_down(real_a_indices_bot);
-            angle_vec_bot       = angle_vec_bot(real_a_indices_bot);
-            [~, indx_max_down]  = max( abs( E_z_fx_down ) );
-            obj.max_angle_down  = angle_vec_bot(indx_max_down);   
+            % calculate angle from phase matching
+            kx      = real(obj.k) - 2*pi/obj.domain_size(2);
+            n_top   = obj.N( end-pml_size-1, 1 );
+            n_bot   = obj.N( pml_size+2, 1 );
+            k0_cl_up   = n_top * k0;
+            k0_cl_down = n_bot * k0;
+            obj.max_angle_up    = asin( kx./k0_cl_up ) * 180/pi;
+            obj.max_angle_down  = asin( kx./k0_cl_down ) * 180/pi;
             
         end     % end function calc_output_angle()
         
         
-        function obj = calc_radiated_power(obj)
+        function obj = calc_radiated_power(obj, k0)
             % Calculates the radiated power in both the upwards and
             % downwards directions
             % Only run AFTER mode solver has been run, since this function
@@ -369,122 +232,62 @@ classdef c_gratingCell < c_bloch_cell
             % Sets these object properties:
             %   P_rad_down      - saves power radiated down
             %   P_rad_up        - saves power radiated up
-            
-%             % define constants
-%             mu0     = 4*pi*1e-7;                % units of H/m
-%             mu0     = mu0 * obj.units.scale;    % units of H/(units)
-%             c       = 3e8;                      % units of m/s
-%             c       = c/obj.units.scale;        % units of (units)/s
-%             omega0 	= 2*pi*c/obj.lambda;     % units of rad*(Units/s)/units = rad/s
-%             
-%            
-%             % Stich field and phase together
-%             phase_onecell   = repmat( exp( 1i * obj.k * obj.x_coords ), size( obj.Phi, 1 ), 1 );
-%             Ez_onecell      = obj.Phi .* phase_onecell;
-%            
-%             
-%             % Calc propagating power vs. x
-%             
-%             % H y in , on second to end-1 steps, using entire E_z
-%             % dimensions are y (transverse) vs. x
-%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
-%             
-%             % poynting vector in, dimensions are y vs x(2:end-1)
-%             Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
-% 
-%             % power per x slice
-%             P_per_x_slice = sum( Sx, 1 )*obj.dy;
-%             
-%             % save to obj
-%             obj.Sx              = Sx;
-%             obj.P_per_x_slice 	= P_per_x_slice;
-%             
-% 
-%             % Calculate power radiated up
-%             
-%             
-%             % Calculate and plot power propagating upwards vs. y
-%             
-%             % calculate H_x
-%             % dimensions H_x vs. y vs x
-%             H_x  = 1/(1i*omega0*mu0) .* ( Ez_onecell( 3:end,:) - Ez_onecell( 1:end-2,:) )/(2*obj.dy);
-% 
-%             % power flowing across y
-%             Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
-%             P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
-            
+                       
             % calculate power distributions for the chosen mode
-            [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = obj.calc_power_distribution_onecell();
+            [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = obj.calc_power_distribution_ncells(1, k0);
             
-            
-            [~, indx_max_up]    = max( P_per_y_slice );
-            [~, indx_max_down]  = min( P_per_y_slice );
-            Sy_up               = Sy( indx_max_up, : );                                 % dimensions Sy vs. x
-            Sy_down             = Sy( indx_max_down, : );
+            % not sure if this is a good way to do it...
+%             [~, indx_max_up]    = max( P_per_y_slice );
+%             [~, indx_max_down]  = min( P_per_y_slice );
+            % taking edge of PML instead
+            pml_size        = round(obj.sim_opts.pml_options(2)/obj.dy);
+            Sy_up               = Sy( end-pml_size, : );                                 % dimensions Sy vs. x
+            Sy_down             = Sy( pml_size+1, : );
             
             % save to obj
             obj.Sx              = Sx;
             obj.P_per_x_slice 	= P_per_x_slice;
             obj.Sy              = Sy;
+            obj.Sy_up           = Sy_up;
+            obj.Sy_down         = Sy_down;
             obj.P_per_y_slice   = P_per_y_slice;
             
-        
-%             % new version, take the flux including both Sx and Sy
-%             % components
-%             P_rad_up    = sum( sqrt( abs( Sy_up(2:end-1) ).^2 + abs( Sx(y_up,:) ).^2 ) ) * obj.dx;
-%             P_rad_down  = sum( sqrt( abs( Sy_down(2:end-1) ).^2 + abs( Sx(y_down,:) ).^2 ) ) * obj.dx;
-
-            % new new version, take only Sy but multiply by ./cos(theta)
-            P_rad_up    = sum( abs( Sy_up(:) ) ) * obj.dx ./ cos( obj.max_angle_up * pi/180 );
-            P_rad_down  = sum( abs( Sy_down(:) ) ) * obj.dx ./ cos( obj.max_angle_down * pi/180 );
-            
-            % save to object
-            obj.P_rad_down    = P_rad_down;
-            obj.P_rad_up      = P_rad_up;
-            
-            
-            % DEBUG calculate angle from Sx and Sy
-% %             obj.debug.tan_sx_sy_up = (180/pi) * atan( Sx(y_up,:)./ Sy_up(2:end-1) );
-        
-            
+            % radiated power is integral of poynting vector
+            obj.P_rad_up    = sum( abs( Sy_up(:) ) ) * obj.dx ;
+            obj.P_rad_down  = sum( abs( Sy_down(:) ) ) * obj.dx ;
+            obj.P_in        = sum( abs( Sx( :, 1 ) ) ) * obj.dy ;
+            obj.P_thru      = sum( abs( Sx( :, end ) ) ) * obj.dy ;
+     
         end     % end function calc_radiated_power()
         
         
         function obj = calc_scattering_strength(obj)
-            % GOING TO REINSTATE THIS FUNCTION
+            % un-used function
             % Calculates scattering strength in terms of decay rate alpha
             % To be run only AFTER mode solver AND calc_radiated_power have
             % been run
             
             % define constants
             mu0     = 4*pi*1e-7;                % units of H/m
-            mu0     = mu0 * obj.units.scale;    % units of H/(units)
             c       = 3e8;                      % units of m/s
-            c       = c/obj.units.scale;        % units of (units)/s
-            omega0 	= 2*pi*c/obj.lambda;        % units of rad*(Units/s)/units = rad/s
+            omega0 	= 2*pi*c/obj.lambda;        % units of rad*(m/s)/units
             
             % grab field
-            E_z = obj.E_z;
+           
+            % how about H y in, on FIRST step, using periodicity
             
-%             % H x in
-%             % gonna calculate input power at grid point 2
-%             H_x_in1 = (-1i/(omega0*mu0)) * ( E_z( 3:2:end, 2 ) - E_z( 1:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 1
-%             H_x_in2 = (-1i/(omega0*mu0)) * ( E_z( 4:2:end, 2 ) - E_z( 2:2:end-2, 2 ) )/(2*obj.dy);   % dy, term staggered 2
-%             % interleave two arrays
-%             H_x_in                                  = zeros( size( [H_x_in1, H_x_in2] ) );
-%             H_x_in( ( 1:length(H_x_in1) )*2 - 1)    = H_x_in1;
-%             H_x_in( ( 1:length(H_x_in2) )*2 )       = H_x_in2;
+            % stitch together e field, including the phase
+            % on the -1, 0, and 1 steps
+            E_z_neg1        = obj.Phi( :, end ) .* exp( 1i * obj.k * -obj.dx );
+            E_z_0           = obj.Phi( :, 1 );
+            E_z_plus1       = obj.Phi( :, 2 ) .* exp( 1i * obj.k * obj.dx );  
             
-            % H y in (on the same grid as Hx in)
-%             H_y_in = (1i/(omega0*mu0)) * ( E_z( 2:end-1, 3 ) - E_z( 2:end-1, 1 ) )/(2*obj.dx);   % dy, term staggered 1
-            
-            % NEW: H y in , on SECOND step, using entire E_z slice
-            H_y_in = (1i/(omega0*mu0)) * ( E_z( :, 3 ) - E_z( :, 1 ) )/(2*obj.dx);   % dy, term staggered 1
+            H_y_in = (1i/(omega0*mu0)) * ( E_z_plus1 - E_z_neg1 )/(2*obj.dx);   % dy, term staggered 1
             
             % power in (at left edge)
-            Sx_in   = real( -1 * conj(H_y_in(:)) .* E_z( :, 2 ) );              % Sx = real( -Ez Hy* )
+            Sx_in   = real( -1 * conj(H_y_in(:)) .* E_z_0 );              % Sx = real( -Ez Hy* )
             P_in    = sum( Sx_in(:) )*obj.dy;
-
+            
             
             % DEBUG save Sx_in
             obj.debug.Sx_in = Sx_in;
@@ -492,15 +295,72 @@ classdef c_gratingCell < c_bloch_cell
             % save input power
             obj.P_in = P_in;
             
+            
+            
             % calculate alpha efficiency (in 1/units)
             period          = obj.domain_size(2);
-            obj.alpha_up    = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/P_in );
-            obj.alpha_down  = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_down/P_in );
-
-
-            % DEBUG calculate efficiency from one cell
             
+            % an old version
+%             obj.alpha_up    = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/P_in );
+%             obj.alpha_down  = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_down/P_in );
+
+            % another old version
+            % this one calcualtes it using decay length of intensity of radiated beam, but
+            % only across a single period.
+%             obj.alpha_up    = ( -1/( 2*period ) ) * log( obj.Sy_up(end)/obj.Sy_up(1) );
+%             obj.alpha_down  = ( -1/( 2*period ) ) * log( obj.Sy_down(end)/obj.Sy_down(1) );
+%             % this one calculates it using ratio of radiated power to input
+%             % power minus the other losses
+%             Prad_in_up = obj.P_in - obj.P_rad_down - obj.P_thru;
+%             alpha_up_from_Prad = ( -1/( 2*period ) ) * log( 1 - obj.P_rad_up/Prad_in_up );
+
+            % newer ver, 6/7/2020 that first predicts how many periods to
+            % look at
+            
+%             % first calculate decay length, so power decays to e^(-4) =
+%             % 1.8%
+%             decaylen = 2/imag(obj.k);
+%             
+%             % now pick num of periods
+%             n_periods = round( decaylen/period );
+%             if isinf(n_periods)
+%                 n_periods = 1;
+%             end
+%             [~, Sx, Sy, P_per_x_slice, P_per_y_slice] = obj.calc_power_distribution_ncells(n_periods);
+%             pml_size        = round(obj.sim_opts.pml_options(2)/obj.dy);
+%             obj.alpha_up    = ( -1/( 2*n_periods*period ) ) * log( Sy(end - pml_size, end)/Sy(end - pml_size, 1) );
+%             obj.alpha_down  = ( -1/( 2*n_periods*period ) ) * log( Sy(pml_size+1, end)/Sy(pml_size+1, 1) );
                      
+            
+%             % new ver, 6/24/2020 that uses total radiated power to get
+%             % alpha
+%             % first calculate decay length, so power decays to e^(-4) =
+%             % 1.8%
+%             decaylen = 2/imag(obj.k);
+%             
+%             % now pick num of periods
+%             n_periods = ceil( decaylen/period );
+%             if isinf(n_periods)
+%                 n_periods = 1;
+%             end
+%             
+%             % if too many periods to fit into memory, slim it down
+%             max_size = 1e5;
+%             if n_periods*period/obj.dx > max_size
+%                 n_periods = floor( max_size*obj.dx/period );
+%             end
+%             
+%             [~, Sx, Sy, P_per_x_slice, P_per_y_slice] = obj.calc_power_distribution_ncells(n_periods);
+%             pml_size        = round(obj.sim_opts.pml_options(2)/obj.dy);
+%             
+%             P_rad_up    = abs(sum( Sy(end - pml_size,:) ) * obj.dx);
+%             P_rad_down  = abs(sum( Sy(pml_size+1,:) ) * obj.dx); 
+          
+%             obj.alpha_up    = ( -1/( 2*period*n_periods ) ) * log( 1 - (P_rad_up+P_rad_down)/P_in );
+%             obj.alpha_down  = obj.alpha_up;
+            
+
+            
 %             % DEBUG let's calculate, numerically, the loss coefficient from
 %             % input to output and compare with imag(k)
 %             % H x out, at grid point end-1
@@ -531,6 +391,8 @@ classdef c_gratingCell < c_bloch_cell
             % cell
             %
             % Pre-requisite for running calc_radiated_power
+            %
+            % currently also saves H fields...
             %
             % inputs:
             %   mode_num
@@ -565,10 +427,7 @@ classdef c_gratingCell < c_bloch_cell
             
             % define constants
             mu0     = 4*pi*1e-7;                % units of H/m
-%             mu0     = mu0 * obj.units.scale;    % units of H/(units)
             c       = 3e8;                      % units of m/s
-%             c       = c/obj.units.scale;        % units of (units)/s
-%             omega0 	= 2*pi*c/obj.lambda;        % units of rad*(Units/s)/units = rad/s (rad * m/s / units )
             omega0 	= 2*pi*c/obj.lambda;        % units of rad m s^-1 units^-1
             
             % Choose field to use
@@ -591,12 +450,19 @@ classdef c_gratingCell < c_bloch_cell
        
             % Calc propagating power vs. x
             
+            % add to Ez_onecell Ez( -dx ) and Ez( end + dx )
+            E_z_neg1        = obj.Phi( :, end ) .* exp( 1i * obj.k * (obj.x_coords(1)-obj.dx) );
+            E_z_plus        = obj.Phi( :, 1 ) .* exp( 1i * obj.k * (obj.x_coords(end)+obj.dx) );
+            Ez_onecell_wbounds = [ E_z_neg1, Ez_onecell, E_z_plus ];
+            
             % H y in , on second to end-1 steps, using entire E_z
             % dimensions are y (transverse) vs. x
-            H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+            H_y = (1i/(omega0*mu0)) * ( Ez_onecell_wbounds( :, 3:end ) - Ez_onecell_wbounds( :, 1:end-2 ) )/(2*obj.dx);   % dx, on same grid as Ez_onecell
             
             % poynting vector in, dimensions are y vs x(2:end-1)
-            Sx = real( -1 * conj( H_y_in ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+%             Sx = real( -1 * conj( H_y ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+            Sx = real( -1 * conj( H_y ) .* Ez_onecell );              % Sx = real( -Ez Hy* )
 
             % power per x slice
             P_per_x_slice = sum( Sx, 1 )*obj.dy;
@@ -611,21 +477,246 @@ classdef c_gratingCell < c_bloch_cell
             % power flowing across y
             Sy                  = real( conj( H_x ) .* Ez_onecell( 2:end-1,: ) );       % Sy = real( Ez Hx* )
             P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
+            
+%             % save H fields?
+%             obj.H_x = H_x;
+%             obj.H_y = H_y;
 
             
         end     % end function calc_power_distribution_onecell()
         
         
-        function obj = choose_mode( obj, mode_to_overlap )
+        function [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = ...
+                        calc_power_distribution_tencells(obj, mode_num)
+            % Calculates Sx and Sy, power distribution for 10 cells
+            %
+            % Pre-requisite for running calc_radiated_power
+            %
+            % currently also saves H fields...
+            %
+            % inputs:
+            %   mode_num
+            %       type: scalar, int
+            %       desc: OPTIONAL, mode number to calc Sx and Sy for
+            %
+            % outputs:
+            %   Sx
+            %       type: matrix, double
+            %       desc: x component (in dir. of waveguide prop) of poynting vector
+            %             dimensions y vs. x(2:end-1)
+            %   Sy
+            %       type: matrix, double
+            %       desc: y component (transverse dir, pos = up) of poynting vector
+            %             dimensions y(2:end-1) vs. x
+            %   P_per_x_slice
+            %       type: vector, double
+            %       desc: integral of Sx aka power propagating through each
+            %             x slice of the domain
+            %             dimensions power vs. x(2:end-1)
+            %   P_per_y_slice
+            %       type: vector, double
+            %       desc: integral of Sy aka power propagating through each
+            %             y slice of the domain
+            %             dimensions power vs. y(2:end-1)
+            
+            if nargin < 2
+                choose_mode = false;
+            else
+                choose_mode = true;
+            end
+            
+            % define constants
+            mu0     = 4*pi*1e-7;                % units of H/m
+            c       = 3e8;                      % units of m/s
+            omega0 	= 2*pi*c/obj.lambda;        % units of rad m s^-1 units^-1
+            
+            n_periods = 10;
+            
+            xcoords = 0 : obj.dx : (n_periods*obj.domain_size(2) - obj.dx);
+            
+            % Choose field to use
+            if ~choose_mode
+                % use the chosen "most guided" mode
+
+                % Stich field and phase together
+                phase_tencells      = repmat( exp( 1i * obj.k * xcoords ), size( obj.Phi, 1 ), 1 );
+                Phi                 = repmat( obj.Phi, 1, n_periods );
+                Ez_tencells         = Phi .* phase_tencells;
+            else
+                % choose which mode to use
+                
+                k_chosen    = obj.k_vs_mode( mode_num );
+                phi_chosen  = obj.Phi_vs_mode( mode_num );
+                % Stich field and phase together
+                phase_tencells   = repmat( exp( 1i * k_chosen * xcoords ), size( phi_chosen, 1 ), 1 );
+                Phi                 = repmat( phi_chosen, 1, n_periods );
+                Ez_tencells      = Phi .* phase_tencells;
+                
+            end
+       
+            % Calc propagating power vs. x
+            
+            % add to Ez_onecell Ez( -dx ) and Ez( end + dx ) (why? oh to
+            % calculate H
+            E_z_neg1        = Phi( :, end ) .* exp( 1i * obj.k * (xcoords(1)-obj.dx) );
+            E_z_plus        = Phi( :, 1 ) .* exp( 1i * obj.k * (xcoords(1)+obj.dx) );
+            Ez_wbounds      = [ E_z_neg1, Ez_tencells, E_z_plus ];
+            
+            % H y in , on second to end-1 steps, using entire E_z
+            % dimensions are y (transverse) vs. x
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+            H_y = (1i/(omega0*mu0)) * ( Ez_wbounds( :, 3:end ) - Ez_wbounds( :, 1:end-2 ) )/(2*obj.dx);   % dx, on same grid as Ez_onecell
+            
+            % poynting vector in, dimensions are y vs x(2:end-1)
+%             Sx = real( -1 * conj( H_y ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+            Sx = real( -1 * conj( H_y ) .* Ez_tencells );              % Sx = real( -Ez Hy* )
+
+            % power per x slice
+            P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*omega0*mu0) .* ( Ez_tencells( 3:end,:) - Ez_tencells( 1:end-2,:) )/(2*obj.dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez_tencells( 2:end-1,: ) );       % Sy = real( Ez Hx* )
+            P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
+            
+%             % save H fields?
+%             obj.H_x = H_x;
+%             obj.H_y = H_y;
+
+            
+        end     % end function calc_power_distribution_onecell()
+        
+        
+        function [obj, Sx, Sy, P_per_x_slice, P_per_y_slice] = ...
+                        calc_power_distribution_ncells(obj, n_periods, k0, mode_num)
+            % Calculates Sx and Sy, power distribution for arbitrary number of cells
+            %
+            % Pre-requisite for running calc_radiated_power
+            %
+            % currently also saves H fields...
+            %
+            % inputs:
+            %   n_periods
+            %       type: scalar, int
+            %       desc: number of cells/periods to calculate Sx and Sy for
+            %   mode_num
+            %       type: scalar, int
+            %       desc: OPTIONAL, mode number to calc Sx and Sy for
+            %
+            % outputs:
+            %   Sx
+            %       type: matrix, double
+            %       desc: x component (in dir. of waveguide prop) of poynting vector
+            %             dimensions y vs. x(2:end-1)
+            %   Sy
+            %       type: matrix, double
+            %       desc: y component (transverse dir, pos = up) of poynting vector
+            %             dimensions y(2:end-1) vs. x
+            %   P_per_x_slice
+            %       type: vector, double
+            %       desc: integral of Sx aka power propagating through each
+            %             x slice of the domain
+            %             dimensions power vs. x(2:end-1)
+            %   P_per_y_slice
+            %       type: vector, double
+            %       desc: integral of Sy aka power propagating through each
+            %             y slice of the domain
+            %             dimensions power vs. y(2:end-1)
+            
+            if nargin < 4
+                choose_mode = false;
+            else
+                choose_mode = true;
+            end
+            
+            % define constants
+            mu0     = 4*pi*1e-7;                % units of H/m
+            c       = 3e8;                      % units of m/s
+%             omega0 	= k0*c;                     % units of rad m s^-1 units^-1
+            
+%             n_periods = 10;
+            
+            % coordinates
+            xcoords = 0 : obj.dx : round((n_periods*obj.domain_size(2) - obj.dx));
+            
+            % Choose field to use
+            if ~choose_mode
+                % use the pre-chosen mode
+
+                % Stich field and phase together
+                phase_tencells      = repmat( exp( 1i * obj.k * xcoords ), size( obj.Phi, 1 ), 1 );
+                Phi                 = repmat( obj.Phi, 1, n_periods );
+                Ez_tencells         = Phi .* phase_tencells;
+                
+            else
+                % choose which mode to use
+                
+                k_chosen    = obj.k_vs_mode( mode_num );
+                phi_chosen  = obj.Phi_vs_mode( mode_num );
+                % Stich field and phase together
+                phase_tencells   = repmat( exp( 1i * k_chosen * xcoords ), size( phi_chosen, 1 ), 1 );
+                Phi                 = repmat( phi_chosen, 1, n_periods );
+                Ez_tencells      = Phi .* phase_tencells;
+                
+            end
+       
+            % Calc propagating power vs. x
+            
+            % add to Ez_onecell Ez( -dx ) and Ez( end + dx ) (why? oh to
+            % calculate H
+            E_z_neg1        = Phi( :, end ) .* exp( 1i * obj.k * (xcoords(1)-obj.dx) );
+            E_z_plus        = Phi( :, 1 ) .* exp( 1i * obj.k * (xcoords(1)+obj.dx) );
+            Ez_wbounds      = [ E_z_neg1, Ez_tencells, E_z_plus ];
+            
+            % H y in , on second to end-1 steps, using entire E_z
+            % dimensions are y (transverse) vs. x
+%             H_y_in = (1i/(omega0*mu0)) * ( Ez_onecell( :, 3:end ) - Ez_onecell( :, 1:end-2 ) )/(2*obj.dx);   % dx, term staggered 1
+            H_y = (1i/(k0*c*mu0)) * ( Ez_wbounds( :, 3:end ) - Ez_wbounds( :, 1:end-2 ) )/(2*obj.dx);   % dx, on same grid as Ez_onecell
+            
+            % poynting vector in, dimensions are y vs x(2:end-1)
+%             Sx = real( -1 * conj( H_y ) .* Ez_onecell( :, 2:end-1 ) );              % Sx = real( -Ez Hy* )
+            Sx = real( -1 * conj( H_y ) .* Ez_tencells );              % Sx = real( -Ez Hy* )
+
+            % power per x slice
+            P_per_x_slice = sum( Sx, 1 )*obj.dy;
+            
+
+            % Calculate power radiated up
+            
+            % calculate H_x
+            % dimensions H_x vs. y vs x
+            H_x  = 1/(1i*k0*c*mu0) .* ( Ez_tencells( 3:end,:) - Ez_tencells( 1:end-2,:) )/(2*obj.dy);
+
+            % power flowing across y
+            Sy                  = real( conj( H_x ) .* Ez_tencells( 2:end-1,: ) );       % Sy = real( Ez Hx* )
+            P_per_y_slice       = sum( Sy, 2 )*obj.dx;                                  % using Sy compmonent
+            
+%             % save H fields?
+%             obj.H_x = H_x;
+%             obj.H_y = H_y;
+
+            
+        end     % end function calc_power_distribution_onecell()
+        
+        
+        function obj = choose_mode( obj, mode )
             % Function that chooses which mode becomes the accepted mode
             %
             % Inputs:
-            %   mode_to_overlap
-            %       type: matrix, double
+            %   mode
+            %       type: matrix, double OR scalar integer
             %       desc: OPTIONAL. If passed in as argument, this function
             %             will choose the mode with the closest overlap.
             %             Otherwise, the function will choose the mode with
             %             the mode guided power
+            %             if a scalar integer, selects that mode as the
+            %             primary mode
             %
             % Sets these properties:
             %   obj.k
@@ -664,6 +755,12 @@ classdef c_gratingCell < c_bloch_cell
                     % sum area of field
                     guided_power(ii)    = sum( abs( phi_guided(:) ).^2 );
                     total_power(ii)     = sum( abs( cur_phi(:).^2 ) );
+                    
+                    % if the imag(k) is negative then discard it from the
+                    % options by setting guided power to -1
+                    if imag(obj.k_vs_mode(ii)) < 0
+                        guided_power(ii) = -1;
+                    end
 
                 end     % end for
 
@@ -672,24 +769,22 @@ classdef c_gratingCell < c_bloch_cell
                 obj.debug.guided_power_ratio    = guided_power./total_power;
 
                 % keep mode with LEAST unguided power OR MOST guided power
-                [~, indx_k]         = max( abs(guided_power./total_power) );        % most guided
+                [~, indx_k]         = max( guided_power./total_power );        % most guided
                 obj.k               = obj.k_vs_mode(indx_k);
                 obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
                 obj.chosen_mode_num = indx_k;
                 
             else
-                % sort on mode overlap
-                
-%                 % run overlaps
-%                 [obj, max_overlaps] = obj.calc_mode_overlaps( mode_to_overlap );
-%                 
-%                 % keep mode with highest overlap
-%                 [~, indx_k]         = max( max_overlaps );        
-%                 obj.k               = obj.k_vs_mode(indx_k);
-%                 obj.Phi             = obj.Phi_vs_mode(:,:,indx_k);
-%                 obj.chosen_mode_num = indx_k;
-                
-                obj = choose_mode@c_bloch_cell( obj, mode_to_overlap );
+                if isscalar( mode )
+                    % pick which mode to use as the primary mode
+                    obj.k               = obj.k_vs_mode(mode);
+                    obj.Phi             = obj.Phi_vs_mode(:,:,mode);
+                    obj.chosen_mode_num = mode;
+                    
+                else
+                    % sort on mode overlap
+                    obj = choose_mode@c_bloch_cell( obj, mode );
+                end
                 
             end
             
@@ -700,7 +795,7 @@ classdef c_gratingCell < c_bloch_cell
             % Calculate directivity based on a single angle
             % Requires that simulation has already been run
             %
-            % this function is very much a WIP
+            % this function is very much a WIP, not used for synthesis
             %
             % inputs:
             

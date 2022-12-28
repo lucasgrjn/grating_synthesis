@@ -137,7 +137,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         % top_bot_fill_ratio  
         % top_fill             
         % period               
-        % offset              
+        % offset        % absolute offset    
         % angles              
         % scatter_str         
         % k                 
@@ -156,6 +156,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         debug_options;
         
 %         input_wg_type;  % 'bottom' or 'full
+
+        chosen_cells;
         
     end
     
@@ -168,307 +170,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % call c_synthGrating constructor
             obj = obj@c_synthGrating(varargin{:});
             
-            % inputs and defaults
-            inputs      = { 'coupling_direction',   'none' }; 
-            obj.inputs  = [ obj.inputs, inputs ];                           % append inputs
-            
-            % parse inputs
-            p = f_parse_varargin( inputs, varargin{:} );
-            
-            obj.coupling_direction = p.coupling_direction;
-
         end     % end constructor()
 
         
-        function obj = generate_design_space( obj, fill_bots, fill_top_bot_ratio, verbose )
-            % Generates the design space vs. fill factors
-            % picking optimum offset and period for highest directivity and
-            % closest angle to desired
-            %
-            % based on synthesizeGaussianGrating
-            %
-            % would be good to implement: option to save GC data or not
-            %
-            % Inputs:
-            %   fill_bots
-            %       type: double, array
-            %       desc: OPTIONAL Currently mostly for testing
-            %   fill_top_bot_ratio
-            %       type: double, array
-            %       desc: OPTIONAL Currently mostly for testing
-            %   verbose
-            %       type: double, array
-            %       desc: OPTIONAL Currently mostly for testing, spits out
-            %             a bunch of stuff to the prompt
-            
-            tic;
-            fprintf('Sweeping fill factors for directivity and angle...\n');
-            
-            % set verbose options
-            if ~exist('verbose', 'var')
-                % default verbose off
-                obj.debug_options.verbose = false;
-            else
-                obj.debug_options.verbose = verbose;
-            end
-            
-            % set fill factors and offsets
-            if ~exist('fill_bots', 'var')
-                % default fill
-                fill_bots           = fliplr( 0.4:0.025:0.975 );
-            end
-            if ~exist('fill_top_bot_ratio', 'var')
-                % default fill
-                fill_top_bot_ratio  = fliplr( 0.05:0.025:1.2 );
-            end
-            %             fill_top_bot_ratio  = fliplr( 0.9:0.025:1.2 );
-%             fill_bots           = fliplr( 0.95:0.025:0.975 );
-%             fill_top_bot_ratio  = fliplr( 0.95:0.025:1 );
-%             fill_bots           = fliplr( 0.475:0.025:0.975 );
-%             fill_top_bot_ratio  = fliplr( 1.175:0.025:1.2 );
-            fill_tops           = [];                                       %fill_bots .* fill_top_bot_ratio;
-            guess_offset        = 0;
-            
-            % sort fills so they are in descending order
-            fill_bots           = sort( fill_bots, 'descend' );
-            fill_top_bot_ratio  = sort( fill_top_bot_ratio, 'descend' );
-            
-            % save fills and offsets
-            obj.sweep_variables.fill_tops           = fill_tops;
-            obj.sweep_variables.fill_bots           = fill_bots;
-            obj.sweep_variables.fill_top_bot_ratio  = fill_top_bot_ratio;
-            
-            % initialize saving variables
-            directivities_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            angles_vs_fills         = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            periods_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            offsets_vs_fills        = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio, this is offset ratio
-            scatter_str_vs_fills    = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            k_vs_fills              = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            GC_vs_fills             = cell( length( fill_bots ), length( fill_top_bot_ratio ) );      % dimensions bot fill vs. top/bot ratio
-            dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_top_bot_ratio ) );     % dimensions bot fill vs. top/bot ratio
-            
-            % make grating cell, assuming both layers are filled
-            waveguide = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
-                                               obj.background_index, ...
-                                               obj.y_domain_size, ...
-                                               2*obj.discretization, ...
-                                               1.0, 1.0, 0.0 );
-            
-            % run waveguide simulation
-            % sim settings
-            guess_n             = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
-            guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
-            num_wg_modes        = 5;
-            BC                  = 0;                                                                % 0 = PEC
-            pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
-            % run sim
-            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, guessk );
-            
-            % update guessk (units rad/'units')
-            guessk = waveguide.k;
-            
-            % grab waveguide k
-            waveguide_k = waveguide.k;                                                              % units of rad/'units'
-            
-            % calculate analytical period which would approximately phase
-            % match to desired output angle
-            k0              = obj.background_index * ( 2*pi/obj.lambda );
-            kx              = k0 * sin( (pi/180) * obj.optimal_angle );
-            guess_period    = 2*pi/(waveguide_k- kx);                                               % units of 'units'
-            
-            % snap period to discretization
-            guess_period = obj.discretization * round(guess_period/obj.discretization);
-            
-            % ugh this is really annoying but i have to - extend the
-            % waveguide's e z overlap
-            [ waveguide, e_z_overlap_ext ]  = ...
-                waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
-            waveguide.E_z_for_overlap       = e_z_overlap_ext;
-            
-            % set grating solver settings
-            num_modes   = 5;
-            BC          = 0;                                                % 0 = PEC
-            pml_options = [1, 100, 20, 2]; 
-            OPTS        = struct( 'mode_to_overlap', e_z_overlap_ext );
-            sim_opts    = struct('num_modes', num_modes, 'BC', BC, 'pml_options', pml_options);
-            
-            
-            % initially start with waveguide GC
-            guess_GC = waveguide;
-                
-            % first fill in the right side of the domain
-            for i_ff_bot = 1:length( fill_bots )
 
-                % print iteration
-                fprintf('Right side of domain, fill iteration %i of %i\n', i_ff_bot, length(fill_bots) );
-
-                % Optimize period and offset
-                fill_top = fill_top_bot_ratio(1) * fill_bots(i_ff_bot);
-                if fill_top < 1
-                    % Only run optimization if theres a perturbation of
-                    % both layers
-
-                    % run optimization loop and save data
-                    [ obj, ...
-                      periods_vs_fills( i_ff_bot, 1 ), ...
-                      offsets_vs_fills( i_ff_bot, 1 ), ...
-                      directivities_vs_fills( i_ff_bot, 1 ), ...
-                      angles_vs_fills( i_ff_bot, 1 ), ...
-                      scatter_str_vs_fills( i_ff_bot, 1 ), ...
-                      GC_vs_fills{ i_ff_bot, 1 }, ...
-                      k_vs_fills( i_ff_bot, 1 ), ...
-                      dir_b4_period_vs_fills( i_ff_bot, 1 ) ...
-                      ] = ...
-                        obj.optimize_period_offset( guess_offset, ...
-                                                  fill_top, ...
-                                                  fill_bots(i_ff_bot), ...
-                                                  guess_period,...
-                                                  guessk, ...
-                                                  sim_opts, ...
-                                                  guess_GC );
-
-
-                    % update the guess parameters, period, k, offset
-                    guessk              = k_vs_fills( i_ff_bot, 1 );
-                    guess_period        = periods_vs_fills( i_ff_bot, 1 );
-                    guess_GC            = GC_vs_fills{ i_ff_bot, 1 };
-                    guess_offset        = offsets_vs_fills( i_ff_bot, 1 );
-
-                else
-                    % we're in a waveguide, there's no reason to run
-                    % the optimization (and actually the period sweep
-                    % bugs out when the fill = 100%)
-
-                    % save dummy 
-                    directivities_vs_fills( i_ff_bot, 1 )   = 1;
-                    angles_vs_fills( i_ff_bot, 1 )          = 0;
-                    scatter_str_vs_fills( i_ff_bot, 1 )     = 0;
-                    periods_vs_fills( i_ff_bot, 1 )         = guess_period;
-                    offsets_vs_fills( i_ff_bot, 1 )         = 0;
-                    k_vs_fills( i_ff_bot, 1 )               = guessk;
-                    GC_vs_fills{ i_ff_bot, 1 }              = waveguide;
-                    dir_b4_period_vs_fills( i_ff_bot, 1 )   = 1;
-
-                end     % end if fill_top < 1
-
-                toc;
-
-            end     % end initial domain sweep
-            
-            
-            % for parallel processing, grab these variables before entering
-            % parfor
-            offsets_vs_fills_1 = offsets_vs_fills(:,1);
-            periods_vs_fills_1 = periods_vs_fills(:,1);
-            k_vs_fills_1       = k_vs_fills(:,1);
-            GC_vs_fills_1      = GC_vs_fills(:,1);
-            % calc number of loops, also necessary apparently for parfor
-            n_fill_bots             = length(fill_bots);
-            n_fill_top_bot_ratio    = length(fill_top_bot_ratio);
-
-            % start up parallel pool
-            obj = obj.start_parpool();
-            
-            
-            % now fill in the rest of the domain
-            parfor i_ff_bot = 1:n_fill_bots
-                % For each bottom fill factor
-    
-                fprintf('Main parfor iteration %i of %i\n', i_ff_bot, n_fill_bots);
-                
-                % grab starting guess period and k
-                guess_period    = periods_vs_fills_1( i_ff_bot );
-                guessk          = k_vs_fills_1( i_ff_bot );
-                guess_GC        = GC_vs_fills_1{ i_ff_bot };
-                guess_offset    = offsets_vs_fills_1( i_ff_bot );
-
-                % grab bottom fill
-                fill_bot = fill_bots( i_ff_bot );
-
-                for i_ff_ratio = 2:n_fill_top_bot_ratio
-                    % for each top/bottom fill factor ratio
-
-                    fprintf('Fill factor ratio %i of %i, main parfor iteration %i of %i\n', i_ff_ratio, n_fill_top_bot_ratio, i_ff_bot, n_fill_bots);
-                        
-                    % Optimize period and offset
-                    fill_top = fill_top_bot_ratio(i_ff_ratio) * fill_bot;
-                    if fill_top < 1
-                            % Only run optimization if theres a perturbation 
-                            
-                        % run optimization loop and save data
-                        [ ~, best_period, best_offset, best_directivity, ...
-                          best_angle, best_scatter_str, best_GC, best_k, dir_b4_period_vs_fill ] = ...
-                            obj.optimize_period_offset( guess_offset, ...
-                                                      fill_top, ...
-                                                      fill_bot, ...
-                                                      guess_period,...
-                                                      guessk, ...
-                                                      sim_opts, ...
-                                                      guess_GC );
-                                        
-                        periods_vs_fills( i_ff_bot, i_ff_ratio )        = best_period;
-                        offsets_vs_fills( i_ff_bot, i_ff_ratio )        = best_offset;
-                        directivities_vs_fills( i_ff_bot, i_ff_ratio )  = best_directivity;
-                        angles_vs_fills( i_ff_bot, i_ff_ratio )         = best_angle;
-                        scatter_str_vs_fills( i_ff_bot, i_ff_ratio )    = best_scatter_str;
-%                         GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
-                        k_vs_fills( i_ff_bot, i_ff_ratio )              = best_k;
-                        dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )  = dir_b4_period_vs_fill;
-                
-                        % update the guess parameters, period, k, offset
-                        guessk              = best_k;
-                        guess_period        = best_period;
-                        guess_GC            = best_GC;
-                        guess_offset        = best_offset;
-%                         guessk              = k_vs_fills( i_ff_bot, i_ff_ratio );
-%                         guess_period        = periods_vs_fills( i_ff_bot, i_ff_ratio );
-%                         guess_GC            = GC_vs_fills{ i_ff_bot, i_ff_ratio };
-%                         guess_offset        = offsets_vs_fills( i_ff_bot, i_ff_ratio );
-                            
-                    else
-                        % we're in a waveguide, there's no reason to run
-                        % the optimization (and actually the period sweep
-                        % bugs out when the fill = 100%)
-
-                        % save dummy 
-                        directivities_vs_fills( i_ff_bot, i_ff_ratio )    = 1;
-                        angles_vs_fills( i_ff_bot, i_ff_ratio )           = 0;
-                        scatter_str_vs_fills( i_ff_bot, i_ff_ratio )      = 0;
-                        periods_vs_fills( i_ff_bot, i_ff_ratio )          = guess_period;
-                        offsets_vs_fills( i_ff_bot, i_ff_ratio )          = 0;
-                        k_vs_fills( i_ff_bot, i_ff_ratio )                = guessk;
-%                         GC_vs_fills{ i_ff_bot, i_ff_ratio }               = waveguide;
-                        dir_b4_period_vs_fills( i_ff_bot, i_ff_ratio )    = 1;
-
-                    end     % end if fill_top < 1
-
-                end     % end for i_ff_ratio = ...
-                
-%                 periods_vs_fills( i_ff_bot, 2:end ) = p_v_fill_thisbot;
-
-            end     % end parfor i_ff_bot = ...
-            
-            % save variables to object
-            obj.sweep_variables.directivities_vs_fills  = directivities_vs_fills;
-            obj.sweep_variables.angles_vs_fills         = angles_vs_fills;
-            obj.sweep_variables.scatter_str_vs_fills    = scatter_str_vs_fills;
-            obj.sweep_variables.periods_vs_fills        = periods_vs_fills;
-            obj.sweep_variables.offsets_vs_fills        = offsets_vs_fills;
-            obj.sweep_variables.k_vs_fills              = k_vs_fills;
-%             obj.sweep_variables.GC_vs_fills             = GC_vs_fills;
-            obj.sweep_variables.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
-            
-            fprintf('Done generating design space\n');
-            toc;
-            
-        end     % end generate_design_space()
-        
-        
         % -----------------
-        % Function generate_design_space_filltopbot()
+        % Function generate_design_space()
         %
         %> Generates the design space vs. fill factors
         %> picking optimum offset and period for highest directivity and
@@ -491,7 +198,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         %>       type: double, array
         %>       desc: OPTIONAL Currently mostly for testing, spits out
         %>             a bunch of stuff to the prompt
-        function obj = generate_design_space_filltopbot( obj, fill_bots, fill_tops, verbose )
+        function obj = generate_design_space( obj, fill_bots, fill_tops, verbose )
             
             tic;
             fprintf('Sweeping fill factors for directivity and angle...\n');
@@ -507,14 +214,17 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % set fill factors and offsets
             if ~exist('fill_bots', 'var')
                 % default fill
-                fill_bots   = fliplr( 0.95:0.025:0.975 );
+                fill_bots   = fliplr( 0.025:0.025:0.975 );
             end
             if ~exist('fill_tops', 'var')
                 % default fill
-                fill_tops   = fliplr( 0.95:0.025:0.975 );
+                fill_tops   = fliplr( 0.025:0.025:0.975 );
             end
             fill_top_bot_ratio  = [];
             guess_offset        = 0;
+            
+            % number of times to iterate over optimizatio loop
+            n_optimize_loops = 2;
             
             % sort fills so they are in descending order
             fill_bots = sort( fill_bots, 'descend' );
@@ -534,11 +244,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             k_vs_fills              = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
             GC_vs_fills             = cell( length( fill_bots ), length( fill_tops ) );      % dimensions bot fill vs. top fill
             dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
+            prad_pin_vs_fills       = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
             
             % make grating cell, assuming both layers are filled
             waveguide = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
                                                2*obj.discretization, ...
@@ -546,13 +255,13 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             % run waveguide simulation
             % sim settings
-            guess_n             = 0.7 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
+            guess_n             = 1.0 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
             guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
             num_wg_modes        = 5;
             BC                  = 0;                                                                % 0 = PEC
             pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
             % run sim
-            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, guessk );
+            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, obj.k0, guessk );
             
             % update guessk (units rad/'units')
             guessk = waveguide.k;
@@ -592,37 +301,42 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 fprintf('Right side of domain, fill iteration %i of %i\n', i_ff_bot, length(fill_bots) );
 
                 % Optimize period and offset
-%                 fill_top = fill_top_bot_ratio(1) * fill_bots(i_ff_bot);
                 if fill_bots(i_ff_bot) < 1 && fill_tops(1) < 1
                     % Only run optimization if theres a perturbation of
                     % both layers
+                    for ii = 1:n_optimize_loops
+                        % run optimization loop
+                        [ ~, ...
+                          guess_period, ...
+                          guess_offset, ...
+                          directivities_vs_fills( i_ff_bot, 1 ), ...
+                          angles_vs_fills( i_ff_bot, 1 ), ...
+                          scatter_str_vs_fills( i_ff_bot, 1 ), ...
+                          guess_GC, ...
+                          guessk, ...
+                          dir_b4_period_vs_fills( i_ff_bot, 1 ) ...
+                          ] = ...
+                            obj.optimize_period_offset( guess_offset, ...
+                                                      fill_tops(1), ...
+                                                      fill_bots(i_ff_bot), ...
+                                                      guess_period,...
+                                                      guessk, ...
+                                                      sim_opts, ...
+                                                      guess_GC );
+                    end
 
-                    % run optimization loop and save data
-                    [ obj, ...
-                      periods_vs_fills( i_ff_bot, 1 ), ...
-                      offsets_vs_fills( i_ff_bot, 1 ), ...
-                      directivities_vs_fills( i_ff_bot, 1 ), ...
-                      angles_vs_fills( i_ff_bot, 1 ), ...
-                      scatter_str_vs_fills( i_ff_bot, 1 ), ...
-                      GC_vs_fills{ i_ff_bot, 1 }, ...
-                      k_vs_fills( i_ff_bot, 1 ), ...
-                      dir_b4_period_vs_fills( i_ff_bot, 1 ) ...
-                      ] = ...
-                        obj.optimize_period_offset( guess_offset, ...
-                                                  fill_tops(1), ...
-                                                  fill_bots(i_ff_bot), ...
-                                                  guess_period,...
-                                                  guessk, ...
-                                                  sim_opts, ...
-                                                  guess_GC );
-
-
-                    % update the guess parameters, period, k, offset
-                    guessk              = k_vs_fills( i_ff_bot, 1 );
-                    guess_period        = periods_vs_fills( i_ff_bot, 1 );
-                    guess_GC            = GC_vs_fills{ i_ff_bot, 1 };
-                    guess_offset        = offsets_vs_fills( i_ff_bot, 1 );
-
+                    % save the optimized period, offset, GC, and k
+                    periods_vs_fills( i_ff_bot, 1 ) = guess_period;
+                    offsets_vs_fills( i_ff_bot, 1 ) = guess_offset;
+                    GC_vs_fills{ i_ff_bot, 1 }      = guess_GC;
+                    k_vs_fills( i_ff_bot, 1 )       = guessk;
+                    
+                    if strcmp( obj.coupling_direction, 'up' )
+                        prad_pin_vs_fills( i_ff_bot, 1 ) = guess_GC.P_rad_up/guess_GC.P_in;
+                    else
+                        prad_pin_vs_fills( i_ff_bot, 1 ) = guess_GC.P_rad_down/guess_GC.P_in;
+                    end
+                    
                 else
                     % at least one of the layers is not perturbed, so there is no optimization to run
                     % save dummy values
@@ -634,6 +348,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                     k_vs_fills( i_ff_bot, 1 )               = guessk;
                     GC_vs_fills{ i_ff_bot, 1 }              = waveguide;
                     dir_b4_period_vs_fills( i_ff_bot, 1 )   = 1;
+                    prad_pin_vs_fills( i_ff_bot, 1 )        = 0;
 
                 end     % end if fill_top < 1
 
@@ -680,37 +395,43 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                     % Optimize period and offset
 %                     fill_top = fill_top_bot_ratio(i_ff_ratio) * fill_bot;
                     if fill_top < 1
-                        % Only run optimization if theres a perturbation 
+                        % Only run optimization if theres a perturbation
+                        
+                        for ii = 1:n_optimize_loops
+                            % run optimization loop
+                            [ ~, ...
+                              guess_period, ...
+                              guess_offset, ...
+                              best_directivity, ...
+                              best_angle, ...
+                              best_scatter_str, ...
+                              guess_GC, ...
+                              guessk, ...
+                              dir_b4_period_vs_fill ...
+                              ] = ...
+                                obj.optimize_period_offset( guess_offset, ...
+                                                          fill_top, ...
+                                                          fill_bot, ...
+                                                          guess_period,...
+                                                          guessk, ...
+                                                          sim_opts, ...
+                                                          guess_GC );
+                        end
                             
-                        % run optimization loop and save data
-                        [ ~, best_period, best_offset, best_directivity, ...
-                          best_angle, best_scatter_str, best_GC, best_k, dir_b4_period_vs_fill ] = ...
-                            obj.optimize_period_offset( guess_offset, ...
-                                                      fill_top, ...
-                                                      fill_bot, ...
-                                                      guess_period,...
-                                                      guessk, ...
-                                                      sim_opts, ...
-                                                      guess_GC );
-                                        
-                        periods_vs_fills( i_ff_bot, i_ff_top )        = best_period;
-                        offsets_vs_fills( i_ff_bot, i_ff_top )        = best_offset;
+                        % save data
+                        periods_vs_fills( i_ff_bot, i_ff_top )        = guess_period;
+                        offsets_vs_fills( i_ff_bot, i_ff_top )        = guess_offset;
                         directivities_vs_fills( i_ff_bot, i_ff_top )  = best_directivity;
                         angles_vs_fills( i_ff_bot, i_ff_top )         = best_angle;
                         scatter_str_vs_fills( i_ff_bot, i_ff_top )    = best_scatter_str;
 %                         GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
-                        k_vs_fills( i_ff_bot, i_ff_top )              = best_k;
+                        k_vs_fills( i_ff_bot, i_ff_top )              = guessk;
                         dir_b4_period_vs_fills( i_ff_bot, i_ff_top )  = dir_b4_period_vs_fill;
-                
-                        % update the guess parameters, period, k, offset
-                        guessk              = best_k;
-                        guess_period        = best_period;
-                        guess_GC            = best_GC;
-                        guess_offset        = best_offset;
-%                         guessk              = k_vs_fills( i_ff_bot, i_ff_ratio );
-%                         guess_period        = periods_vs_fills( i_ff_bot, i_ff_ratio );
-%                         guess_GC            = GC_vs_fills{ i_ff_bot, i_ff_ratio };
-%                         guess_offset        = offsets_vs_fills( i_ff_bot, i_ff_ratio );
+                        if strcmp( obj.coupling_direction, 'up' )
+                            prad_pin_vs_fills( i_ff_bot, i_ff_top ) = guess_GC.P_rad_up/guess_GC.P_in;
+                        else
+                            prad_pin_vs_fills( i_ff_bot, i_ff_top ) = guess_GC.P_rad_down/guess_GC.P_in;
+                        end
                             
                     else
                         % at least one of the layers is not perturbed, so there is no optimization to run
@@ -723,13 +444,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         k_vs_fills( i_ff_bot, i_ff_top )                = guessk;
 %                         GC_vs_fills{ i_ff_bot, i_ff_ratio }               = waveguide;
                         dir_b4_period_vs_fills( i_ff_bot, i_ff_top )    = 1;
+                        prad_pin_vs_fills( i_ff_bot, i_ff_top )         = 0;
 
                     end     % end if fill_top < 1
-
-                end     % end for i_ff_top = ...
-                
-%                 periods_vs_fills( i_ff_bot, 2:end ) = p_v_fill_thisbot;
-
+                end     % end for i_ff_top = ...         
             end     % end parfor i_ff_bot = ...
             
             % save variables to object
@@ -739,13 +457,13 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             obj.sweep_variables.periods_vs_fills        = periods_vs_fills;
             obj.sweep_variables.offsets_vs_fills        = offsets_vs_fills;
             obj.sweep_variables.k_vs_fills              = k_vs_fills;
-%             obj.sweep_variables.GC_vs_fills             = GC_vs_fills;
             obj.sweep_variables.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
-            
+            obj.sweep_variables.prad_pin_vs_fills       = prad_pin_vs_fills;
+
             fprintf('Done generating design space\n');
             toc;
             
-        end     % end generate_design_space_filltopbot()
+        end     % end generate_design_space()
         
         
         
@@ -772,7 +490,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         
         
         function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
-                    best_GC, best_k, dir_b4_period_vs_fill ] ...
+                    best_GC, best_k, dir_b4_period_vs_fill, DEBUG ] ...
                     = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
             % for given fill ratios, optimizes period and offset for best angle/directivity
             %
@@ -830,47 +548,37 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %   dir_b4_period_vs_fill
             %       type: scalar, double
             %       desc: directivity b4 period sweep, mostly for debugging purposes 
+            %   DEBUG
+            %       type: struct
+            %       desc: as name suggests, holds fields for debugging
             
-%             % enable/disable debug mode
-%             DEBUG = false;
-            
-            % generate vector of absolute offsets
-            offsets         = guess_offset : obj.discretization : guess_offset + guess_period;
-            offsets         = mod( offsets, guess_period );
-            offset_ratios   = offsets / guess_period;
-
-            % init saving variables vs. offset
-            directivities = zeros( size(offset_ratios) );
-            k_vs_offset   = zeros( size(offset_ratios) );
-            angles        = zeros( size(offset_ratios) );
+            directivities = [];
+            k_vs_offset   = [];
+            angles        = [];
             GC_vs_offset  = {};
 
             % grab mode to overlap with
             OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
 
-            % Sweep offsets, pick offset with best directivity
-%             fprintf('Sweeping offsets...\n');
-            for i_offset = 1:length( offset_ratios )
-
-                % verbose printing
-                if obj.debug_options.verbose == true
-                    fprintf('Sweeping offset %i of %i\n', i_offset, length(offset_ratios) );
-                end
-                
+            % new version of sweepign offsets, local search
+            cur_offset   = guess_offset;
+            offsets      = [];
+            delta_offset = obj.discretization;  % start with positive delta offset
+            i_offset     = 1;
+            while true
+               
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
                                                guess_period, ...
                                                fill_top, ...
                                                fill_bot, ...
-                                               offset_ratios(i_offset) );
-                                        
+                                               cur_offset./guess_period );
+                
                 % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
-
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, obj.k0, guessk, OPTS );
+                
                 % save directivity
                 if strcmp( obj.coupling_direction, 'up' )
                     % coupling direction is upwards
@@ -889,32 +597,37 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 % update the mode overlap field
                 GC_vs_offset{i_offset}  = GC;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
+                
+                offsets( i_offset ) = cur_offset;
 
-%                 toc;
+                % Check if we need to switch directions
+                if i_offset > 1
+                    
+                    if delta_offset > 0 && directivities( i_offset ) < directivities( i_offset-1 )
+                        % Switch directions, we hit a max.
+                        delta_offset            = -delta_offset;
+                        OPTS.mode_to_overlap    = guess_gc.E_z_for_overlap;
+                        cur_offset              = guess_offset;
+                    elseif delta_offset < 0 && directivities( i_offset ) < max( directivities( 1:end-1) )
+                        % Quit loop, we're done
+                        break;
+                    end
+                    
+                end
+                
+                % update for next loop
+                cur_offset      = cur_offset + delta_offset;
+                i_offset        = i_offset + 1;
+                    
+            end
 
-            end     % end for i_offset = ...
-%             fprintf('...done.\n');
+            % DEBUG field
+            DEBUG.GC_vs_offset = GC_vs_offset;
 
-%                         % DEBUG plot directivity vs. offset
-%             if DEBUG
-%                 figure;
-%                 plot( offsets, directivities, '-o' );
-%                 xlabel('offsets'); ylabel('directivities');
-%                 title('DEBUG directivities vs offsets');
-%                 makeFigureNice();
-%                             
-%                             figure;
-%                             plot( offsets, angles, '-o' );
-%                             xlabel('offsets'); ylabel('angles');
-%                             title('DEBUG angles vs offsets for first run');
-%                             makeFigureNice();
-%                             
-%             end
-
-            % pick best offset
+            % pick best offset, to feed into period sweep loop
             [ ~, indx_best_offset ]     = max( directivities );
-%             best_offset                 = offsets( indx_best_offset );
-            best_offset_ratio           = offset_ratios( indx_best_offset );
+%             best_offset_ratio           = offset_ratios( indx_best_offset );
+            best_offset_ratio           = offsets( indx_best_offset )./guess_period;      % newer local search ver.
             best_offset_k               = k_vs_offset( indx_best_offset );
             best_offset_angle           = angles( indx_best_offset );
             
@@ -924,79 +637,52 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % here's an output variable
             dir_b4_period_vs_fill = max( directivities );
 
-            % DEBUG plot grating with best directivity
-%             if DEBUG
-% 
-%                 % make grating cell
-%                 GC = obj.h_makeGratingCell(  obj.convertObjToStruct(), ...
-%                                             guess_period, ...
-%                                             fill_tops(i_ff_top), ...
-%                                             fill_bots(i_ff_bot), ...
-%                                             best_offset );
-% 
-%                 % run sim
-%                 GC = GC.runSimulation( num_modes, BC, pml_options, best_offset_k );
-% 
-%                 % plot field
-%                 GC.plotEz_w_edges();
-% 
-%             end
-
-
-%             % now sweep periods
-%             % only sweep larger periods. Doubtful that the period
-%             % will be smaller
-%             periods     = guess_period : obj.discretization : 1.05 * guess_period;
-%             periods     = obj.discretization * round(periods/obj.discretization);
-% %                         periods_nm  = periods * obj.units.scale * 1e9;                            % convert to nm
-
             % now sweep periods
             % decide whether to sweep larger or smaller periods
             % based on the angle
             if best_offset_angle > obj.optimal_angle
                 % only sweep smaller periods
-                decrease_periods = true;
+                delta_period = -obj.discretization;
             else
                 % only sweep larger periods
-                decrease_periods = false;
+                delta_period = obj.discretization;
             end
 
             % init saving variables
-            angles_vs_period    = []; %= zeros( size(periods) );
-            k_vs_period         = []; %zeros( size(periods) );
-            GC_vs_period        = {}; % cell( size(periods) );
+            angles_vs_period    = []; 
+            k_vs_period         = [];
+            GC_vs_period        = {};
             periods             = [];
-
-            % sweep periods
-            guessk = best_offset_k;
-            period = guess_period;
             
-            % set while loop exit flag
-            angle_err_sign_flip = false;
-
-            i_period    = 0;
-            while ~angle_err_sign_flip
-
-                i_period = i_period + 1;
-                
+            % initial period sweep values
+            guessk              = best_offset_k;
+            periods(1)          = guess_period;
+            GC_vs_period{1}     = GC_vs_offset{indx_best_offset};
+            k_vs_period(1)      = best_offset_k;
+            angles_vs_period(1) = best_offset_angle;
+                       
+            i_period    = 2;
+            while true
+             
                 % verbose printing
                 if obj.debug_options.verbose == true
                     fprintf('Sweeping period %i\n', i_period );
                 end
                 
+                % update period
+                guess_period = guess_period + delta_period;
+                
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
-                                               obj.units.name, ...
-                                               obj.lambda, ...
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
-                                               period, ...
+                                               guess_period, ...
                                                fill_top, ...
                                                fill_bot, ...
                                                best_offset_ratio );
 
                 % run sim
-                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, guessk, OPTS );
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, obj.k0, guessk, OPTS );
 
                 % save angle
                 if strcmp( obj.coupling_direction, 'up' )
@@ -1008,43 +694,31 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 end
 
                 % update for next iteration
-                periods(i_period)       = period;
+                periods(i_period)       = guess_period;
                 GC_vs_period{i_period}  = GC;
                 k_vs_period(i_period)   = GC.k;
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
                 
-                % update period
-                if decrease_periods == true
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) < obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % decrease the period
-                        period = period - obj.discretization;
-                    end
-                else
-                    % check for exit condition (error of angle switches
-                    % sign)
-                    if angles_vs_period(i_period) > obj.optimal_angle
-                        angle_err_sign_flip = true;
-                    else
-                        % increase the period
-                        period = period + obj.discretization;
-                    end
-                end     % end updating period if else
+                % check for exit condition (if error in angle gets worse)
+                cur_angle_err   = abs( angles_vs_period( i_period ) - obj.optimal_angle );
+                prev_angle_err  = abs( angles_vs_period( i_period-1 ) - obj.optimal_angle );
+                if cur_angle_err > prev_angle_err
+                    % optimization over, break
+                    break;
+                end
                 
-%                 toc;
+                i_period = i_period + 1;
 
             end     % end period sweep
-%             fprintf('...done.\n');
 
+            % DEBUG field
+            DEBUG.GC_vs_period = GC_vs_period;
+            
             % pick best period
             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
             best_period_k                   = k_vs_period( indx_best_period );
             
- 
             % return data
             % best offset is already set
             best_GC = GC_vs_period{ indx_best_period };
@@ -1063,228 +737,15 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
             best_period = periods( indx_best_period );
             best_k      = best_GC.k;
-            best_offset = best_offset_ratio * best_period;
+%             best_offset = best_offset_ratio * best_period;
+            best_offset = round( best_offset_ratio * best_period / obj.discretization ) .* obj.discretization;  % snap to grid
                     
-        end     % end function optimizePeriodOffset()
+        end     % end function optimize_period_offset()
+              
         
         
-        function obj = generate_final_design_gaussian( obj, MFD, input_wg_type, invert_normal_top_bot_ratio_thresh, enforce_min_feat_size_func )
-            % function for generating the final synthesized design
-            % parameters
-            %
-            % Inputs:
-            %   MFD
-            %       type: double, scalar
-            %       desc: mode field diameter, in units 'units'
-            %   input_wg_type
-            %       type: string
-            %       desc: 'bottom' for cSi only or 'full' for both cSi and
-            %             pSi
-            %   invert_normal_top_bot_ratio_thresh
-            %       type: double, scalar
-            %       desc: OPTIONAL: top/bottom fill factor threshold
-            %             currently for my own debugging purposes
-            %
-            % Sets these fields: (not updated)
-            %   obj.dir_synth                   = [];
-            %   obj.bot_fill_synth              = [];
-            %   obj.top_bot_fill_ratio_synth    = [];
-            %   obj.period_synth                = [];
-            %   obj.offset_synth                = [];
-            %   obj.angles_synth                = [];
-            %   obj.scatter_str_synth           = [];
-            %   obj.k_synth                     = [];
-            %   obj.GC_synth                    = {};
-            %   obj.des_scatter_norm            = [];
-            
-
-            % save input waveguide type
-            obj.synthesized_design.input_wg_type = input_wg_type;    
-            
-            % calcualte desired scattering
-            [ obj, xvec, alpha_des ] = obj.calculate_desired_scattering( MFD );
-
-            % meshgrid the fills
-            [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_top_bot_ratio, obj.sweep_variables.fill_bots );
-            
-            % set invert/normal threshold
-            if ~exist( 'invert_normal_top_bot_ratio_thresh', 'var' )
-                invert_normal_top_bot_ratio_thresh = 0.6;
-            end
-
-            
-            % Select subset of domain to use
-            if strcmp( input_wg_type, 'bottom' ) == true
-                % input waveguide is the bottom layer
-            
-                % first narrow down the space to take the datapoints with the
-                % maximum directivity per bottom fill factor (so for each row
-                % on my design space)
-
-                indx_bottom_space   = obj.sweep_variables.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
-                
-                % narrow down design space (take top left quadrant)
-                % recall fills are sorted in descending order
-                topbot_ratios   = topbot_ratio_mesh( :, indx_bottom_space );
-                bot_fills       = bot_fills_mesh( :, indx_bottom_space );
-                directivities   = obj.sweep_variables.directivities_vs_fills( :, indx_bottom_space );
-                angles          = obj.sweep_variables.angles_vs_fills( :, indx_bottom_space );      
-                periods         = obj.sweep_variables.periods_vs_fills( :, indx_bottom_space );
-                offsets         = obj.sweep_variables.offsets_vs_fills( :, indx_bottom_space );
-                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( :, indx_bottom_space );
-                ks              = obj.sweep_variables.k_vs_fills( :, indx_bottom_space );
-                
-            elseif strcmp( input_wg_type, 'full' ) == true
-                % input waveguide is a full waveguide
-                
-                % first narrow down the space to take the datapoints with the
-                % maximum directivity per bottom fill factor (so for each row
-                % on my design space)
-
-                indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
-                
-                % narrow down design space (take top right quadrant)
-                topbot_ratios   = topbot_ratio_mesh( :, indx_full_space );
-                bot_fills       = bot_fills_mesh( :, indx_full_space );
-                directivities   = obj.sweep_variables.directivities_vs_fills( :, indx_full_space );
-                angles          = obj.sweep_variables.angles_vs_fills( :, indx_full_space );      
-                periods         = obj.sweep_variables.periods_vs_fills( :, indx_full_space );
-                offsets         = obj.sweep_variables.offsets_vs_fills( :, indx_full_space );
-                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( :, indx_full_space );
-                ks              = obj.sweep_variables.k_vs_fills( :, indx_full_space );
-                
-            end     % end if strcmp( input_wg_type, 'bottom' )
-            
-            % for each top fill, pick bottom fill with highest
-            % directivity
-            [ high_dirs, indx_highest_dir_per_ratio ] = max( directivities, [], 1 );
-            % gotta use linear indexing
-            indxs                   = sub2ind( size(directivities), indx_highest_dir_per_ratio, 1:size(directivities,2)  );
-            angles_high_dir         = angles( indxs );
-            periods_high_dir        = periods( indxs );
-            offsets_high_dir        = offsets( indxs );
-            scatter_strs_high_dir   = scatter_strs( indxs );
-            k_high_dir              = ks( indxs );
-            topbot_ratio_high_dir   = topbot_ratios( indxs );
-            bot_fills_high_dir      = bot_fills( indxs );
-%                 GC_high_dir             = GC_vs_fills_inv( indxs );
-            
-
-            % enforce min feature size
-            obj.synthesized_design.use_min_feat_size = false;                   % default to false
-            if exist( 'enforce_min_feat_size_func', 'var' )
-                % loop through each cell and discard any that violate
-                % feature size rules
-                obj.synthesized_design.use_min_feat_size = true;
-                
-                indices_to_keep = [];
-                for ii = 1:length( periods_high_dir )
-                    if enforce_min_feat_size_func(  periods_high_dir(ii), ...
-                                                    topbot_ratio_high_dir(ii) .* bot_fills_high_dir(ii), ...
-                                                    bot_fills_high_dir(ii) ) ...
-                                                    == true
-                        indices_to_keep(end+1) = ii;
-                    end
-                end
-                
-                angles_high_dir         = angles_high_dir(indices_to_keep);
-                periods_high_dir        = periods_high_dir(indices_to_keep);
-                offsets_high_dir        = offsets_high_dir(indices_to_keep);
-                scatter_strs_high_dir   = scatter_strs_high_dir(indices_to_keep);
-                k_high_dir              = k_high_dir(indices_to_keep);
-                topbot_ratio_high_dir   = topbot_ratio_high_dir(indices_to_keep);
-                bot_fills_high_dir      = bot_fills_high_dir(indices_to_keep);
-                        
-            end
-
-            % DEBUG plot the resulting picked out datapoints
-            % angles
-            figure;
-            plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
-            title('chosen datapoints, angles');
-            makeFigureNice();
-            % periods
-            figure;
-            plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
-            title('chosen datapoints, periods');
-            makeFigureNice();
-            % offsets
-            figure;
-            plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
-            title('chosen datapoints, offsets');
-            makeFigureNice();
-            % scattering strengths
-            figure;
-            plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
-            title('chosen datapoints, scattering strengths');
-            makeFigureNice();
-            % k real
-            figure;
-            plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
-            title('chosen datapoints, k real');
-            makeFigureNice();
-            % k imag
-            figure;
-            plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
-            title('chosen datapoints, k imaginary');
-            makeFigureNice();
-            % top bottom ratio
-            figure;
-            plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
-            title('chosen datapoints, top/bottom ratio');
-            makeFigureNice();
-            % bottom fill
-            figure;
-            plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
-            title('chosen datapoints, bottom fill');
-            makeFigureNice();
-            % directivity
-            figure;
-            plot( 1:length(high_dirs), 10*log10(high_dirs), '-o' );
-            title('chosen datapoints, directivity (dB)');
-            makeFigureNice();
-            
-%             % DEBUG plot bot fills vs topbot ratio
-%             figure;
-%             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
-%             xlabel('top/bottom ratio'); ylabel('bottom fill');
-%             title('DEBUG bottom fill vs top/bottom ratio');
-%             makeFigureNice();
-%             
-%             % DEBUG plot bot fills vs top fills
-%             figure;
-%             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
-%             xlabel('bottom fill'); ylabel('top fill');
-%             title('DEBUG bottom fill vs top/bottom ratio');
-%             makeFigureNice();
-%             
-%             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
-%             
-%             x = 0:0.01:1;
-%             y = -(x.^3)/2 + x;
-%             figure;
-%             plot(x, y);
-%             xlabel('bot'); ylabel('top');
-            
-            % match datapoints to desired alpha
-            obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-                                         bot_fills_high_dir, top_fills_high_dir, ...
-                                         offsets_high_dir, periods_high_dir, ...
-                                         angles_high_dir, scatter_strs_high_dir, ...
-                                         k_high_dir );
-            
-            % build final index distribution
-            obj = obj.build_final_index();
-            
-            % coordinates of index distribution
-            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
-            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
-            
-            
-        end     % end function generate_final_design_gaussian()
-        
-        
-        function obj = generate_final_design_gaussian_topbot( obj, MFD, input_wg_type, enforce_min_feat_size_func, start_alpha_des )
+        function obj = generate_final_design_apodized( obj, desired_field, input_wg_type, enforce_min_feat_size_func, ...
+                                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both )
             % function for generating the final synthesized design
             % parameters
             %
@@ -1297,6 +758,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %   input_wg_type
             %       type: string
             %       desc: 'bottom' for body only or 'full' for both layers
+            %             or 'none' for no layers
             %   enforce_min_feat_size_func
             %       type: function handle
             %       desc: OPTIONAL INPUT
@@ -1304,6 +766,19 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %             feat size
             %             See the example function at the bottom of this
             %             file
+            %   fill_top_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_bot_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_vs_top_bot_both
+            %       type: string
+            %       desc: OPTIONAL: pick design vs top fill, bottom fill,
+            %               or both
+            %             either 'top', 'bottom', or 'both'
+            %             default to 'top'
+            %   
             %
             % Sets these fields: (not updated)
             %     obj.synthesized_design.dir                  
@@ -1316,64 +791,199 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %     obj.synthesized_design.scatter_str        
             %     obj.synthesized_design.k                  
             %     obj.synthesized_design.GC                 
-            %     obj.synthesized_design.des_scatter        
-
-            % save input waveguide type
-            obj.synthesized_design.input_wg_type = input_wg_type;      
+            %     obj.synthesized_design.des_scatter             
             
             % calcualte desired scattering
-            [ obj, xvec, alpha_des, desired_field ] = obj.calculate_desired_scattering( MFD );
-
-            % meshgrid the fills (dimensions are bot vs. top, I believe)
-            [ top_fills_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots );
-
-            % find where the max scattering strength is
-            [~, max_indx] = max( obj.sweep_variables.scatter_str_vs_fills(:) );
-            [ i_max_bot_scat, i_max_top_scat ] = ind2sub( size(obj.sweep_variables.scatter_str_vs_fills), max_indx );
+            [ obj, xvec, alpha_des, desired_field ] = obj.calculate_desired_scattering( desired_field );
             
-            % Select subset of domain to use
-            if strcmp( input_wg_type, 'bottom' ) == true
-                % input waveguide is the bottom layer
+            % select cells to use
+            obj = obj.choose_unit_cells( input_wg_type, enforce_min_feat_size_func, ...
+                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+
+                     
+            % optimize start alpha
+            [ obj, best_alpha_power ] = obj.optimize_start_alpha( xvec, alpha_des, obj.chosen_cells.chosen_dirs, ...
+                                              obj.chosen_cells.chosen_bot_fills, obj.chosen_cells.chosen_top_fills, ...
+                                              obj.chosen_cells.chosen_offsets, obj.chosen_cells.chosen_periods, ...
+                                              obj.chosen_cells.chosen_angles, obj.chosen_cells.chosen_scatter_str, ...
+                                              obj.chosen_cells.chosen_ks, desired_field );
+                                          
+            % DEBUG PLOTTING PREDICTED FIELD SHAPE
+            [ ~, field_shape_prediction ] = obj.predict_overlap_for_optimization( ...
+                                              xvec, alpha_des, obj.chosen_cells.chosen_dirs, ...
+                                              obj.chosen_cells.chosen_bot_fills, obj.chosen_cells.chosen_top_fills, ...
+                                              obj.chosen_cells.chosen_offsets, obj.chosen_cells.chosen_periods, ...
+                                              obj.chosen_cells.chosen_angles, obj.chosen_cells.chosen_scatter_str, ...
+                                              obj.chosen_cells.chosen_ks, desired_field, best_alpha_power );
+%             figure('Name','predicted_field');
+%             plot( xvec, alpha_des ); hold on;
+%             plot( xvec, abs(desired_field).*max(alpha_des)./max(desired_field) );
+%             plot( xvec, field_shape_prediction.*max(alpha_des)./max(field_shape_prediction) );
+%             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
+%             legend('desired scattering strength', 'fiber mode', 'predicted field shape');
+%             title('DEBUG predicted field shape');
+%             makeFigureNice();  
+                                          
+            % synthesize final design
+            [ obj, synthesized_des ] = obj.pick_final_datapoints( xvec, alpha_des, ...
+                                 obj.chosen_cells.chosen_dirs, ...
+                                 obj.chosen_cells.chosen_bot_fills, ...
+                                 obj.chosen_cells.chosen_top_fills, ...
+                                 obj.chosen_cells.chosen_offsets, ...
+                                 obj.chosen_cells.chosen_periods, ...
+                                 obj.chosen_cells.chosen_angles, ...
+                                 obj.chosen_cells.chosen_scatter_str, ...
+                                 obj.chosen_cells.chosen_ks, ...
+                                 10.^best_alpha_power );
+            obj.synthesized_design = catstruct( obj.synthesized_design, synthesized_des );  % in aux function
+            % save input waveguide type
+            obj.synthesized_design.input_wg_type = input_wg_type; 
             
-                % narrow down design space (take top left quadrant)
-                % recall fills are sorted in descending order
-                top_fills       = top_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
-                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
-                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
-                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );      
-                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
-                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
-                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
-                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
-                
-            elseif strcmp( input_wg_type, 'full' ) == true
-                % input waveguide is a full waveguide
-                
-                % narrow down design space (take top right quadrant)
-                top_fills       = top_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
-                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
-                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
-                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );      
-                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
-                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
-                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
-                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
-                
-            end     % end if strcmp( input_wg_type, 'bottom' )
+            % build final index distribution
+            obj = obj.build_final_index();
+            
+        end     % end function generate_final_design_apodized()
+        
+        function obj = generate_final_design_apodized_v2_20200612( obj, desired_field, input_wg_type, enforce_min_feat_size_func, ...
+                                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both )
+            % function for generating the final synthesized design
+            % parameters
+            %
+            % new version created on 6/12/2020 that uses a different method
+            % of matching total radiated power to apodize
+            %
+            % i don't recall if this really worked out in the end
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter, in units 'units'
+            %   input_wg_type
+            %       type: string
+            %       desc: 'bottom' for body only or 'full' for both layers
+            %             or 'none' for no layers
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: OPTIONAL INPUT
+            %             A function that user makes which enforces min.
+            %             feat size
+            %             See the example function at the bottom of this
+            %             file
+            %   fill_top_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_bot_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_vs_top_bot_both
+            %       type: string
+            %       desc: OPTIONAL: pick design vs top fill, bottom fill,
+            %               or both
+            %             either 'top', 'bottom', or 'both'
+            %             default to 'top'
+            %   
+            %
+            % Sets these fields: (not updated)
+            %     obj.synthesized_design.dir                  
+            %     obj.synthesized_design.bot_fill            
+            %     obj.synthesized_design.top_bot_fill_ratio  
+            %     obj.synthesized_design.top_fill            
+            %     obj.synthesized_design.period              
+            %     obj.synthesized_design.offset              
+            %     obj.synthesized_design.angles             
+            %     obj.synthesized_design.scatter_str        
+            %     obj.synthesized_design.k                  
+            %     obj.synthesized_design.GC                 
+            %     obj.synthesized_design.des_scatter             
+
+            % select subset of domain to use
+             if nargin < 5
+                 [ obj, top_fills, bot_fills, directivities, ...
+                           angles, periods, offsets, scatter_strs, ks, rad_power_ratio ] ...
+                           = obj.pick_design_quadrant( input_wg_type );
+             else
+                 % override the fills as user desired
+                 [ obj, top_fills, bot_fills, directivities, ...
+                           angles, periods, offsets, scatter_strs, ks, rad_power_ratio ] ...
+                           = obj.pick_design_quadrant( input_wg_type, fill_top_override, fill_bot_override );
+             end
+              
+             
+            % default to using top fill
+            if nargin < 7
+                fill_vs_top_bot_both = 'top';
+            end
             
             % for each top fill, pick bottom fill with highest
             % directivity
-            [ high_dirs, indx_highest_dir_per_topfill ] = max( directivities, [], 1 );
+            [ chosen_dirs_vs_top, indx_highest_dir_per_topfill ] = max( directivities, [], 1 );
             % gotta use linear indexing
-            indxs                   = sub2ind( size(directivities), indx_highest_dir_per_topfill, 1:size(directivities,2)  );
-            angles_high_dir         = angles( indxs );
-            periods_high_dir        = periods( indxs );
-            offsets_high_dir        = offsets( indxs );
-            scatter_strs_high_dir   = scatter_strs( indxs );
-            k_high_dir              = ks( indxs );
-            top_fills_high_dir      = top_fills( indxs );
-            bot_fills_high_dir      = bot_fills( indxs );
-%                 GC_high_dir             = GC_vs_fills_inv( indxs );
+            indxs_vs_top               = sub2ind( size(directivities), indx_highest_dir_per_topfill, 1:size(directivities,2)  );
+
+
+            % for each bottom fill, pick top fill
+            % with highest directivity
+            % directivity
+            [ chosen_dirs_vs_bot, indx_highest_dir_per_botfill ] = max( directivities, [], 2 );
+            % gotta use linear indexing
+            indxs_vs_bot                   = sub2ind( size(directivities), 1:size(directivities,1), indx_highest_dir_per_botfill.' );
+
+            switch fill_vs_top_bot_both
+                
+                case 'top'
+            
+                    % use top fill
+                    chosen_angles       = angles( indxs_vs_top );
+                    chosen_periods      = periods( indxs_vs_top );
+                    chosen_offsets      = offsets( indxs_vs_top );
+                    chosen_scatter_str  = scatter_strs( indxs_vs_top );
+                    chosen_ks           = ks( indxs_vs_top );
+                    chosen_top_fills    = top_fills( indxs_vs_top );
+                    chosen_bot_fills    = bot_fills( indxs_vs_top );
+                    chosen_dirs         = chosen_dirs_vs_top;
+                    chosen_rad_power_ratio = rad_power_ratio( indxs_vs_top );
+                    
+                case 'bottom'
+                     
+                    % use bot fill
+                    chosen_angles       = angles( indxs_vs_bot );
+                    chosen_periods      = periods( indxs_vs_bot );
+                    chosen_offsets      = offsets( indxs_vs_bot);
+                    chosen_scatter_str  = scatter_strs( indxs_vs_bot );
+                    chosen_ks           = ks( indxs_vs_bot );
+                    chosen_top_fills    = top_fills( indxs_vs_bot );
+                    chosen_bot_fills    = bot_fills( indxs_vs_bot );
+                    chosen_dirs         = chosen_dirs_vs_bot;
+                    chosen_rad_power_ratio = rad_power_ratio( indxs_vs_bot );
+                    
+                case 'both'
+                    
+                    % append bot fill
+                    chosen_angles       = [ angles( indxs_vs_top ), angles( indxs_vs_bot ) ];
+                    chosen_periods      = [ periods( indxs_vs_top ), periods( indxs_vs_bot ) ];
+                    chosen_offsets      = [ offsets( indxs_vs_top ), offsets( indxs_vs_bot) ];
+                    chosen_scatter_str  = [ scatter_strs( indxs_vs_top ), scatter_strs( indxs_vs_bot ) ];
+                    chosen_ks           = [ ks( indxs_vs_top ), ks( indxs_vs_bot ) ];
+                    chosen_top_fills    = [ top_fills( indxs_vs_top ), top_fills( indxs_vs_bot ) ];
+                    chosen_bot_fills    = [ bot_fills( indxs_vs_top ), bot_fills( indxs_vs_bot ) ];
+                    chosen_dirs = [ chosen_dirs_vs_top, chosen_dirs_vs_bot.' ];
+                    chosen_rad_power_ratio = [ rad_power_ratio( indxs_vs_top ), rad_power_ratio( indxs_vs_bot ) ]; 
+            
+            end
+            
+%             chosen_dirs = chosen_dirs_vs_top;
+%             chosen_dirs = [ chosen_dirs_vs_top, chosen_dirs_vs_bot.' ];
+            
+            % sort on radiated power ratio
+            [ chosen_rad_power_ratio, indx_sort ] = sort( chosen_rad_power_ratio );
+            chosen_angles       = chosen_angles( indx_sort );
+            chosen_periods      = chosen_periods( indx_sort );
+            chosen_offsets      = chosen_offsets( indx_sort );
+            chosen_ks           = chosen_ks( indx_sort );
+            chosen_top_fills    = chosen_top_fills( indx_sort );
+            chosen_bot_fills    = chosen_bot_fills( indx_sort );
+            chosen_dirs         = chosen_dirs( indx_sort );
+            chosen_scatter_str = chosen_scatter_str( indx_sort );  
 
             % enforce min feature size
             obj.synthesized_design.use_min_feat_size = false;                   % default to false
@@ -1383,162 +993,568 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 obj.synthesized_design.use_min_feat_size = true;
                 
                 indices_to_keep = [];
-                for ii = 1:length( periods_high_dir )
-                    if enforce_min_feat_size_func( periods_high_dir(ii), top_fills_high_dir(ii), bot_fills_high_dir(ii) ) == true
+                for ii = 1:length( chosen_periods )
+                    if enforce_min_feat_size_func( chosen_periods(ii), chosen_top_fills(ii), chosen_bot_fills(ii), chosen_offsets(ii) ) == true
                         indices_to_keep(end+1) = ii;
                     end
                 end
                 
-                angles_high_dir         = angles_high_dir(indices_to_keep);
-                periods_high_dir        = periods_high_dir(indices_to_keep);
-                offsets_high_dir        = offsets_high_dir(indices_to_keep);
-                scatter_strs_high_dir   = scatter_strs_high_dir(indices_to_keep);
-                k_high_dir              = k_high_dir(indices_to_keep);
-                top_fills_high_dir      = top_fills_high_dir(indices_to_keep);
-                bot_fills_high_dir      = bot_fills_high_dir(indices_to_keep);
+                chosen_angles       = chosen_angles(indices_to_keep);
+                chosen_periods      = chosen_periods(indices_to_keep);
+                chosen_offsets      = chosen_offsets(indices_to_keep);
+                chosen_scatter_str  = chosen_scatter_str(indices_to_keep);
+                chosen_ks           = chosen_ks(indices_to_keep);
+                chosen_top_fills    = chosen_top_fills(indices_to_keep);
+                chosen_bot_fills    = chosen_bot_fills(indices_to_keep);
+                chosen_dirs         = chosen_dirs(indices_to_keep);
+                chosen_rad_power_ratio = chosen_rad_power_ratio(indices_to_keep);
                         
             end
+            
+            chosen_params = struct( 'chosen_angles', chosen_angles, 'chosen_periods', chosen_periods, ...
+                                'chosen_offsets', chosen_offsets, 'chosen_scatter_str', chosen_scatter_str, ...
+                                'chosen_ks', chosen_ks, 'chosen_top_fills', chosen_top_fills, ...
+                                'chosen_bot_fills', chosen_bot_fills, 'chosen_dirs', chosen_dirs, ...
+                                'chosen_rad_power_ratio', chosen_rad_power_ratio );
                 
-            
-            % DEBUG plot the resulting picked out datapoints
-            % angles
-            figure;
-            plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
+            OPTS = struct('fig_size', [1200, 800]);
+            figure('Name', 'chosen_datapoints');
+            % chosen angles
+            subplot(3,3,1);
+            plot( 1:length(chosen_angles), chosen_angles, '-o' );
             title('chosen datapoints, angles');
-            makeFigureNice();
-            % periods
-            figure;
-            plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
+            xlim( [1, length(chosen_angles) ] );
+            makeFigureNice( OPTS );
+            % chosen periods
+            subplot(3,3,2);
+            plot( 1:length(chosen_periods), chosen_periods, '-o' );
             title('chosen datapoints, periods');
-            makeFigureNice();
-            % offsets
-            figure;
-            plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
+            makeFigureNice( OPTS );
+            % chosen offsets
+            subplot(3,3,3);
+            plot( 1:length(chosen_offsets), chosen_offsets, '-o' );
             title('chosen datapoints, offsets');
-            makeFigureNice();
-            % scattering strengths
-            figure;
-            plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
-            title('chosen datapoints, scattering strengths');
-            makeFigureNice();
-            % k real
-            figure;
-            plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
+            makeFigureNice( OPTS );
+            % chosen scatter strength
+            subplot(3,3,4);
+            plot( 1:length(chosen_rad_power_ratio), chosen_rad_power_ratio, '-o' );
+            title('chosen datapoints, radiated power ratio');
+            makeFigureNice( OPTS );
+            % chosen k real
+            subplot(3,3,5);
+            plot( 1:length(chosen_ks), real(chosen_ks), '-o' );
             title('chosen datapoints, k real');
-            makeFigureNice();
-            % k imag
-            figure;
-            plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
+            makeFigureNice( OPTS );
+            % chosen k imag
+            subplot(3,3,6);
+            plot( 1:length(chosen_ks), imag(chosen_ks), '-o' );
             title('chosen datapoints, k imaginary');
-            makeFigureNice();
-            % top bottom ratio
-            figure;
-            plot( 1:length(top_fills_high_dir), top_fills_high_dir, '-o' );
+            makeFigureNice( OPTS );
+            % chosen top fill
+            subplot(3,3,7);
+            plot( 1:length(chosen_top_fills), chosen_top_fills, '-o' );
             title('chosen datapoints, top fill');
-            makeFigureNice();
-            % bottom fill
-            figure;
-            plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
+            makeFigureNice( OPTS );
+            % chosen bottom fill
+            subplot(3,3,8);
+            plot( 1:length(chosen_bot_fills), chosen_bot_fills, '-o' );
             title('chosen datapoints, bottom fill');
-            makeFigureNice();
-            % directivity
-            figure;
-            plot( 1:length(high_dirs), 10*log10(high_dirs), '-o' );
+            makeFigureNice( OPTS );
+            % chosen directivity
+            subplot(3,3,9);
+            plot( 1:length(chosen_dirs), 10*log10(chosen_dirs), '-o' );
             title('chosen datapoints, directivity (dB)');
-            makeFigureNice();
+            makeFigureNice( OPTS );
             
-            obj = obj.optimize_start_alpha( xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, desired_field );
+            % apodization starts here
             
-%             % match data points to desired alpha
-%             if exist( 'start_alpha_des', 'var' )
-%                 % use user defined alpha start
-%                 obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-%                                              bot_fills_high_dir, top_fills_high_dir, ...
-%                                              offsets_high_dir, periods_high_dir, ...
-%                                              angles_high_dir, scatter_strs_high_dir, ...
-%                                              k_high_dir, start_alpha_des );
-%             else
-%                 obj = obj.pick_final_datapoints( xvec, alpha_des, high_dirs, ...
-%                                              bot_fills_high_dir, top_fills_high_dir, ...
-%                                              offsets_high_dir, periods_high_dir, ...
-%                                              angles_high_dir, scatter_strs_high_dir, ...
-%                                              k_high_dir );
-%             end
-
+            % find the optimal starting point on the power vs. pos curve
+            [ obj, best_start_power ] = obj.optimize_start_power( desired_field, chosen_params );
+            
+            % grab and save final datapoints
+            [ obj, synthesized_design ]         = obj.pick_final_datapoints_v2(desired_field, best_start_power, chosen_params);
+            obj.synthesized_design              = catstruct( obj.synthesized_design, synthesized_design );  % in aux function
+            obj.synthesized_design.input_wg_type = input_wg_type; 
+            
             % build final index distribution
             obj = obj.build_final_index();
             
-            % coordinates of index distribution
-            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
-            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
-            
-            
-        end     % end function generate_final_design_gaussian_topbot()
+        end     % end function generate_final_design_apodized_v2_20200612()
         
         
-        function obj = generate_final_design_uniform( obj, MFD )
-            % purpose of this function right now is just for uniform
-            % gratings for CLO
-            
-            % save input waveguide type
-            obj.synthesized_design.input_wg_type = 'bottom';
-            
-            
-            
-        end     % end function generate_final_design_uniform()
-        
-        
-        function [ obj, xvec, alpha_des, u ] = calculate_desired_scattering( obj, MFD )
-            % Calculates desired scattering profile for a Gaussian field
-            % with the given MFD
+        function obj = generate_final_design_apodized_gaussian( obj, MFD, input_wg_type, ...
+                enforce_min_feat_size_func, fill_top_override, fill_bot_override, fill_vs_top_bot_both )
+            % Synthesizes an apodized grating that radiates desired Gaussian field profile
             %
             % Inputs:
             %   MFD
-            %
-            % Outputs:
-            %   xvec
-            %   alpha_des
-            %   u
-            %       type: double, array
-            %       desc: desired output field
-           
-            % generate x coordinates for the gaussian mode
-            % must be large enough to fit mode
-            xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
-            xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
+            %       type: double, scalar
+            %       desc: mode field diameter of gaussian, defined as 1/e^2 width of intensity
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'bottom' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )   
+            %   fill_top_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_bot_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_vs_top_bot_both
+            %       type: string
+            %       desc: OPTIONAL: pick design vs top fill, bottom fill,
+            %               or both
+            %             either 'top', 'bottom', or 'both'
+            %             default to 'top'
             
             % generate a fiber gaussian mode
-            w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
-            zvec        = 0;                                                            % this is unused
-            d0          = 0;                                                            % take slice at waist
-            [obj, u]    = obj.fiber_mode_gaussian(  w0, zvec, xvec,...
-                                                    obj.optimal_angle, d0, obj.background_index );
-                                              
-            % calculate desired scattering strength vs. x
-            integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
-            alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );             % in units 1/m
-            alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
+            [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
             
-            % DEBUG plot alpha desired
-            figure;
-            plot( xvec, alpha_des, xvec, abs(u).*max(alpha_des)./max(u) );
-            xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
-            legend('desired scattering strength', 'fiber mode');
-            title('DEBUG scattering strength for gaussian');
-            makeFigureNice();  
+            % generate final design, apodized
+            if nargin < 5
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func );
+            elseif nargin < 7
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func, ...
+                                                            fill_top_override, fill_bot_override );
+            else
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func, ...
+                                                            fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+            end
             
-        end     % end function calculate_desired_scattering()
+            % save MFD
+            obj.synthesized_design.MFD = MFD;
+            
+        end % end function generate_final_design_apodized_gaussian()
+        
+        function obj = generate_final_design_apodized_gaussian_v2_20200612( obj, MFD, input_wg_type, ...
+                enforce_min_feat_size_func, fill_top_override, fill_bot_override, fill_vs_top_bot_both )
+            % Synthesizes an apodized grating that radiates desired Gaussian field profile
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter of gaussian, defined as 1/e^2 width of intensity
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'bottom' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill )   
+            %   fill_top_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_bot_override
+            %       type: scalar
+            %       desc: OPTIONAL: fill threshold override
+            %   fill_vs_top_bot_both
+            %       type: string
+            %       desc: OPTIONAL: pick design vs top fill, bottom fill,
+            %               or both
+            %             either 'top', 'bottom', or 'both'
+            %             default to 'top'
+            
+            % generate a fiber gaussian mode
+            [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
+            
+            % generate final design, apodized
+            if nargin < 5
+                obj = obj.generate_final_design_apodized_v2_20200612( field_profile, input_wg_type, enforce_min_feat_size_func );
+            elseif nargin < 7
+                obj = obj.generate_final_design_apodized_v2_20200612( field_profile, input_wg_type, enforce_min_feat_size_func, ...
+                                                            fill_top_override, fill_bot_override );
+            else
+                obj = obj.generate_final_design_apodized_v2_20200612( field_profile, input_wg_type, enforce_min_feat_size_func, ...
+                                                            fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+            end
+            
+            % save MFD
+            obj.synthesized_design.MFD = MFD;
+            
+        end % end function generate_final_design_apodized_gaussian_v2_20200612()
+        
+        function obj = generate_final_design_uniform( obj, desired_field, input_wg_type, enforce_min_feat_size_func, filltop, fillbot )
+            % Synthesizes a uniform grating that has amplitude matching field_profile
+            %
+            % reworking this code?
+            % inputs:
+            %   desired_field
+            %       type: double, array
+            %       desc: field profile to amplitude match to. dimensions
+            %             are amplitude vs. x coordinates
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: OPTIONAL, user defined function for enforcing minimum feature sizes
+            %               currently this function must take 4 args - ( period, top_fill, bot_fill, offset )
+            %   filltop
+            %       type: double, scalar
+            %       desc: OPTIONAL fill to use
+            %   fillbot
+            %       type: double, scalar
+            %       desc: OPTIONAL fill to use
+            
+                    
+            % pick the best fills
+            % select subset of domain to use
+            % dimensions are bot vs. top
+            if nargin < 4
+                [ obj, top_fills, bot_fills, directivities, ...
+                           angles, periods, offsets, scatter_strs, ks ] ...
+                           = obj.pick_design_quadrant( input_wg_type );
+            else
+                % override fills
+                [ obj, top_fills, bot_fills, directivities, ...
+                           angles, periods, offsets, scatter_strs, ks ] ...
+                           = obj.pick_design_quadrant( input_wg_type , filltop, fillbot );
+            end
+                   
+            
+            % init saving vars
+            % dims are bot fill vs top fill
+            obj.sweep_variables.overlap_predict_vs_fill = zeros( size( top_fills ) );
+
+            % calculate transmission, bot fill vs top fill
+            t = directivities./(directivities+1);
+
+            % for each fill
+            for i_bot = 1:size( bot_fills, 1 )
+
+                for i_top = 1:size( top_fills, 2 )
+
+                    % grab current alpha
+                    cur_alpha = scatter_strs( i_bot, i_top );
+
+                    % calc length of grating to scatter 99% of light (1/e^4 power)
+                    grat_len = 2/cur_alpha;     % in 'units'
+
+                    % gen x coords
+                    xvec = 0 : obj.discretization : grat_len - obj.discretization;
+
+                    % integrate the picked scatter strengths to get the predicted
+                    % field shape
+                    scatter_str_vs_x                = cur_alpha .* ones( size(xvec) );
+                    [obj, field_shape_prediction]   = obj.predict_field_shape( xvec, scatter_str_vs_x );
+
+                    % calculate overlap with desired field (simple xcorr)
+                    [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
+                    obj.sweep_variables.overlap_predict_vs_fill(i_bot, i_top) = max( abs(overlap) );
+
+                    % check for min feat size, if doesn't satisfy, set overlap to 0
+                    if exist( 'enforce_min_feat_size_func', 'var' )
+                        if ~enforce_min_feat_size_func( periods( i_bot, i_top ), ...
+                                top_fills( i_bot, i_top ), ...
+                                bot_fills( i_bot, i_top ), ...
+                                offsets( i_bot, i_top ) )
+                            obj.sweep_variables.overlap_predict_vs_fill(i_bot, i_top) = 0;
+                        end
+                    end
+
+                end     % end for i_top
+
+            end     % end for i_bot
+
+            % calculate coupling
+            obj.sweep_variables.coupling_predict_vs_fill = obj.sweep_variables.overlap_predict_vs_fill.*t;
+            obj.sweep_variables.fill_top_predict = top_fills( 1, : );
+            obj.sweep_variables.fill_bot_predict = bot_fills( :, 1 );
+
+            % now pick the best datapoint
+            [ ~, i_bot_best, i_top_best ] = f_get_max_matrix_elem( obj.sweep_variables.coupling_predict_vs_fill );
+
+            % generate final design
+            grat_len            = 4./scatter_strs( i_bot_best, i_top_best );
+            xvec                = 0 : obj.discretization : grat_len - obj.discretization;
+            alpha_des           = scatter_strs( i_bot_best, i_top_best ) .* ones( size( xvec ) );
+            [ obj, synthesized_des ] = obj.pick_final_datapoints( xvec, alpha_des, ...
+                                             directivities( i_bot_best, i_top_best ), ...
+                                             bot_fills( i_bot_best, i_top_best ), ...
+                                             top_fills( i_bot_best, i_top_best ), ...
+                                             offsets( i_bot_best, i_top_best ), ...
+                                             periods( i_bot_best, i_top_best ), ...
+                                             angles( i_bot_best, i_top_best ), ...
+                                             scatter_strs( i_bot_best, i_top_best ), ...
+                                             ks( i_bot_best, i_top_best ) );
+            obj.synthesized_design = synthesized_des;
+            obj.synthesized_design.input_wg_type = input_wg_type;
+            
+            % build final index distribution
+            obj = obj.build_final_index();
+            
+        end     % end generate_final_design_uniform()
         
         
-        function obj = optimize_start_alpha( obj, xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, desired_field )
+                    
+        function obj = generate_final_design_uniform_gaussian( obj, MFD, input_wg_type, enforce_min_feat_size_func, filltop, fillbot )
+            % Synthesizes a uniform grating that radiates desired Gaussian field profile
+            %
+            % Inputs:
+            %   MFD
+            %       type: double, scalar
+            %       desc: mode field diameter of gaussian, defined as 1/e^2 width of intensity
+            %   input_wg_type
+            %       type: string
+            %       desc: 'full' or 'none' are currently supported
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: user defined function for enforcing minimum feature sizes
+            %               currently this function must take 2 args - ( period, fill ) 
+            %   filltop
+            %       type: double, scalar
+            %       desc: OPTIONAL fill to use
+            %   fillbot
+            %       type: double, scalar
+            %       desc: OPTIONAL fill to use
+            
+            % generate a fiber gaussian mode
+            [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
+            
+            % generate final design, uniform
+            if nargin > 4
+                obj = obj.generate_final_design_uniform( field_profile, input_wg_type, enforce_min_feat_size_func, filltop, fillbot );
+            else
+                obj = obj.generate_final_design_uniform( field_profile, input_wg_type, enforce_min_feat_size_func );
+            end
+            
+            % save MFD
+            obj.synthesized_design.MFD = MFD;
+        
+        end     % end generate_final_design_uniform_gaussian()
+        
+        function obj = choose_unit_cells( obj, input_wg_type, enforce_min_feat_size_func, ...
+                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both, ...
+                                        interp_on, plot_on )
+            % added a new input - interp_on. optionally interpolates the
+            % final chosen cells. default is true
+            % plot_on - optional. decide whether to plot the chosen cells
+            % or not. default is true
+                                    
+            % select subset of domain to use
+            if nargin < 4
+             [ obj, top_fills, bot_fills, directivities, ...
+                       angles, periods, offsets, scatter_strs, ks ] ...
+                       = obj.pick_design_quadrant( input_wg_type );
+            else
+             % override the fills as user desired
+             [ obj, top_fills, bot_fills, directivities, ...
+                       angles, periods, offsets, scatter_strs, ks ] ...
+                       = obj.pick_design_quadrant( input_wg_type, fill_top_override, fill_bot_override );
+            end
+            
+            if nargin < 7
+                interp_on = true;
+            end
+            
+            if nargin < 8
+                plot_on = true;
+            end
+
+%             % try interpolating
+%             n_interp            = 200;
+%             top_fills_interp 	= linspace(min(top_fills(:)), max(top_fills(:)), n_interp);
+%             bot_fills_interp    = linspace(min(bot_fills(:)), max(bot_fills(:)), n_interp);
+%             [top_fills_interp, bot_fills_interp] = meshgrid(top_fills_interp, bot_fills_interp);
+%             directivities       = interp2( top_fills, bot_fills, directivities, top_fills_interp, bot_fills_interp );
+%             angles              = interp2( top_fills, bot_fills, angles, top_fills_interp, bot_fills_interp );
+%             periods             = interp2( top_fills, bot_fills, periods, top_fills_interp, bot_fills_interp );
+%             offsets             = interp2( top_fills, bot_fills, offsets, top_fills_interp, bot_fills_interp );
+%             scatter_strs        = interp2( top_fills, bot_fills, scatter_strs, top_fills_interp, bot_fills_interp );
+%             ks                  = interp2( top_fills, bot_fills, ks, top_fills_interp, bot_fills_interp );
+%             top_fills           = top_fills_interp;
+%             bot_fills           = bot_fills_interp;
+            
+            % default to using top fill
+            if nargin < 6
+                fill_vs_top_bot_both = 'top';
+            end
+
+            % for each top fill, pick bottom fill with highest
+            % directivity
+            [ chosen_dirs_vs_top, indx_highest_dir_per_topfill ] = max( directivities, [], 1 );
+            % gotta use linear indexing
+            indxs_vs_top               = sub2ind( size(directivities), indx_highest_dir_per_topfill, 1:size(directivities,2)  );
+
+
+            % for each bottom fill, pick top fill
+            % with highest directivity
+            % directivity
+            [ chosen_dirs_vs_bot, indx_highest_dir_per_botfill ] = max( directivities, [], 2 );
+            % gotta use linear indexing
+            indxs_vs_bot                   = sub2ind( size(directivities), 1:size(directivities,1), indx_highest_dir_per_botfill.' );
+
+            switch fill_vs_top_bot_both
+
+                case 'top'
+
+                    % use top fill
+                    chosen_angles       = angles( indxs_vs_top );
+                    chosen_periods      = periods( indxs_vs_top );
+                    chosen_offsets      = offsets( indxs_vs_top );
+                    chosen_scatter_str  = scatter_strs( indxs_vs_top );
+                    chosen_ks           = ks( indxs_vs_top );
+                    chosen_top_fills    = top_fills( indxs_vs_top );
+                    chosen_bot_fills    = bot_fills( indxs_vs_top );
+                    chosen_dirs         = chosen_dirs_vs_top;
+
+                case 'bottom'
+
+                    % use bot fill
+                    chosen_angles       = angles( indxs_vs_bot );
+                    chosen_periods      = periods( indxs_vs_bot );
+                    chosen_offsets      = offsets( indxs_vs_bot);
+                    chosen_scatter_str  = scatter_strs( indxs_vs_bot );
+                    chosen_ks           = ks( indxs_vs_bot );
+                    chosen_top_fills    = top_fills( indxs_vs_bot );
+                    chosen_bot_fills    = bot_fills( indxs_vs_bot );
+                    chosen_dirs         = chosen_dirs_vs_bot;
+
+                case 'both'
+
+                    % append bot fill
+                    chosen_angles       = [ angles( indxs_vs_top ), angles( indxs_vs_bot ) ];
+                    chosen_periods      = [ periods( indxs_vs_top ), periods( indxs_vs_bot ) ];
+                    chosen_offsets      = [ offsets( indxs_vs_top ), offsets( indxs_vs_bot) ];
+                    chosen_scatter_str  = [ scatter_strs( indxs_vs_top ), scatter_strs( indxs_vs_bot ) ];
+                    chosen_ks           = [ ks( indxs_vs_top ), ks( indxs_vs_bot ) ];
+                    chosen_top_fills    = [ top_fills( indxs_vs_top ), top_fills( indxs_vs_bot ) ];
+                    chosen_bot_fills    = [ bot_fills( indxs_vs_top ), bot_fills( indxs_vs_bot ) ];
+                    chosen_dirs = [ chosen_dirs_vs_top, chosen_dirs_vs_bot.' ];
+
+            end
+
+            % try sorting on scattering strength
+            [ chosen_scatter_str, indx_sort ] = sort( chosen_scatter_str );
+            chosen_angles       = chosen_angles( indx_sort );
+            chosen_periods      = chosen_periods( indx_sort );
+            chosen_offsets      = chosen_offsets( indx_sort );
+            chosen_ks           = chosen_ks( indx_sort );
+            chosen_top_fills    = chosen_top_fills( indx_sort );
+            chosen_bot_fills    = chosen_bot_fills( indx_sort );
+            chosen_dirs         = chosen_dirs( indx_sort );
+            
+            % remove 0 directionality cells
+            chosen_scatter_str  = chosen_scatter_str( chosen_dirs > 0 );
+            chosen_angles       = chosen_angles( chosen_dirs > 0 );
+            chosen_periods      = chosen_periods( chosen_dirs > 0 );
+            chosen_offsets      = chosen_offsets( chosen_dirs > 0 );
+            chosen_ks           = chosen_ks( chosen_dirs > 0 );
+            chosen_top_fills    = chosen_top_fills( chosen_dirs > 0 );
+            chosen_bot_fills    = chosen_bot_fills( chosen_dirs > 0 );
+            chosen_dirs         = chosen_dirs( chosen_dirs > 0 );
+            
+            % how about interpolating here
+            if interp_on
+                n_interp            = 200;
+                chosen_scatter_str  = interp1( 1:length(chosen_scatter_str), chosen_scatter_str, linspace(1, length(chosen_scatter_str), n_interp) );
+                chosen_angles       = interp1( 1:length(chosen_angles), chosen_angles, linspace(1, length(chosen_angles), n_interp) );
+                chosen_periods      = interp1( 1:length(chosen_periods), chosen_periods, linspace(1, length(chosen_periods), n_interp) );
+                chosen_offsets      = interp1( 1:length(chosen_offsets), chosen_offsets, linspace(1, length(chosen_offsets), n_interp) );
+                chosen_ks           = interp1( 1:length(chosen_ks), chosen_ks, linspace(1, length(chosen_ks), n_interp) );
+                chosen_top_fills    = interp1( 1:length(chosen_top_fills), chosen_top_fills, linspace(1, length(chosen_top_fills), n_interp) );
+                chosen_bot_fills    = interp1( 1:length(chosen_bot_fills), chosen_bot_fills, linspace(1, length(chosen_bot_fills), n_interp) );
+                chosen_dirs         = interp1( 1:length(chosen_dirs), chosen_dirs, linspace(1, length(chosen_dirs), n_interp) );
+            end
+                
+            % enforce min feature size
+            obj.synthesized_design.use_min_feat_size = false;                   % default to false
+            if exist( 'enforce_min_feat_size_func', 'var' )
+                % loop through each cell and discard any that violate
+                % feature size rules
+                obj.synthesized_design.use_min_feat_size = true;
+
+                indices_to_keep = [];
+                for ii = 1:length( chosen_periods )
+                    if enforce_min_feat_size_func( chosen_periods(ii), chosen_top_fills(ii), chosen_bot_fills(ii), chosen_offsets(ii) ) == true
+                        indices_to_keep(end+1) = ii;
+                    end
+                end
+
+                chosen_angles       = chosen_angles(indices_to_keep);
+                chosen_periods      = chosen_periods(indices_to_keep);
+                chosen_offsets      = chosen_offsets(indices_to_keep);
+                chosen_scatter_str  = chosen_scatter_str(indices_to_keep);
+                chosen_ks           = chosen_ks(indices_to_keep);
+                chosen_top_fills    = chosen_top_fills(indices_to_keep);
+                chosen_bot_fills    = chosen_bot_fills(indices_to_keep);
+                chosen_dirs         = chosen_dirs(indices_to_keep);
+
+            end
+           
+            if plot_on
+                OPTS = struct('fig_size', [2400, 1200]);
+                figure('Name', 'chosen_datapoints');
+                % chosen angles
+                subplot(3,3,1);
+                plot( 1:length(chosen_angles), chosen_angles, '-o' );
+                title('chosen datapoints, angles');
+                xlim( [1, length(chosen_angles) ] );
+                makeFigureNice( OPTS );
+                % chosen periods
+                subplot(3,3,2);
+                plot( 1:length(chosen_periods), chosen_periods, '-o' );
+                title('chosen datapoints, periods');
+                makeFigureNice( OPTS );
+                % chosen offsets
+                subplot(3,3,3);
+                plot( 1:length(chosen_offsets), chosen_offsets, '-o' );
+                title('chosen datapoints, offsets');
+                makeFigureNice( OPTS );
+                % chosen scatter strength
+                subplot(3,3,4);
+                plot( 1:length(chosen_scatter_str), chosen_scatter_str, '-o' );
+                title('chosen datapoints, scattering strengths');
+                makeFigureNice( OPTS );
+                % chosen k real
+                subplot(3,3,5);
+                plot( 1:length(chosen_ks), real(chosen_ks), '-o' );
+                title('chosen datapoints, k real');
+                makeFigureNice( OPTS );
+                % chosen k imag
+                subplot(3,3,6);
+                plot( 1:length(chosen_ks), imag(chosen_ks), '-o' );
+                title('chosen datapoints, k imaginary');
+                makeFigureNice( OPTS );
+                % chosen top fill
+                subplot(3,3,7);
+                plot( 1:length(chosen_top_fills), chosen_top_fills, '-o' );
+                title('chosen datapoints, top fill');
+                makeFigureNice( OPTS );
+                % chosen bottom fill
+                subplot(3,3,8);
+                plot( 1:length(chosen_bot_fills), chosen_bot_fills, '-o' );
+                title('chosen datapoints, bottom fill');
+                makeFigureNice( OPTS );
+                % chosen directivity
+                subplot(3,3,9);
+                plot( 1:length(chosen_dirs), 10*log10(chosen_dirs), '-o' );
+                title('chosen datapoints, directivity (dB)');
+                makeFigureNice( OPTS );
+            end
+
+            % save the chosen cells
+            obj.chosen_cells = struct( 'chosen_angles', chosen_angles, ...
+                                    'chosen_periods', chosen_periods, ...
+                                    'chosen_offsets', chosen_offsets, ...
+                                    'chosen_scatter_str', chosen_scatter_str, ...
+                                    'chosen_ks', chosen_ks, ...
+                                    'chosen_top_fills', chosen_top_fills, ...
+                                    'chosen_bot_fills', chosen_bot_fills, ...
+                                    'chosen_dirs', chosen_dirs );
+                                    
+        end % end choose_unit_cells()
+        
+       
+        
+        function [ obj, best_alpha_power ] = optimize_start_alpha( obj, xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, desired_field )
             % Optimizes the starting alpha, based on predicted field overlap
             %
             % Inputs:
@@ -1568,11 +1584,11 @@ classdef c_synthTwoLevelGrating < c_synthGrating
            
             % using matlab's fminsearch
             f = @(alpha_power)( 1 - obj.predict_overlap_for_optimization( ...
-                                              xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, desired_field, alpha_power ) );
+                                              xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, desired_field, alpha_power ) );
             
             % options
 %             opts = optimset( 'Display', 'iter' );
@@ -1580,7 +1596,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % for debuggging
 %             [ best_alpha_power, best_val] = fminsearch( f, log10(min( scatter_strs_high_dir )), opts );
             
-            best_alpha_power = fminsearch( f, log10(min( scatter_strs_high_dir )) );
+            best_alpha_power = fminsearch( f, log10(min( chosen_scatter_strs )) );
             
 %             best_overlap_fminsearch = 1 - best_val;
             
@@ -1592,21 +1608,36 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             makeFigureNice();
             
             % now save the final design with the best predicted overlap
-            obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, 10.^(best_alpha_power) );
+            obj = obj.pick_final_datapoints(  xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, 10.^(best_alpha_power) );
                                           
         end     % end function optimize_start_alpha()
         
+        function [ obj, best_start_power ] = optimize_start_power( obj, desired_field, chosenparams )
+            % Optimizes the starting radiation power, based on predicted field overlap
+            % for the new version of apodization, 6/14/2020
+            %
+            % Inputs:
+            %     desired_field
+            %         type: double, array
+            %         desc: desired field vs. xvec
+           
+            % using matlab's fminsearch
+            f = @(startpower)( 1 - obj.predict_overlap_for_optimization_v2( desired_field, startpower, chosenparams ));                            
+            best_start_power = fminsearch( f, min(chosenparams.chosen_rad_power_ratio) );
+                                                     
+        end     % end function optimize_start_alpha()
         
-        function [ max_overlap ] = predict_overlap_for_optimization( ...
-                                              obj, xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, desired_field, start_alpha_power )
+        
+        function [ max_overlap, field_shape_prediction ] = predict_overlap_for_optimization( ...
+                                              obj, xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, desired_field, start_alpha_power )
             % merit function used in optimize_start_alpha for predicting
             % overlap
             %
@@ -1615,23 +1646,27 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       type: double, scalar
             %       desc: alpha to try = 10^(start_alpha_power)
             %
-            % returns max overlap
-            
+            % Outputs:
+            %     max_overlap
+            %     field_shape_prediction
+            %         type: double, array
+            %         desc: predicted field shape vs. x, mostly for debugging
+                      
             % pick the datapoints
-            obj = obj.pick_final_datapoints(  xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, 10.^(start_alpha_power) );
-
+            [ obj, synthesized_design ] = obj.pick_final_datapoints(  xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, 10.^(start_alpha_power) );
+                                          
             % convert scatter str vs. cell into scatter str vs. x
             xvec                = xvec - xvec(1);
             scatter_str_vs_x    = zeros( size( xvec ) );
-            end_pos_vs_cell     = cumsum( obj.synthesized_design.period );
+            end_pos_vs_cell     = cumsum( synthesized_design.period );
             cur_cell            = 1;
             for ii = 1:length(xvec)
 
-                scatter_str_vs_x(ii) = obj.synthesized_design.scatter_str(cur_cell);
+                scatter_str_vs_x(ii) = synthesized_design.scatter_str(cur_cell);
 
                 if xvec(ii) > end_pos_vs_cell( cur_cell ) && cur_cell < length(end_pos_vs_cell)
                     % move to next cell
@@ -1642,50 +1677,61 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 
             % integrate the picked scatter strengths to get the predicted
             % field shape
-            field_shape_prediction = zeros( size(xvec) );
-            A0 = 1;
-            dx = xvec(2) - xvec(1);
-            for ii = 1:length(xvec)
-
-                % update radiation
-                field_shape_prediction(ii) = A0.*(1 - exp( -scatter_str_vs_x(ii) * dx ) );
-
-                % update guided power
-                A0 = A0.*exp( -scatter_str_vs_x(ii) * dx );
-
-            end
-
+            
+            [obj, field_shape_prediction] = obj.predict_field_shape( xvec, scatter_str_vs_x );
+            
             % calculate overlap with desired field
             [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
             max_overlap     = max( abs(overlap) );
             
         end     % end function predict_overlap_for_optimization()
+  
+        function [ max_overlap, field_shape_prediction ] = predict_overlap_for_optimization_v2( ...
+                                              obj, desired_field, starting_power, chosenparams )
+            % merit function used in optimize_start_alpha for predicting
+            % overlap   
+           
+            [ obj, synthesized_design ] = obj.pick_final_datapoints_v2(desired_field, starting_power, chosenparams);
+                                          
+            % convert power ratio into scatter strength vs cell
+            scatter_str = (-1./(2*synthesized_design.period)) .* log( 1 - synthesized_design.chosen_rad_power_ratio );
+            
+            % convert scatter str vs. cell into scatter str vs. x
+            xvec                = synthesized_design.xvec - synthesized_design.xvec(1);
+            scatter_str_vs_x    = zeros( size( xvec ) );
+            imag_k_vs_x         = zeros( size( xvec ) );
+            end_pos_vs_cell     = cumsum( synthesized_design.period );
+            cur_cell            = 1;
+            for ii = 1:length(xvec)
+
+                scatter_str_vs_x(ii) = scatter_str(cur_cell);
+                imag_k_vs_x(ii)     = imag(synthesized_design.k(cur_cell));
+
+                if xvec(ii) > end_pos_vs_cell( cur_cell ) && cur_cell < length(end_pos_vs_cell)
+                    % move to next cell
+                    cur_cell = cur_cell + 1;
+                end
+
+            end
+
+            % integrate the picked scatter strengths to get the predicted
+            % field shape
+            
+            [obj, field_shape_prediction] = obj.predict_field_shape_v2( xvec, scatter_str_vs_x, imag_k_vs_x );
+            
+            % calculate overlap with desired field
+            [ ~, overlap ]  = obj.xcorr_normalized( desired_field, field_shape_prediction );
+            max_overlap     = max( abs(overlap) );
+            
+        end     % end function predict_overlap_for_optimization_v2()
+  
         
         
-        function [ obj, overlap_12 ] = xcorr_normalized( obj, field1, field2 )
-            % very simple function that just computes normalized cross correlation of two vectors, 
-            % field1 and field2
-            
-            % transpose fields so they are nx1
-            field1 = reshape( field1, [ length(field1), 1 ] );
-            field2 = reshape( field2, [ length(field2), 1 ] );
-            
-            % first normalize both fields
-            norm_factor_1   = field1' * field1;
-            norm_factor_2   = field2' * field2;
-            
-            % calculate field1 and field2 xcorr
-            overlap_12 = ifftshift( ifft( fft( fftshift( field1 ) ) .* conj( fft( fftshift( field2 ) ) ) ) );
-            overlap_12 = overlap_12./sqrt( ( norm_factor_1 .* norm_factor_2 ) );
-            
-        end     % end function xcorr_normalized()
-        
-        
-        function obj = pick_final_datapoints( obj, xvec, alpha_des, high_dirs, ...
-                                              bot_fills_high_dir, top_fills_high_dir, ...
-                                              offsets_high_dir, periods_high_dir, ...
-                                              angles_high_dir, scatter_strs_high_dir, ...
-                                              k_high_dir, start_alpha_des )
+        function [ obj, synthesized_design ] = pick_final_datapoints( obj, xvec, alpha_des, chosen_dirs, ...
+                                              chosen_bot_fills, chosen_top_fills, ...
+                                              chosen_offsets, chosen_periods, ...
+                                              chosen_angles, chosen_scatter_strs, ...
+                                              chosen_ks, start_alpha_des )
             % Picks the final datapoints (cells) that make up the grating
             %
             % Inputs:
@@ -1723,31 +1769,35 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %     start_alpha_des
             %         type: double, scalar
             %         desc: OPTIONAL, user defined starting alpha
+            %
+            % Outputs:
+            %   synthesized_design:
+            %       type: struct
+            %       desc: a struct that holds the synthesized cells
             
             % default to weakest cell
             if ~exist( 'start_alpha_des', 'var' )
-                start_alpha_des = min(scatter_strs_high_dir); %1e-5;
+                start_alpha_des = min(chosen_scatter_strs); %1e-5;
             end
             
             % now match these data points to the desired alpha
             % starting point
             [~, indx_max_alpha] = max( alpha_des );
-%             start_alpha_des     = min(scatter_strs_high_dir); %1e-5;
             [~, indx_x]         = min(abs( alpha_des(1:indx_max_alpha) - start_alpha_des ) );
             cur_x               = xvec(indx_x);
             
             % final synthesized variables
-            obj.synthesized_design.dir                  = [];
-            obj.synthesized_design.bot_fill             = [];
-            obj.synthesized_design.top_bot_fill_ratio   = [];
-            obj.synthesized_design.top_fill             = [];
-            obj.synthesized_design.period               = [];
-            obj.synthesized_design.offset               = [];
-            obj.synthesized_design.angles               = [];
-            obj.synthesized_design.scatter_str          = [];
-            obj.synthesized_design.k                    = [];
-            obj.synthesized_design.GC                   = {};
-            obj.synthesized_design.des_scatter          = [];
+            synthesized_design.dir                  = [];
+            synthesized_design.bot_fill             = [];
+            synthesized_design.top_bot_fill_ratio   = [];
+            synthesized_design.top_fill             = [];
+            synthesized_design.period               = [];
+            synthesized_design.offset               = [];
+            synthesized_design.angles               = [];
+            synthesized_design.scatter_str          = [];
+            synthesized_design.k                    = [];
+            synthesized_design.GC                   = {};
+            synthesized_design.des_scatter          = [];
             
             
             % flag for switching to using max scattering strength
@@ -1760,351 +1810,283 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 % pick design with scattering strength closest to desired
                 % alpha
                 des_scatter = alpha_des(indx_x);                            % desired alpha
-                if des_scatter  > max( scatter_strs_high_dir )
-                    % desired scattering strength too high, gotta saturate
-                    saturate_scatter_str_to_max = true;
+                if ii > 1
+                    if des_scatter  > max( chosen_scatter_strs ) || des_scatter < synthesized_design.des_scatter(ii-1)
+                        % desired scattering strength too high, gotta saturate
+                        saturate_scatter_str_to_max = true;
+                    end
                 end
                 if ~saturate_scatter_str_to_max
-                    [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
+                    [~, indx_closest_scatter]   = min( abs(chosen_scatter_strs - des_scatter) );          % index of closest scatter design 
                 else
-                    [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
+                    [~, indx_closest_scatter]   = max( chosen_scatter_strs );                             % saturate to max
                 end
                 
                 % save parameters
-                obj.synthesized_design.dir(ii)                   = high_dirs( indx_closest_scatter );
-                obj.synthesized_design.bot_fill(ii)              = bot_fills_high_dir( indx_closest_scatter );
-                obj.synthesized_design.top_fill(ii)              = top_fills_high_dir( indx_closest_scatter );
-                obj.synthesized_design.top_bot_fill_ratio(ii)    = top_fills_high_dir( indx_closest_scatter ) ./ bot_fills_high_dir( indx_closest_scatter );
-                obj.synthesized_design.offset(ii)                = offsets_high_dir( indx_closest_scatter );
-                obj.synthesized_design.period(ii)                = periods_high_dir( indx_closest_scatter );
-                obj.synthesized_design.angles(ii)                = angles_high_dir( indx_closest_scatter );
-                obj.synthesized_design.scatter_str(ii)           = scatter_strs_high_dir( indx_closest_scatter );
-                obj.synthesized_design.k(ii)                     = k_high_dir( indx_closest_scatter );
-                obj.synthesized_design.des_scatter(ii)           = des_scatter;
+                synthesized_design.dir(ii)                   = chosen_dirs( indx_closest_scatter );
+                synthesized_design.bot_fill(ii)              = chosen_bot_fills( indx_closest_scatter );
+                synthesized_design.top_fill(ii)              = chosen_top_fills( indx_closest_scatter );
+                synthesized_design.top_bot_fill_ratio(ii)    = chosen_top_fills( indx_closest_scatter ) ./ chosen_bot_fills( indx_closest_scatter );
+                synthesized_design.offset(ii)                = chosen_offsets( indx_closest_scatter );
+                synthesized_design.period(ii)                = chosen_periods( indx_closest_scatter );
+                synthesized_design.angles(ii)                = chosen_angles( indx_closest_scatter );
+                synthesized_design.scatter_str(ii)           = chosen_scatter_strs( indx_closest_scatter );
+                synthesized_design.k(ii)                     = chosen_ks( indx_closest_scatter );
+                synthesized_design.des_scatter(ii)           = des_scatter;
                 
-                obj.synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
-                                                       obj.discretization, ...
-                                                       obj.units.name, ...
-                                                       obj.lambda, ...
-                                                       obj.background_index, ...
-                                                       obj.y_domain_size, ...
-                                                       obj.synthesized_design.period(ii), ...
-                                                       obj.synthesized_design.top_fill(ii), ...
-                                                       obj.synthesized_design.bot_fill(ii), ...
-                                                       obj.synthesized_design.offset(ii)/obj.synthesized_design.period(ii) );
-
-                
+                synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
+                               obj.discretization, ...
+                               obj.background_index, ...
+                               obj.y_domain_size, ...
+                               synthesized_design.period(ii), ...
+                               synthesized_design.top_fill(ii), ...
+                               synthesized_design.bot_fill(ii), ...
+                               synthesized_design.offset(ii)/synthesized_design.period(ii) );
+                           
                 % move onto next
-                cur_x       = cur_x + obj.synthesized_design.period(ii);
+                cur_x       = cur_x + synthesized_design.period(ii);
                 [~, indx_x] = min( abs(xvec - cur_x) );
                 cur_x       = xvec( indx_x );
                 ii          = ii + 1;
                 
             end     % end for ii = 1:ncells
             
-            % this may be temporary
-            % build final index distribution
-            obj = obj.build_final_index();
-            
-            % coordinates of index distribution
-            obj.synthesized_design.x_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,2)-1 ) );
-            obj.synthesized_design.y_coords = obj.discretization*( 0:1:( size(obj.synthesized_design.N,1)-1 ) );
-            
         end     % end pick_final_datapoints()
-        
-        
-        function obj = build_final_index( obj )
-        % build final index distribution
-        % to be run after a design has been synthesized
-        
-            obj.synthesized_design.N = [];
-            for ii = 1:length(obj.synthesized_design.GC)
+              
+        function [ obj, synthesized_design ] = pick_final_datapoints_v2(obj, desired_field, starting_power, chosenparams)
+            % new version, 6/14/2020
+            % follows total radiated power profile of the desired field to
+            % synthesize an apodized grating
+            
+            % generate x coordinates for the field profile
+            xvec = obj.discretization .* ( 0:length(desired_field)-1 );
+            xvec = xvec - xvec(round(end/2));                                % shift origin over to middle
 
-                GC                          = obj.synthesized_design.GC{ii};
-                obj.synthesized_design.N    = [ obj.synthesized_design.N, GC.N ];
+            % calculate desired total radiated power vs position
+            power_vs_pos    = cumsum( abs(desired_field).^2 ) * obj.discretization;
+            power_vs_pos    = power_vs_pos./max(abs(power_vs_pos));     % normalize power to 1
+            
+            % for now, pick a starting power and apodize from there
+            % starting point
+%             starting_power      = min(chosen_rad_power_ratio);
+            [~, indx_startx]    = min(abs( power_vs_pos - starting_power ) );
+            cur_x               = xvec(indx_startx);
+            cur_x_vs_cell       = []; % for debugging
+                      
+            % pick datapoints
+            
+            % final synthesized variables
+            synthesized_design.dir                  = [];
+            synthesized_design.bot_fill             = [];
+            synthesized_design.top_bot_fill_ratio   = [];
+            synthesized_design.top_fill             = [];
+            synthesized_design.period               = [];
+            synthesized_design.offset               = [];
+            synthesized_design.angles               = [];
+            synthesized_design.scatter_str          = [];
+            synthesized_design.k                    = [];
+            synthesized_design.GC                   = {};
+%             synthesized_design.des_rad_power        = [];   % for debugging
+            synthesized_design.chosen_rad_power_ratio     = [];
+            synthesized_design.xvec                 = xvec;
+            synthesized_design.power_vs_pos         = power_vs_pos;
+            
+            % starting input power
+            Pin = max(power_vs_pos);
+            Pin_vs_cell                 = []; %  mostly for debugging
+            power_rad_err_vs_cell       = []; % for debugging
+            desired_rad_power_vs_cell   = [];
+            pred_rad_power_vs_cell      = [];
+            cur_rad_power_vs_cell       = [];
+            
+            
+            ii = 1;
+            cur_rad_power = 0;
+            while cur_x < xvec(end) && cur_rad_power < 1
+                % build grating one cell at a time
+                
+                % first go through each possible cell and find the one that
+                % scatters the best
+                power_rad_error = zeros(size(chosenparams.chosen_rad_power_ratio));
+                pred_rad_power  = zeros(size(chosenparams.chosen_rad_power_ratio));
+                desired_rad_power = zeros(size(chosenparams.chosen_rad_power_ratio));
+                for i_cell = 1:length(chosenparams.chosen_periods)
+                    
+                    this_period     = chosenparams.chosen_periods(i_cell);
+                    next_x          = cur_x + this_period;
+                    [~, indx_next_power]    = min(abs(xvec - next_x));
+%                     [~, indx_cur_power]     = min(abs(xvec - cur_x));
+                    desired_rad_power(i_cell) = power_vs_pos( indx_next_power ) - cur_rad_power;
+                    pred_rad_power(i_cell)  = chosenparams.chosen_rad_power_ratio(i_cell) * Pin;
+                    power_rad_error(i_cell) = abs( pred_rad_power(i_cell) - desired_rad_power(i_cell) );
+                    
+                end
+                
+                % pick cell with radiated power closest to desired
+                [power_rad_err_vs_cell(ii), indx_closest_scatter ] = min(power_rad_error);
+                desired_rad_power_vs_cell(ii)   = desired_rad_power(indx_closest_scatter);
+                pred_rad_power_vs_cell(ii)      = pred_rad_power(indx_closest_scatter);
+                
+                % update current amount of radiated power
+                cur_rad_power_vs_cell(ii) = cur_rad_power;
+                cur_rad_power = cur_rad_power + pred_rad_power_vs_cell(ii);
+                
+                
+                % save parameters
+                synthesized_design.dir(ii)                   = chosenparams.chosen_dirs( indx_closest_scatter );
+                synthesized_design.bot_fill(ii)              = chosenparams.chosen_bot_fills( indx_closest_scatter );
+                synthesized_design.top_fill(ii)              = chosenparams.chosen_top_fills( indx_closest_scatter );
+                synthesized_design.top_bot_fill_ratio(ii)    = chosenparams.chosen_top_fills( indx_closest_scatter ) ./ chosenparams.chosen_bot_fills( indx_closest_scatter );
+                synthesized_design.offset(ii)                = chosenparams.chosen_offsets( indx_closest_scatter );
+                synthesized_design.period(ii)                = chosenparams.chosen_periods( indx_closest_scatter );
+                synthesized_design.angles(ii)                = chosenparams.chosen_angles( indx_closest_scatter );
+                synthesized_design.scatter_str(ii)           = chosenparams.chosen_scatter_str( indx_closest_scatter );
+                synthesized_design.k(ii)                     = chosenparams.chosen_ks( indx_closest_scatter );
+                synthesized_design.chosen_rad_power_ratio(ii)      = chosenparams.chosen_rad_power_ratio( indx_closest_scatter );
+%                 synthesized_design.des_rad_power(ii)         = des_scatter;
+                
+                synthesized_design.GC{ii} = obj.h_makeGratingCell(    ...
+                               obj.discretization, ...
+                               obj.units.name, ...
+                               obj.lambda, ...
+                               obj.background_index, ...
+                               obj.y_domain_size, ...
+                               synthesized_design.period(ii), ...
+                               synthesized_design.top_fill(ii), ...
+                               synthesized_design.bot_fill(ii), ...
+                               synthesized_design.offset(ii)/synthesized_design.period(ii) );
+                           
+                % move onto next
+                cur_x_vs_cell(ii) = cur_x;
+                cur_x       = cur_x + synthesized_design.period(ii);
+                [~, indx_x] = min( abs(xvec - cur_x) );
+                cur_x       = xvec( indx_x );
+                Pin_vs_cell(ii) = Pin;
+%                 Pin         = Pin * exp( -2*imag(synthesized_design.k(ii))*synthesized_design.period(ii) );
+                Pin         = Pin - pred_rad_power_vs_cell(ii);
+                ii          = ii + 1;
+                
+            end     % end cur_x < xvec(end)
+            
+            synthesized_design.cur_x_vs_cell = cur_x_vs_cell;
+            synthesized_design.Pin_vs_cell = Pin_vs_cell;
+            synthesized_design.power_rad_err_vs_cell = power_rad_err_vs_cell;
+            synthesized_design.desired_rad_power_vs_cell = desired_rad_power_vs_cell;
+            synthesized_design.pred_rad_power_vs_cell = pred_rad_power_vs_cell;
+            synthesized_design.pred_total_rad_power_vs_cell = cumsum(pred_rad_power_vs_cell);
+            synthesized_design.des_total_rad_power_vs_cell = cumsum(desired_rad_power_vs_cell);
+            synthesized_design.cur_rad_power_vs_cell = cur_rad_power_vs_cell;
+            
+        end     % end pick_final_datapoints_v2
+        
+        function [ obj, top_fills, bot_fills, directivities, ...
+                   angles, periods, offsets, scatter_strs, ks, rad_power_ratio ] ...
+                   = pick_design_quadrant( obj, input_wg_type, fill_top_override, fill_bot_override )
+            % Picks out the design quadrant of the top/bot fill space that
+            % corresponds to the desired input waveguide type
+            %
+            % Inputs:
+            %   input_wg_type
+            %       type: string
+            %       desc: 'top' 'bottom' 'full' 'none'
+            %   fill_top_override
+            %       type: scalar
+            %       desc: OPTIONAL - overrides the center of mass
+            %   fill_bot_override
+            %       type: scalar
+            %       desc: OPTIONAL - overrides the center of mass 
+            
+            % meshgrid the fills (dimensions are bot vs. top, I believe)
+            [ top_fills_mesh, bot_fills_mesh ] = meshgrid( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots );
 
+            % find where the max scattering strength is
+            if nargin < 3
+                % new ver. where i find center of mass
+                r       = [ top_fills_mesh(:), bot_fills_mesh(:) ];   % dimensions [ top fill vs. mass, bot fill vs. mass ]
+                mass    = obj.sweep_variables.scatter_str_vs_fills(:); 
+                R       = sum( r .* [ mass, mass ], 1 )./sum(mass(:));
+                [~, i_max_top_scat] = min(abs( obj.sweep_variables.fill_tops - R(1) ) );
+                [~, i_max_bot_scat] = min(abs( obj.sweep_variables.fill_bots - R(2) ) );
+            else
+                % override center of mass
+                [~, i_max_top_scat] = min(abs( obj.sweep_variables.fill_tops - fill_top_override ) );
+                [~, i_max_bot_scat] = min(abs( obj.sweep_variables.fill_bots - fill_bot_override ) );
             end
             
-        end     % end build_final_index()
-        
-%         function obj = generateFinalDesignGaussian_old(obj, MFD, input_wg_type)
-%             % OLD VERSION
-%             % function for generating the final synthesized design
-%             % parameters
-%             %
-%             % Inputs:
-%             %   MFD
-%             %       type: double, scalar
-%             %       desc: mode field diameter, in units 'units'
-%             %   input_wg_type
-%             %       type: string
-%             %       desc: 'bottom' for cSi only or 'full' for both cSi and
-%             %             pSi
-%             %
-%             % Sets these fields:
-%             %   obj.dir_synth                   = [];
-%             %   obj.bot_fill_synth              = [];
-%             %   obj.top_bot_fill_ratio_synth    = [];
-%             %   obj.period_synth                = [];
-%             %   obj.offset_synth                = [];
-%             %   obj.angles_synth                = [];
-%             %   obj.scatter_str_synth           = [];
-%             %   obj.k_synth                     = [];
-%             %   obj.GC_synth                    = {};
-%             %   obj.des_scatter_norm            = [];
-%             
-% 
-%             % save input waveguide type
-%             obj.input_wg_type = input_wg_type;
-%             
-%             % generate x coordinates for the gaussian mode
-%             % must be large enough to fit mode
-%             xvec            = 0 : obj.discretization : MFD*4 - obj.discretization;
-%             xvec            = xvec - xvec(round(end/2));                                % shift origin over to middle
-%             
-%             % generate a fiber gaussian mode
-%             w0          = MFD/2;                                                        % not sure if this is the proper exact relationship
-%             zvec        = 0;                                                            % this is unused
-%             d0          = 0;                                                            % take slice at waist
-%             [obj, u]    = obj.fiberModeGaussian(    w0, zvec, xvec,...
-%                                                     obj.optimal_angle, d0, obj.background_index );
-%             
-%             % calculate desired scattering strength vs. x
-%             integral_u      = cumsum( abs(u).^2 ) * obj.discretization * obj.units.scale;
-%             alpha_des       = (1/2)*( abs(u).^2 ) ./ ( 1 + 1e-9 - integral_u );  % in units 1/m
-% %             alpha_des(end)  = 0;                                                            % for stability
-%             alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
-%             
-%             
-%             % DEBUG plot alpha desired
-%             figure;
-%             plot( xvec, alpha_des );
-%             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
-%             title('DEBUG scattering strength for gaussian');
-%             makeFigureNice();
-% %             
-% 
-%             % meshgrid the fills
-%             [ topbot_ratio_mesh, bot_fills_mesh ] = meshgrid( obj.fill_top_bot_ratio, obj.fill_bots );
-%             
-%             % set invert/normal threshold
-%             invert_normal_top_bot_ratio_thresh = 0.6;
-% 
-%             if strcmp( input_wg_type, 'bottom' ) == true
-%                 % Inverted design
-%             
-%                 % first narrow down the space to take the datapoints with the
-%                 % maximum directivity per bottom fill factor (so for each row
-%                 % on my design space)
-% 
-%                 indx_bottom_space   = obj.fill_top_bot_ratio < invert_normal_top_bot_ratio_thresh;
-% 
-%                 % grab variables (remember dimensions are bot fill x top bot
-%                 % ratio)
-%                 topbot_ratio_vs_fills_inv   = topbot_ratio_mesh( :, indx_bottom_space );
-%                 bot_fills_vs_fills_inv      = bot_fills_mesh( :, indx_bottom_space );
-%                 directivities_vs_fills_inv  = obj.directivities_vs_fills( :, indx_bottom_space );
-%                 angles_vs_fills_inv         = obj.angles_vs_fills( :, indx_bottom_space );      
-%                 periods_vs_fills_inv        = obj.periods_vs_fills( :, indx_bottom_space );
-%                 offsets_vs_fills_inv        = obj.offsets_vs_fills( :, indx_bottom_space );
-%                 scatter_str_vs_fills_inv    = obj.scatter_str_vs_fills( :, indx_bottom_space );
-%                 k_vs_fills_inv              = obj.k_vs_fills( :, indx_bottom_space );
-%                 GC_vs_fills_inv             = obj.GC_vs_fills( :, indx_bottom_space );
-%                 
-%                 % remove datapoints where the angle deviates beyond some
-%                 % angle, by artifically setting the directivity to be very
-%                 % low
-%                 directivities_vs_fills_inv( abs( angles_vs_fills_inv - obj.optimal_angle ) > 1 ) = 1e-6;
-% 
-% 
-%                 % for each top/bottom ratio, pick bottom fill with highest
-%                 % directivity
-%                 [ highest_dir_per_ratio, indx_highest_dir_per_ratio ] = max( directivities_vs_fills_inv, [], 1 );
-%                 % gotta use linear indexing
-%                 indxs                   = sub2ind( size(angles_vs_fills_inv), indx_highest_dir_per_ratio, 1:size(angles_vs_fills_inv,2)  );
-%                 angles_high_dir         = angles_vs_fills_inv( indxs );
-%                 periods_high_dir        = periods_vs_fills_inv( indxs );
-%                 offsets_high_dir        = offsets_vs_fills_inv( indxs );
-%                 scatter_strs_high_dir   = scatter_str_vs_fills_inv( indxs );
-%                 k_high_dir              = k_vs_fills_inv( indxs );
-%                 topbot_ratio_high_dir   = topbot_ratio_vs_fills_inv( indxs );
-%                 bot_fills_high_dir      = bot_fills_vs_fills_inv( indxs );
-%                 GC_high_dir             = GC_vs_fills_inv( indxs );
-%                 dir_high                = highest_dir_per_ratio;
-%                 
-%             elseif strcmp( input_wg_type, 'full' ) == true
-%                 % normal design
-%                 
-%                 % first narrow down the space to take the datapoints with the
-%                 % maximum directivity per bottom fill factor (so for each row
-%                 % on my design space)
-% 
-%                 indx_full_space   = obj.fill_top_bot_ratio > invert_normal_top_bot_ratio_thresh - 0.01;
-% 
-%                 % grab variables (remember dimensions are bot fill x top bot
-%                 % ratio)
-%                 topbot_ratio_vs_fills_full   = topbot_ratio_mesh( :, indx_full_space );
-%                 bot_fills_vs_fills_full      = bot_fills_mesh( :, indx_full_space );
-%                 directivities_vs_fills_full  = obj.directivities_vs_fills( :, indx_full_space );
-%                 angles_vs_fills_full         = obj.angles_vs_fills( :, indx_full_space );      
-%                 periods_vs_fills_full        = obj.periods_vs_fills( :, indx_full_space );
-%                 offsets_vs_fills_full        = obj.offsets_vs_fills( :, indx_full_space );
-%                 scatter_str_vs_fills_full    = obj.scatter_str_vs_fills( :, indx_full_space );
-%                 k_vs_fills_full              = obj.k_vs_fills( :, indx_full_space );
-%                 GC_vs_fills_full             = obj.GC_vs_fills( :, indx_full_space );
-%                 
-%                 % remove datapoints where the angle deviates beyond some
-%                 % angle, by artifically setting the directivity to be very
-%                 % low
-%                 directivities_vs_fills_full( abs( angles_vs_fills_full - obj.optimal_angle ) > 0.5 ) = 1e-6;
-%                 
-%                 % for each bottom fill, pick the datapoint with the highest
-%                 % directivity
-%                 [ highest_dir_per_bot, indx_highest_dir_per_bot ] = max( directivities_vs_fills_full, [], 2 );
-%                 % gotta use linear indexing
-%                 indxs                   = sub2ind( size(angles_vs_fills_full), 1:size(angles_vs_fills_full,1), indx_highest_dir_per_bot.' );
-%                 angles_high_dir         = angles_vs_fills_full( indxs );
-%                 periods_high_dir        = periods_vs_fills_full( indxs );
-%                 offsets_high_dir        = offsets_vs_fills_full( indxs );
-%                 scatter_strs_high_dir   = scatter_str_vs_fills_full( indxs );
-%                 k_high_dir              = k_vs_fills_full( indxs );
-%                 topbot_ratio_high_dir   = topbot_ratio_vs_fills_full( indxs );
-%                 bot_fills_high_dir      = bot_fills_vs_fills_full( indxs );
-%                 GC_high_dir             = GC_vs_fills_full( indxs );
-%                 dir_high                = highest_dir_per_bot;
-%                 
-%             end     % end if strcmp( input_wg_type, 'bottom' )
-%             
-%             % DEBUG plot the resulting picked out datapoints
-%             % angles
-%             figure;
-%             plot( 1:length(angles_high_dir), angles_high_dir, '-o' );
-%             title('chosen datapoints, angles');
-%             makeFigureNice();
-%             % periods
-%             figure;
-%             plot( 1:length(periods_high_dir), periods_high_dir, '-o' );
-%             title('chosen datapoints, periods');
-%             makeFigureNice();
-%             % offsets
-%             figure;
-%             plot( 1:length(offsets_high_dir), offsets_high_dir, '-o' );
-%             title('chosen datapoints, offsets');
-%             makeFigureNice();
-%             % scattering strengths
-%             figure;
-%             plot( 1:length(scatter_strs_high_dir), scatter_strs_high_dir, '-o' );
-%             title('chosen datapoints, scattering strengths');
-%             makeFigureNice();
-%             % k real
-%             figure;
-%             plot( 1:length(k_high_dir), real(k_high_dir), '-o' );
-%             title('chosen datapoints, k real');
-%             makeFigureNice();
-%             % k imag
-%             figure;
-%             plot( 1:length(k_high_dir), imag(k_high_dir), '-o' );
-%             title('chosen datapoints, k imaginary');
-%             makeFigureNice();
-%             % top bottom ratio
-%             figure;
-%             plot( 1:length(topbot_ratio_high_dir), topbot_ratio_high_dir, '-o' );
-%             title('chosen datapoints, top/bottom ratio');
-%             makeFigureNice();
-%             % bottom fill
-%             figure;
-%             plot( 1:length(bot_fills_high_dir), bot_fills_high_dir, '-o' );
-%             title('chosen datapoints, bottom fill');
-%             makeFigureNice();
-%             % directivity
-%             figure;
-%             plot( 1:length(dir_high), 10*log10(dir_high), '-o' );
-%             title('chosen datapoints, directivity (dB)');
-%             makeFigureNice();
-%             
-% %             % DEBUG plot bot fills vs topbot ratio
-% %             figure;
-% %             plot( topbot_ratio_high_dir, bot_fills_high_dir, '-o' );
-% %             xlabel('top/bottom ratio'); ylabel('bottom fill');
-% %             title('DEBUG bottom fill vs top/bottom ratio');
-% %             makeFigureNice();
-% %             
-% %             % DEBUG plot bot fills vs top fills
-% %             figure;
-% %             plot( bot_fills_high_dir, topbot_ratio_high_dir .* bot_fills_high_dir, '-o' );
-% %             xlabel('bottom fill'); ylabel('top fill');
-% %             title('DEBUG bottom fill vs top/bottom ratio');
-% %             makeFigureNice();
-% %             
-% %             p = polyfit( topbot_ratio_high_dir, bot_fills_high_dir, 2 )
-% %             
-% %             x = 0:0.01:1;
-% %             y = -(x.^3)/2 + x;
-% %             figure;
-% %             plot(x, y);
-% %             xlabel('bot'); ylabel('top');
-%             
-%             % now match these data points to the desired alpha
-%             % starting point
-%             start_alpha_des     = 1e-5;
-%             [~, indx_x]         = min(abs( alpha_des - start_alpha_des ) );
-%             cur_x               = xvec(indx_x);
-%             
-%             % final synthesized variables
-%             obj.synthesized_design.dir_synth                   = [];
-%             obj.synthesized_design.bot_fill_synth              = [];
-%             obj.synthesized_design.top_bot_fill_ratio_synth    = [];
-%             obj.synthesized_design.period_synth                = [];
-%             obj.synthesized_design.offset_synth                = [];
-%             obj.synthesized_design.angles_synth                = [];
-%             obj.synthesized_design.scatter_str_synth           = [];
-%             obj.synthesized_design.k_synth                     = [];
-%             obj.synthesized_design.GC_synth                    = {};
-%             obj.synthesized_design.des_scatter_synth           = [];
-%             
-%             % flag for switching to using max scattering strength
-%             saturate_scatter_str_to_max = false;
-%  
-%             ii = 1;
-%             while cur_x < xvec(end)
-%                 % build grating one cell at a time
-%                 
-%                 % pick design with scattering strength closest to desired
-%                 % alpha
-%                 des_scatter                 = alpha_des(indx_x);                                        % desired alpha
-%                 if des_scatter  > max( scatter_strs_high_dir )
-%                     % desired scattering strength too high, gotta saturate
-%                     saturate_scatter_str_to_max = true;
-%                 end
-%                 if ~saturate_scatter_str_to_max
-%                     [~, indx_closest_scatter]   = min( abs(scatter_strs_high_dir - des_scatter) );          % index of closest scatter design 
-%                 else
-%                     [~, indx_closest_scatter]   = max( scatter_strs_high_dir );                             % saturate to max
-%                 end
-%                 
-%                 % save parameters
-%                 obj.dir_synth(ii)                   = dir_high( indx_closest_scatter );
-%                 obj.bot_fill_synth(ii)              = bot_fills_high_dir( indx_closest_scatter );
-%                 obj.top_bot_fill_ratio_synth(ii)    = topbot_ratio_high_dir( indx_closest_scatter );
-%                 obj.offset_synth(ii)                = offsets_high_dir( indx_closest_scatter );
-%                 obj.period_synth(ii)                = periods_high_dir( indx_closest_scatter );
-%                 obj.angles_synth(ii)                = angles_high_dir( indx_closest_scatter );
-%                 obj.scatter_str_synth(ii)           = scatter_strs_high_dir( indx_closest_scatter );
-%                 obj.k_synth(ii)                     = k_high_dir( indx_closest_scatter );
-% %                 obj.GC_synth{ii}                    = GC_high_dir{ indx_closest_scatter };
-%                 obj.des_scatter_synth(ii)           = des_scatter;
-%                 
-%                 % move onto next
-%                 cur_x       = cur_x + obj.period_synth(ii);
-%                 [~, indx_x] = min( abs(xvec - cur_x) );
-%                 cur_x       = xvec( indx_x );
-%                 ii          = ii + 1;
-%                 
-%             end     % end for ii = 1:ncells
-%             
-%             
-%         end     % end function generateFinalDesignGaussian_old()
-        
+            % Select subset of domain to use
+            if strcmp( input_wg_type, 'bottom' ) == true
+                % input waveguide is the bottom layer
+            
+                % narrow down design space (take top left quadrant)
+                % recall fills are sorted in descending order
+                top_fills       = top_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
+                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, i_max_top_scat:end );
+                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );      
+                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                try
+                    rad_power_ratio = obj.sweep_variables.prad_pin_vs_fills( 1:i_max_bot_scat, i_max_top_scat:end );
+                catch
+                end
+                
+            elseif strcmp( input_wg_type, 'full' ) == true
+                % input waveguide is a full waveguide
+                
+                % narrow down design space (take top right quadrant)
+                top_fills       = top_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
+                bot_fills       = bot_fills_mesh( 1:i_max_bot_scat, 1:i_max_top_scat );
+                directivities   = obj.sweep_variables.directivities_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                angles          = obj.sweep_variables.angles_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );      
+                periods         = obj.sweep_variables.periods_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                offsets         = obj.sweep_variables.offsets_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                ks              = obj.sweep_variables.k_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                try
+                    rad_power_ratio = obj.sweep_variables.prad_pin_vs_fills( 1:i_max_bot_scat, 1:i_max_top_scat );
+                catch
+                end
+                    
+            elseif strcmp( input_wg_type, 'top' ) == true
+                % input waveguide is a full waveguide
+                
+                % narrow down design space (take bottom right quadrant)
+                top_fills       = top_fills_mesh( i_max_bot_scat:end, 1:i_max_top_scat );
+                bot_fills       = bot_fills_mesh( i_max_bot_scat:end, 1:i_max_top_scat );
+                directivities   = obj.sweep_variables.directivities_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                angles          = obj.sweep_variables.angles_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );      
+                periods         = obj.sweep_variables.periods_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                offsets         = obj.sweep_variables.offsets_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                ks              = obj.sweep_variables.k_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                try
+                    rad_power_ratio = obj.sweep_variables.prad_pin_vs_fills( i_max_bot_scat:end, 1:i_max_top_scat );
+                catch
+                end
+                
+            elseif strcmp( input_wg_type, 'none' ) == true
+                % input waveguide is cladding
+                
+                % narrow down design space (take bottom left quadrant)
+                top_fills       = top_fills_mesh( i_max_bot_scat:end, i_max_top_scat:end );
+                bot_fills       = bot_fills_mesh( i_max_bot_scat:end, i_max_top_scat:end );
+                directivities   = obj.sweep_variables.directivities_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                angles          = obj.sweep_variables.angles_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );      
+                periods         = obj.sweep_variables.periods_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                offsets         = obj.sweep_variables.offsets_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                scatter_strs    = obj.sweep_variables.scatter_str_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                ks              = obj.sweep_variables.k_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                try
+                    rad_power_ratio = obj.sweep_variables.prad_pin_vs_fills( i_max_bot_scat:end, i_max_top_scat:end );
+                catch
+                end
+                
+            end     % end if strcmp( input_wg_type, 'bottom' )
+            
+        end     % end pick_design_quadrant()
+
         
         function obj = runFinalDesignEME(obj, MFD)
             % runs the final design's index distribution in EME and saves
@@ -2440,7 +2422,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %             makeFigureNice();
 %             
             % DEBUG plot alpha desired
-            figure;
+            figure('Name','des_scatter');
             plot( xvec, alpha_des );
             xlabel(['x (' obj.units.name ')']); ylabel( ['\alpha (1/' obj.units.name ')'] );
             title('DEBUG scattering strength for gaussian');

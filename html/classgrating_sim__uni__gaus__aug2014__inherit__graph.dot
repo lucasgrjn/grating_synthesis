@@ -1,9 +1,0 @@
-digraph "gratingSim_uni_gaus_aug2014"
-{
- // LATEX_PDF_SIZE
-  edge [fontname="FreeSans",fontsize="10",labelfontname="FreeSans",labelfontsize="10"];
-  node [fontname="FreeSans",fontsize="10",shape=record];
-  Node0 [label="gratingSim_uni_gaus\l_aug2014",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black",tooltip=" "];
-  Node1 -> Node0 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
-  Node1 [label="fdtdSim",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$classfdtd_sim.html",tooltip=" "];
-}

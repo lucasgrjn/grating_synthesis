@@ -20,7 +20,7 @@ figure;
 imagesc( synth_obj.sweep_variables.fill_tops, synth_obj.sweep_variables.fill_bots, 10*log10(synth_obj.sweep_variables.directivities_vs_fills) );
 colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top fill factor'); ylabel('bottom fill factor');
-title('Directivity (dB) vs. fill factors');
+title('Directionality (dB) vs. fill factors');
 figure_name = [ 'dir_v_ff' fig_suffix ];
 save_fig_multiformat( gcf, save_plots_path, figure_name );
 
@@ -29,7 +29,7 @@ figure;
 imagesc( synth_obj.sweep_variables.fill_tops, synth_obj.sweep_variables.fill_bots, 10*log10(synth_obj.sweep_variables.dir_b4_period_vs_fills) );
 colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top fill factor'); ylabel('bottom fill factor');
-title('Directivity (dB) BEFORE PERIOD SWEEP vs. fill factors');
+title('Directionality (dB) BEFORE PERIOD SWEEP vs. fill factors');
 figure_name = [ 'dir_b4_period_v_ff' fig_suffix ];
 save_fig_multiformat( gcf, save_plots_path, figure_name );
 
@@ -73,7 +73,7 @@ imagesc( synth_obj.sweep_variables.fill_tops, ...
          synth_obj.sweep_variables.periods_vs_fills );
 colorbar; set( gca, 'ydir', 'normal' );
 xlabel('top fill factor'); ylabel('bottom fill factor');
-title(['Period (' synth_obj.units.name ') vs. fill factors']);
+title(['Period vs. fill factors']);
 figure_name = [ 'period_v_ff' fig_suffix ];
 save_fig_multiformat( gcf, save_plots_path, figure_name );
 

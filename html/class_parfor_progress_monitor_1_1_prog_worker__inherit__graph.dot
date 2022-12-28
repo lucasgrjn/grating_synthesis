@@ -1,9 +1,0 @@
-digraph "ParforProgressMonitor.ProgWorker"
-{
- // LATEX_PDF_SIZE
-  edge [fontname="FreeSans",fontsize="10",labelfontname="FreeSans",labelfontsize="10"];
-  node [fontname="FreeSans",fontsize="10",shape=record];
-  Node0 [label="ParforProgressMonitor.Prog\lWorker",height=0.2,width=0.4,color="black", fillcolor="grey75", style="filled", fontcolor="black",tooltip="The worker-side object."];
-  Node1 -> Node0 [dir="back",color="midnightblue",fontsize="10",style="solid",fontname="FreeSans"];
-  Node1 [label="ParforProgressMonitor.Prog\lThing",height=0.2,width=0.4,color="black", fillcolor="white", style="filled",URL="$interface_parfor_progress_monitor_1_1_prog_thing.html",tooltip="Common interface exposed by both objects."];
-}
