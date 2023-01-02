@@ -81,6 +81,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %   'h_makeGratingCell'
 %       type: function handle
 %       desc: handle to grating drawing function
+%             has to have these inputs in this order: 
+%               dxy, background_index, y_domain_size,
+%               period, fill_top, fill_bot, offset_ratio
 %
 % Examples:
 %

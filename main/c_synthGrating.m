@@ -12,7 +12,7 @@ classdef c_synthGrating
 %   drawing function.
 %   HOWEVER, this function MUST have the following inputs and outputs, IN
 %   ORDER:
-%       function GC = your_makeGratingCell_function( dxy, units, lambda, background_index, y_domain_size, period, fill_ratio )
+%       function GC = your_makeGratingCell_function( dxy, background_index, y_domain_size, period, fill )
 %           % makes and returns a c_gratingCell object (or subclass of one)
 % 
 %       outputs:
