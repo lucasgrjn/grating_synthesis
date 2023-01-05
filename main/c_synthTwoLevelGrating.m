@@ -1033,7 +1033,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                         fill_top_override, fill_bot_override, fill_vs_top_bot_both, ...
                                         interp_on, plot_on )
             % added a new input - interp_on. optionally interpolates the
-            % final chosen cells. default is true
+            % final chosen cells. default is false
             % plot_on - optional. decide whether to plot the chosen cells
             % or not. default is true
                                     
@@ -1050,7 +1050,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             end
             
             if nargin < 7
-                interp_on = true;
+                interp_on = false;
             end
             
             if nargin < 8
