@@ -18,7 +18,6 @@ function [] = f_save_design_space_plots_single_level( synth_obj, fig_suffix, sav
 figure;
 plot( synth_obj.sweep_variables.fill_ratios_to_sweep, ...
          synth_obj.sweep_variables.angles_vs_fill, '-o' );
-colorbar; set( gca, 'ydir', 'normal' );
 xlabel('fill factor'); ylabel('angle');
 title('Angles (deg) vs. fill factors');
 figure_name = [ 'angle_v_ff' fig_suffix ];
@@ -29,7 +28,6 @@ save_fig_multiformat( gcf, save_plots_path, figure_name );
 figure;
 plot( synth_obj.sweep_variables.fill_ratios_to_sweep, ...
          real(synth_obj.sweep_variables.scatter_str_vs_fill), '-o' );
-colorbar; set( gca, 'ydir', 'normal' );
 xlabel('fill factor'); ylabel('\alpha');
 title('Scattering strength vs. fill factors');
 figure_name = [ 'scatter_str_v_ff' fig_suffix ];
@@ -40,9 +38,8 @@ save_fig_multiformat( gcf, save_plots_path, figure_name );
 figure;
 plot( synth_obj.sweep_variables.fill_ratios_to_sweep, ...
          synth_obj.sweep_variables.periods_vs_fill, '-o' );
-colorbar; set( gca, 'ydir', 'normal' );
 xlabel('fill factor'); ylabel('period');
-title(['Period (' synth_obj.units.name ') vs. fill factors']);
+title(['Period vs. fill factors']);
 figure_name = [ 'period_v_ff' fig_suffix ];
 makeFigureNice();
 save_fig_multiformat( gcf, save_plots_path, figure_name );
@@ -51,7 +48,6 @@ save_fig_multiformat( gcf, save_plots_path, figure_name );
 figure;
 plot( synth_obj.sweep_variables.fill_ratios_to_sweep, ...
          real(synth_obj.sweep_variables.k_vs_fill), '-o' );
-colorbar; set( gca, 'ydir', 'normal' );
 xlabel('fill factor'); ylabel('k (real)');
 title('Real k vs. fill factors');
 figure_name = [ 'k_real_v_ff' fig_suffix ];
@@ -61,7 +57,6 @@ save_fig_multiformat( gcf, save_plots_path, figure_name );
 figure;
 plot( synth_obj.sweep_variables.fill_ratios_to_sweep, ...
          imag(synth_obj.sweep_variables.k_vs_fill), '-o' );
-colorbar; set( gca, 'ydir', 'normal' );
 xlabel('fill factor'); ylabel('k (imag)');
 title('Imag k vs. fill factors');
 figure_name = [ 'k_imag_v_ff' fig_suffix ];

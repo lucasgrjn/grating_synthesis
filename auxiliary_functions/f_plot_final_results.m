@@ -234,12 +234,21 @@ ax(end).OuterPosition = [ 0, 0.13, 0.48, 0.4 ];
 ax(end+1) = subplot(2,2,4);
 plot( fdtd_results.lambda * 1e6, abs(fdtd_results.R), '-', 'linewidth', linewidth ); hold on;
 plot( fdtd_results.lambda * 1e6, fdtd_results.T_thru, '-', 'linewidth', linewidth );
-plot( fdtd_results.lambda * 1e6, fdtd_results.T_thru + abs(fdtd_results.R), '--', 'linewidth', linewidth );
+switch coupling_dir
+    case 'up'
+        plot( fdtd_results.lambda * 1e6, fdtd_results.T_down );
+        plot( fdtd_results.lambda * 1e6, fdtd_results.T_thru + fdtd_results.T_down + abs(fdtd_results.R), '--', 'linewidth', linewidth );
+        legend('R', 'P_{through}', 'P_{down}', 'Total lost', 'location', 'best' );
+        ylim( [ -0.1*max(ylim), 1.1*max(fdtd_results.T_thru + fdtd_results.T_down + abs(fdtd_results.R)) ] );
+    case 'down'
+        plot( fdtd_results.lambda * 1e6, fdtd_results.T_up );
+        plot( fdtd_results.lambda * 1e6, fdtd_results.T_thru + fdtd_results.T_up + abs(fdtd_results.R), '--', 'linewidth', linewidth );
+        legend('R', 'P_{through}', 'P_{up}', 'Total lost', 'location', 'best' );
+        ylim( [ -0.1*max(ylim), 1.1*max(fdtd_results.T_thru + fdtd_results.T_up + abs(fdtd_results.R)) ] );
+end
 xlabel('\lambda (\mum)'); ylabel('Power');
-legend('R', 'P_{through}', 'Total lost', 'location', 'best' );
 title('Non-coupling losses');
 xlim( [min(lambda_um), max(lambda_um)] );
-ylim( [ -0.1*max(ylim), 1.1*max(fdtd_results.T_thru + abs(fdtd_results.R)) ] );
 ax(end).OuterPosition = [ 0.5, 0.13, 0.51, 0.4 ];
 
 % adjust settings for axes
@@ -292,30 +301,32 @@ makeFigureNice();
 
 % best overlap at each angle
 figure('name', 'bestoverlap_vsangle');
+
+yyaxis left;
 plot( coupling_results.thetas, 10*log10(coupling_results.peak_overlap_vs_theta), '-o' );
-xlabel('\theta'); ylabel('best overlap (dB)');
-title('Best overlap at each angle');
+ylabel('best overlap (dB)');
 makeFigureNice();
 
-% best overlap wavelength at each angle
-figure('name', 'bestoverlapwl_vsangle');
+yyaxis right;
 plot( coupling_results.thetas, 1e-3*coupling_results.peak_overlapwl_vs_theta, '-o' );
-xlabel('\theta'); ylabel('best overlap wavelength (\mum)');
-title('Best overlap wavelength at each angle');
+ylabel('best overlap wavelength (\mum)');
+xlabel('\theta'); 
+title('Best overlap at each angle');
 makeFigureNice();
 
 % best coupling at each angle
 figure('name', 'bestcoupling_vsangle');
+
+yyaxis left;
 plot( coupling_results.thetas, 10*log10(coupling_results.peak_coupling_vs_theta), '-o' );
-xlabel('\theta'); ylabel('best coupling (dB)');
-title('Best coupling at each angle');
+ylabel('best coupling (dB)');
 makeFigureNice();
 
-% best coupling wavelength at each angle
-figure('name', 'bestcouplingwl_vsangle');
+yyaxis right;
 plot( coupling_results.thetas, 1e-3*coupling_results.peak_couplingwl_vs_theta, '-o' );
-xlabel('\theta'); ylabel('best coupling wavelength (\mum)');
-title('Best coupling wavelength at each angle');
+ylabel('best coupling wavelength (\mum)');
+xlabel('\theta'); 
+title('Best coupling at each angle');
 makeFigureNice();
 
 % 1dB coupling bandwidth at each angle
