@@ -10,26 +10,26 @@ clear; close all;
 
 % import code
 addpath(['..' filesep 'main']);                 % main
-addpath(['..' filesep '45RFSOI']);              % 45rfsoi
+% addpath(['..' filesep '45RFSOI']);              % 45rfsoi
 addpath(['..' filesep 'auxiliary_functions']);  % aux functions (gui)
 
 % initial settings
-disc        = 5;
-units       = 'nm';
-lambda      = 1000;
-k0          = 2*pi/lambda;
+disc        = 0.005;
+units       = 'um';
+lambda      = 1; %000;
+k0          = 2*pi/lambda; 
 n0          = 1.45;
 n1          = 1.39;
 a           = 0.39*lambda;                              % HALF of width of core wavevguide
 b           = 1.96*lambda;
-outer_clad  = 920;                                      % width of outer cladding
-domain      = [ 2*outer_clad + 2*b, 100 ];
+outer_clad  = 1.920;                                      % width of outer cladding
+domain      = [ 2*outer_clad + 2*b, 0.100 ];
 numcells    = 10;
 neff_analy  = 1.4185997 + 1i*1.577e-4;
 
 
 % make object
-GC = c_twoLevelGratingCell(  'discretization',   disc, ...
+GC = c_gratingCell(  'discretization',   disc, ...
                             'units',            units, ...
                             'lambda',           lambda, ...
                             'domain_size',      domain, ...
@@ -68,25 +68,26 @@ BC          = 0;     % 0 for PEC, 1 for PMC
 % PML_options(2): length of PML layer in nm
 % PML_options(3): strength of PML in the complex plane
 % PML_options(4): PML polynomial order (1, 2, 3...)
-pml_options     = [ 1, 200, 500, 2 ];
+pml_options     = [ 1, 0.200, 20, 0 ];
 DEBUG           = true;
 
 % set guessk to analytical k
 guessk = k0 * neff_analy;
 
+% set top and bottom bounds for guided region
+GC.wg_min_y                = min_y;     % bottom position of wg
+% [ obj.wg_max_y, indx_max ]  = max( min_y + height_y );     % top position of wg
+GC.wg_max_y                = min_y + height_y;
+
+
 % run new
 % Phi has dimensions ny vs. nx vs. mode #
 fprintf('running new solver\n');
 tic;
-[Phi_new, k_new, A, B] = complexk_mode_solver_2D_PML( GC.N, ...
-                                                           disc, ...
-                                                           k0, ...
-                                                           num_modes, ...
-                                                           guessk, ...
-                                                           BC, ...
-                                                           pml_options, ...
-                                                           DEBUG );
+GC = GC.runSimulation( num_modes, BC, pml_options, k0, guessk );
 toc;
+
+GC.plot_E_field_gui()
 
 % % run old
 % fprintf('running old solver\n');
@@ -105,13 +106,13 @@ toc;
 % -------------------------------------------------------------------------
 
 % display results
-format shortEng                 % display in scientific notation
-neff_new = k_new/k0
+% format shortEng                 % display in scientific notation
+neff_new = GC.k_vs_mode(1)/k0
 % neff_old = k_all_old/k0
 
 % test out the gui
-f_plot_all_modes_gui( Phi_new, GC.x_coords, GC.y_coords, k_new )
-
+% f_plot_all_modes_gui( Phi_new, GC.x_coords, GC.y_coords, k_new )
+% 
 % lets look at the old modes too
 
 % generate and plot the analytical result
@@ -130,11 +131,11 @@ psi             = 0;
 y                                   = y_shift( abs(y_shift) < a );
 E_analytical( abs(y_shift) < a )    = cos( ky * y );
 % inter cladding
-y                                                       = y_shift( a <= abs(y_shift) & abs(y_shift) < b );
+y = y_shift( a <= abs(y_shift) & abs(y_shift) < b );
 % E_analytical( a <= abs(y_shift) & abs(y_shift) < b )    = cos( ky*a ) .* cosh( alpha*abs(y) + psi ) ./ cosh( alpha*a + psi );
 E_analytical( a <= abs(y_shift) & abs(y_shift) < b )    = cos( ky*a ) .* cosh( alpha*a + psi ) ./ cosh( alpha*abs(y) + psi );
 % outer cladding
-y                                   = y_shift ( abs(y_shift) >= b );
+y = y_shift ( abs(y_shift) >= b );
 % E_analytical( abs(y_shift) >= b )   = cos( ky*a ) .* cosh( alpha*b + psi ) .* exp( 1i*ky*( abs(y) - b ) ) ./ cosh( alpha*a + psi );
 E_analytical( abs(y_shift) >= b )   = cos( ky*a ) .* cosh( alpha*a + psi ) .* exp( 1i*ky*( abs(y) - b ) ) ./ cosh( alpha*b + psi );
 
