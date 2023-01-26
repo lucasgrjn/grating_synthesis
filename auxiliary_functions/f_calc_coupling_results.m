@@ -1,10 +1,5 @@
 function [coupling_results] = f_calc_coupling_results( synth_obj, fdtd_results )
-% calculates coupling results
-% currently might only work for dual layer grating?
-%
-% ill have this code sweep angle as well
-%
-% this is currently the main way i calculate coupling results 
+% calculates coupling results after fdtd is ran
 
 % angles to couple to
 thetas = ( synth_obj.optimal_angle - 5 ) : 0.25 : ( synth_obj.optimal_angle + 5 );
@@ -61,8 +56,6 @@ for i_theta = 1:length(thetas)
       peak_couplingwl_vs_theta(i_theta),...
       indx_peak, ...
       coupling_1db_bw_vs_theta(i_theta)] = f_getpeak_calc_1db_bw( fdtd_results.lambda, coupling_vs_theta_wl(i_theta,:) );
-%     [peak_coupling_vs_theta(i_theta), indx_peak]    = max(coupling_vs_theta_wl(i_theta,:));
-%     peak_couplingwl_vs_theta(i_theta)               = fdtd_results.lambda(indx_peak);
 
     % get other values that we care about at peak coupling wavelength
     T_up_peakwl_vs_theta(i_theta)   = fdtd_results.T_up(indx_peak);
@@ -73,45 +66,12 @@ for i_theta = 1:length(thetas)
     end
     R_peakwl_vs_theta(i_theta)      = fdtd_results.R(indx_peak);
 
-%     % calc 1dB coupling bw
-%     wl_bound1       = interp1( 10*log10( coupling_vs_theta_wl(i_theta, 1:indx_peak) ), ...
-%                                fdtd_results.lambda(1:indx_peak), ...
-%                                10*log10( peak_coupling_vs_theta(i_theta) ) - 1 );
-%     wl_bound2       = interp1( 10*log10( coupling_vs_theta_wl(i_theta, indx_peak:end)), ...
-%                                fdtd_results.lambda(indx_peak:end), ...
-%                                10*log10 (peak_coupling_vs_theta(i_theta) ) - 1 );
-%     coupling_1db_bw_vs_theta(i_theta) = abs(wl_bound2 - wl_bound1);
-
-    
     
     % find value, wavelength, and 1dB bw of peak overlap
     [ peak_overlap_vs_theta(i_theta),...
       peak_overlapwl_vs_theta(i_theta),...
       ~, ...
       overlap_1db_bw_vs_theta(i_theta)] = f_getpeak_calc_1db_bw( fdtd_results.lambda, overlap_vs_theta_wl(i_theta,:) );
-%     [peak_coupling_vs_theta(i_theta), indx_peak]    = max(coupling_vs_theta_wl(i_theta,:));
-%     peak_couplingwl_vs_theta(i_theta)               = fdtd_results.lambda(indx_peak);
-%     [peak_overlap_vs_theta(i_theta), indx_peak] = max(overlap_vs_theta_wl(i_theta,:));
-%     peak_overlapwl_vs_theta(i_theta)            = fdtd_results.lambda(indx_peak);
-
-%     % calc 1dB overlap bw
-%     wl_bound1       = interp1( 10*log10( overlap_vs_theta_wl(i_theta, 1:indx_peak) ), ...
-%                                fdtd_results.lambda(1:indx_peak), ...
-%                                10*log10( peak_overlap_vs_theta(i_theta) ) - 1 );
-%     wl_bound2       = interp1( 10*log10( overlap_vs_theta_wl(i_theta, indx_peak:end) ), ...
-%                                fdtd_results.lambda(indx_peak:end), ...
-%                                10*log10( peak_overlap_vs_theta(i_theta) ) - 1 );
-%                            
-%     % check if wavelengths are out of bands and if so, snap to edge of
-%     % simulated bandwidth
-%     if isnan(wl_bound1)
-%         wl_bound1 = fdtd_results.lambda(1);
-%     end
-%     if isnan(wl_bound2)
-%         wl_bound2 = fdtd_results.lambda(end);
-%     end
-%         
-%     overlap_1db_bw_vs_theta(i_theta)  = abs(wl_bound2 - wl_bound1);
 
 end % end theta for loop
 
@@ -170,6 +130,14 @@ if strcmp( synth_obj.coupling_direction, 'down' )
 end
 R_bestcoup_designang = fdtd_results.R(indx_wl_bestcoup_designang);
 
+% find 1dB bw of T
+[ peak_T,...
+  peak_T_wl,...
+  indx_peak, ...
+  T_1db_bw ] = f_getpeak_calc_1db_bw( fdtd_results.lambda, T );
+
+% find where reflection increases to 5%
+% [~, ~, ~, R_5perc_bw] = f_getpeak_calc_bw( wl, val_vs_wl, thresh )
 
 % results to return
 coupling_results = struct( ...
@@ -181,6 +149,9 @@ coupling_results = struct( ...
     'peak_coupling_vs_theta', peak_coupling_vs_theta, ...
     'peak_overlapwl_vs_theta', 1e9*peak_overlapwl_vs_theta, ...
     'peak_couplingwl_vs_theta', 1e9*peak_couplingwl_vs_theta, ...
+    'peak_T', peak_T, ...
+    'peak_T_wl', 1e9*peak_T_wl, ...
+    'T_1db_bw', 1e9*T_1db_bw, ...
     'T_up_peakwl_vs_theta', T_up_peakwl_vs_theta, ...
     'T_down_peakwl_vs_theta', T_down_peakwl_vs_theta, ...
     'dir_peakwl_vs_theta', dir_peakwl_vs_theta, ...
@@ -287,6 +258,48 @@ bw_1db = abs(wl_bound2 - wl_bound1);
 
 end
 
+% helper function for getting bw
+function [peak_val, peak_wl, indx_peak, bw_1db] = f_getpeak_calc_bw( wl, val_vs_wl, thresh )
+% first finds the value, index, and wavelength of maximum
+% then calculates 1db bw
+% 
+% wl = wavelength
+% val_vs_wl = function in amplitude not db
+% thresh = threshold (down from max) to calc bw for, in dB
+
+[peak_val, indx_peak]   = max(val_vs_wl);
+peak_wl                 = wl(indx_peak);
+
+% get wavelength bounds
+try
+    wl_bound1 = interp1( 10*log10( val_vs_wl(1:indx_peak) ), ...
+                               wl(1:indx_peak), ...
+                               10*log10( peak_val ) - thresh );
+catch
+    % i think error gets thrown when peak is at edge of sim domain
+    wl_bound1 = wl(1);
+end
+try
+    wl_bound2 = interp1( 10*log10( val_vs_wl(indx_peak:end) ), ...
+                               wl(indx_peak:end), ...
+                               10*log10( peak_val ) - thresh );
+catch
+    % i think error gets thrown when peak is at edge of sim domain
+    wl_bound2 = wl(end);
+end
+                       
+% check if wavelengths are out of bands and if so, snap to edge of
+% simulated bandwidth
+if isnan(wl_bound1)
+    wl_bound1 = wl(1);
+end
+if isnan(wl_bound2)
+    wl_bound2 = wl(end);
+end
+                       
+bw_1db = abs(wl_bound2 - wl_bound1);
+
+end
 
 
 

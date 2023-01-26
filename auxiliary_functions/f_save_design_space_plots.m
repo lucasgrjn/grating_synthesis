@@ -25,13 +25,17 @@ title('Directionality (dB) vs. fill factors');
 % save_fig_multiformat( gcf, save_plots_path, figure_name );
 
 % directivity BEFORE sweeping periods vs. fill
-figure('name', [ 'dir_b4_period_v_ff' fig_suffix ]);
-imagesc( synth_obj.sweep_variables.fill_tops, synth_obj.sweep_variables.fill_bots, 10*log10(synth_obj.sweep_variables.dir_b4_period_vs_fills) );
-colorbar; set( gca, 'ydir', 'normal' );
-xlabel('top fill factor'); ylabel('bottom fill factor');
-title('Directionality (dB) BEFORE PERIOD SWEEP vs. fill factors');
-% figure_name = [ 'dir_b4_period_v_ff' fig_suffix ];
-% save_fig_multiformat( gcf, save_plots_path, figure_name );
+try
+    figure('name', [ 'dir_b4_period_v_ff' fig_suffix ]);
+    imagesc( synth_obj.sweep_variables.fill_tops, synth_obj.sweep_variables.fill_bots, 10*log10(synth_obj.sweep_variables.dir_b4_period_vs_fills) );
+    colorbar; set( gca, 'ydir', 'normal' );
+    xlabel('top fill factor'); ylabel('bottom fill factor');
+    title('Directionality (dB) BEFORE PERIOD SWEEP vs. fill factors');
+    % figure_name = [ 'dir_b4_period_v_ff' fig_suffix ];
+    % save_fig_multiformat( gcf, save_plots_path, figure_name );
+catch
+    fprintf('no dir b4 period sweep to plot, skipping\n');
+end
 
 % angles vs. fill
 figure('name', [ 'angle_v_ff' fig_suffix ]);
