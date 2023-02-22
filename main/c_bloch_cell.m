@@ -374,14 +374,25 @@ classdef c_bloch_cell
                 % grab this mode, including phase
                 this_mode   = obj.Phi_vs_mode(:,:,mode_num) .* repmat( exp( 1i * obj.x_coords * real(obj.k_vs_mode( mode_num ) )), ny_this_mode, 1 );
             
-                % zero pad
-                mode_to_overlap_pad = padarray( mode_to_overlap, [ floor(ny_this_mode/2), floor(nx_this_mode/2) ], 0, 'pre' );
-                mode_to_overlap_pad = padarray( mode_to_overlap_pad, [ ceil(ny_this_mode/2), ceil(nx_this_mode/2) ], 0, 'post' );
-                this_mode_pad       = padarray( this_mode, [ floor(ny_mode_to_overlap/2), floor(nx_mode_to_overlap/2) ], 0, 'pre' );
-                this_mode_pad       = padarray( this_mode_pad, [ ceil(ny_mode_to_overlap/2), ceil(nx_mode_to_overlap/2) ], 0, 'post' );
+                % reshape this mode to have same size as that to overlap
+                this_mode_reshape = zeros(size(mode_to_overlap));
+                if size(mode_to_overlap, 2) > size(this_mode, 2)
+                    % reshaped matrix will have trailing zeros in x
+                    this_mode_reshape(:,1:size(this_mode,2)) = this_mode;
+                else
+                    % reshaped matrix will be cut off in x
+                    this_mode_reshape(:,:) = this_mode(:,1:size(mode_to_overlap,2));
+                end
+                
+%                 % zero pad
+%                 mode_to_overlap_pad = padarray( mode_to_overlap, [ floor(ny_this_mode/2), floor(nx_this_mode/2) ], 0, 'pre' );
+%                 mode_to_overlap_pad = padarray( mode_to_overlap_pad, [ ceil(ny_this_mode/2), ceil(nx_this_mode/2) ], 0, 'post' );
+%                 this_mode_pad       = padarray( this_mode, [ floor(ny_mode_to_overlap/2), floor(nx_mode_to_overlap/2) ], 0, 'pre' );
+%                 this_mode_pad       = padarray( this_mode_pad, [ ceil(ny_mode_to_overlap/2), ceil(nx_mode_to_overlap/2) ], 0, 'post' );
             
                 % x-correlate
-                mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap_pad ) ) .* fft2( this_mode_pad ) ) );
+%                 mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap_pad ) ) .* fft2( this_mode_pad ) ) );
+                mode_xcorr = ifftshift( ifft2( conj( fft2( mode_to_overlap ) ) .* fft2( this_mode_reshape ) ) );
                 
                 % save max overlap
                 max_overlaps( mode_num ) = max( abs( mode_xcorr(:) ) );
