@@ -248,6 +248,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             GC_vs_fills             = cell( length( fill_bots ), length( fill_tops ) );      % dimensions bot fill vs. top fill
             dir_b4_period_vs_fills  = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
             prad_pin_vs_fills       = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
+            R_vs_fills              = zeros( length( fill_bots ), length( fill_tops ) );     % dimensions bot fill vs. top fill
             
             % make grating cell, assuming both layers are filled
             waveguide = obj.h_makeGratingCell( obj.discretization, ...
@@ -281,8 +282,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             % snap period to discretization
             guess_period = obj.discretization * round(guess_period/obj.discretization);
             
-            % ugh this is really annoying but i have to - extend the
-            % waveguide's e z overlap
+            % extend waveguide's ez for overlap
             [ waveguide, e_z_overlap_ext ]  = ...
                 waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
             waveguide.E_z_for_overlap       = e_z_overlap_ext;
@@ -333,13 +333,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                     offsets_vs_fills( i_ff_bot, 1 ) = guess_offset;
                     GC_vs_fills{ i_ff_bot, 1 }      = guess_GC;
                     k_vs_fills( i_ff_bot, 1 )       = guessk;
+                    [~,R_vs_fills( i_ff_bot, 1 )]   = guess_GC.estimate_reflection(obj.background_index);
                     
                     if strcmp( obj.coupling_direction, 'up' )
                         prad_pin_vs_fills( i_ff_bot, 1 ) = guess_GC.P_rad_up/guess_GC.P_in;
                     else
                         prad_pin_vs_fills( i_ff_bot, 1 ) = guess_GC.P_rad_down/guess_GC.P_in;
                     end
-                    
+
                 else
                     % at least one of the layers is not perturbed, so there is no optimization to run
                     % save dummy values
@@ -435,6 +436,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
 %                         GC_vs_fills{ i_ff_bot, i_ff_ratio }             = best_GC;
                         k_vs_fills( i_ff_bot, i_ff_top )              = guessk;
                         dir_b4_period_vs_fills( i_ff_bot, i_ff_top )  = dir_b4_period_vs_fill;
+                        [~,R_vs_fills( i_ff_bot, i_ff_top )]          = guess_GC.estimate_reflection(obj.background_index);
                         if strcmp( obj.coupling_direction, 'up' )
                             prad_pin_vs_fills( i_ff_bot, i_ff_top ) = guess_GC.P_rad_up/guess_GC.P_in;
                         else
@@ -467,6 +469,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             obj.sweep_variables.k_vs_fills              = k_vs_fills;
             obj.sweep_variables.dir_b4_period_vs_fills  = dir_b4_period_vs_fills;
             obj.sweep_variables.prad_pin_vs_fills       = prad_pin_vs_fills;
+            obj.sweep_variables.R_vs_fills              = R_vs_fills;
 
             fprintf('Done generating design space\n');
             toc;
