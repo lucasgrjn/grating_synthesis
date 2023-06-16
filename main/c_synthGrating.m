@@ -108,6 +108,7 @@ classdef c_synthGrating
         lambda;             % center wavelength
         k0;                 % center wavenumber
         background_index;   % background index
+        coupling_index;     % index to calculate coupling/angle
         y_domain_size;      % transverse domain size (y coordinate aka vertical dimension)
         inputs;             % saves input settings for user reference
         start_time;         % time when object was created, 'YEAR-month-day hour-min-sec'
@@ -158,6 +159,7 @@ classdef c_synthGrating
                         'optimal_angle',    'none', ...
                         'data_notes',       '', ...
                         'coupling_direction',   'none', ...
+                        'coupling_index', 1.0, ...
                         'h_makeGratingCell', @makeGratingCell ...
                      }; 
             obj.inputs = inputs;
@@ -175,6 +177,7 @@ classdef c_synthGrating
             obj.background_index    = p.background_index;
             obj.y_domain_size       = p.y_domain_size;
             obj.optimal_angle       = p.optimal_angle;
+            obj.coupling_index      = p.coupling_index;
 
             if strcmp( p.coupling_direction, 'up') || strcmp( p.coupling_direction, 'down') 
                 % set coupling direction
@@ -292,6 +295,15 @@ classdef c_synthGrating
 
         end     % end fiber_mode_gaussian()
         
+        function guess_period = predict_phasematch_period( obj, k )
+            % calculate analytical period which would approximately phase
+            % match to desired output angle
+            k0              = obj.coupling_index * obj.k0;
+            kx              = k0 * sin( (pi/180) * obj.optimal_angle );
+            guess_period    = 2*pi/(k - kx);                              % units of 'units'
+            % snap period to discretization
+            guess_period    = obj.discretization * round(guess_period/obj.discretization);
+        end
         
         function obj = generate_design_space( obj, fill_ratios_to_sweep )
             % sweep fills, optimize period for a single output angle
@@ -334,12 +346,7 @@ classdef c_synthGrating
             
             % calculate analytical period which would approximately phase
             % match to desired output angle
-            k0              = obj.background_index * obj.k0;
-            kx              = k0 * sin( (pi/180) * obj.optimal_angle );
-            guess_period    = 2*pi/(waveguide_k - kx);                              % units of 'units'
-            
-            % snap period to discretization
-            guess_period    = obj.discretization * round(guess_period/obj.discretization);
+            guess_period = predict_phasematch_period( obj, waveguide_k );
 
             % ugh this is really annoying but i have to extend the
             % waveguide's e z overlap
@@ -398,15 +405,15 @@ classdef c_synthGrating
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
                 
-                % decide whether to sweep larger or smaller periods
-                % based on the angle
-                if angles_vs_period(1) > obj.optimal_angle
-                    % only sweep smaller periods
-                    delta_period = -obj.discretization;
-                else
-                    % only sweep larger periods
-                    delta_period = obj.discretization;
-                end
+%                 % decide whether to sweep larger or smaller periods
+%                 % based on the angle
+%                 if angles_vs_period(1) > obj.optimal_angle
+%                     % only sweep smaller periods
+%                     delta_period = -obj.discretization;
+%                 else
+%                     % only sweep larger periods
+%                     delta_period = obj.discretization;
+%                 end
             
                 i_period = 2;
                 while true
@@ -414,7 +421,14 @@ classdef c_synthGrating
                     fprintf('Period iteration %i\n', i_period );
                     
                     % update period
-                    guess_period = guess_period + delta_period;
+                    guess_period = predict_phasematch_period( obj, k_vs_period(end) );
+%                     guess_period = guess_period + delta_period;
+
+                    % check for period convergence
+                    if guess_period == periods(end)
+                        fprintf('Periods have converged\n');
+                        break;
+                    end
 
                     % make grating cell
                     GC = obj.h_makeGratingCell( obj.discretization, ...
@@ -444,8 +458,9 @@ classdef c_synthGrating
                     % check for exit condition (if error in angle gets worse)
                     cur_angle_err   = abs( angles_vs_period( i_period ) - obj.optimal_angle );
                     prev_angle_err  = abs( angles_vs_period( i_period-1 ) - obj.optimal_angle );
-                    if cur_angle_err > prev_angle_err
+                    if cur_angle_err >= prev_angle_err
                         % optimization over, break
+                        fprintf('Angle has converged\n');
                         break;
                     end
                 
