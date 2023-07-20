@@ -47,6 +47,9 @@ classdef c_synthGrating
 %       type: double, scalar
 %       desc: value of background index
 %
+%   'coupling_index'
+%       index to calculate coupling/angle
+%
 %   'domain_size'
 %       type: 1x2 array, double
 %       desc: domain size, [ y height, x length ]
@@ -300,9 +303,14 @@ classdef c_synthGrating
             % match to desired output angle
             k0              = obj.coupling_index * obj.k0;
             kx              = k0 * sin( (pi/180) * obj.optimal_angle );
-            guess_period    = 2*pi/(k - kx);                              % units of 'units'
+            guess_period    = 2*pi/(real(k) - kx);                              % units of 'units'
             % snap period to discretization
             guess_period    = obj.discretization * round(guess_period/obj.discretization);
+
+%             % DEBUG
+%             if ~isreal(guess_period)
+%                 fprintf('period is complex valued\n');
+%             end
         end
         
         function obj = generate_design_space( obj, fill_ratios_to_sweep )
@@ -370,6 +378,7 @@ classdef c_synthGrating
             obj.sweep_variables.periods_vs_fill         = zeros( size(fill_ratios_to_sweep) );
             obj.sweep_variables.k_vs_fill               = zeros( size(fill_ratios_to_sweep) );
             obj.sweep_variables.GC_vs_fill              = cell( size(fill_ratios_to_sweep) );
+            obj.sweep_variables.R_est_vs_fill           = zeros( size(fill_ratios_to_sweep) );
             
             % for each fill, optimize the period to achieve closest angle
             tic;
@@ -496,6 +505,9 @@ classdef c_synthGrating
                                                    best_GC.domain_size(1), ...
                                                    best_GC.domain_size(2), ...
                                                    fill_ratios_to_sweep(ii) );
+
+                % estimate reflection
+                [~, obj.sweep_variables.R_est_vs_fill(ii)] = best_GC.estimate_reflection( 1.0 );
                 
                 % update guess period for next iteration
                 guess_period = best_GC.domain_size(2);
