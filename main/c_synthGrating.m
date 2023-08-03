@@ -313,28 +313,45 @@ classdef c_synthGrating
 %             end
         end
         
-        function obj = generate_design_space( obj, fill_ratios_to_sweep )
+        function obj = generate_design_space( obj, fill_ratios_to_sweep, sort_ascend, init_wg_fill )
             % sweep fills, optimize period for a single output angle
             %
             % Inputs:
             %   fill_ratios_to_sweep
             %       type: double, array
             %       desc: OPTIONAL fill ratios to sweep
+            %   sort_ascend
+            %       type: bool
+            %       desc: OPTIONAL set to true to sort fills ascending.
+            %           default is false (descending)
+            %   init_wg_fill
+            %       type: double, scalar
+            %       desc: OPTIONAL initial waveguide fill, default is 1
             
             % default fills
             if nargin < 2
                 fill_ratios_to_sweep = fliplr( 0.02:0.02:0.98 );
             end
+            if nargin < 3
+                sort_ascend = false;
+            end
+            if nargin < 4
+                init_wg_fill = 1.0;
+            end
             
-            % sort fills so they are in descending order
-            fill_ratios_to_sweep = sort( fill_ratios_to_sweep, 'descend' );
+            % sort fills so they are in descending or ascending order
+            if sort_ascend
+                fill_ratios_to_sweep = sort( fill_ratios_to_sweep, 'ascend' );
+            else
+                fill_ratios_to_sweep = sort( fill_ratios_to_sweep, 'descend' );
+            end
             
             % make waveguide cell
             waveguide = obj.h_makeGratingCell( obj.discretization, .....
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
                                                2*obj.discretization, ...
-                                               1.0 );
+                                               init_wg_fill );
             
             % run waveguide simulation
             % sim settings
