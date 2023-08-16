@@ -313,7 +313,7 @@ classdef c_synthGrating
 %             end
         end
         
-        function obj = generate_design_space( obj, fill_ratios_to_sweep, sort_ascend, init_wg_fill )
+        function obj = generate_design_space( obj, fill_ratios_to_sweep, sort_ascend, init_wg_fill, init_gc_cell )
             % sweep fills, optimize period for a single output angle
             %
             % Inputs:
@@ -327,6 +327,10 @@ classdef c_synthGrating
             %   init_wg_fill
             %       type: double, scalar
             %       desc: OPTIONAL initial waveguide fill, default is 1
+            %   init_gc_cell
+            %       type: grating cell
+            %       desc: OPTIONAL SOLVED initial grating cell to use as
+            %               the starting guess
             
             % default fills
             if nargin < 2
@@ -346,40 +350,51 @@ classdef c_synthGrating
                 fill_ratios_to_sweep = sort( fill_ratios_to_sweep, 'descend' );
             end
             
-            % make waveguide cell
-            waveguide = obj.h_makeGratingCell( obj.discretization, .....
-                                               obj.background_index, ...
-                                               obj.y_domain_size, ...
-                                               2*obj.discretization, ...
-                                               init_wg_fill );
-            
-            % run waveguide simulation
-            % sim settings
-            guess_n             = 1.0 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
-            guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
-            num_wg_modes        = 5;
-            BC                  = 0;                                                                % 0 = PEC
-            pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
-            % run sim
-            waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, obj.k0, guessk );
-            
-            % update guessk (units rad/'units')
-            guessk = waveguide.k;
-            
-            % grab waveguide k
-            waveguide_k = waveguide.k;                                      % units of rad/'units'                    
-            
-            % calculate analytical period which would approximately phase
-            % match to desired output angle
-            guess_period = predict_phasematch_period( obj, waveguide_k );
+            if nargin < 5
+                % a starting grating cell was not specified so guess based
+                % on a waveguide 
 
-            % ugh this is really annoying but i have to extend the
-            % waveguide's e z overlap
-            [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
-            waveguide.E_z_for_overlap       = e_z_overlap_ext;
-            
-            % initially start with waveguide GC
-            guess_GC = waveguide;
+                % make waveguide cell
+                waveguide = obj.h_makeGratingCell( obj.discretization, .....
+                                                   obj.background_index, ...
+                                                   obj.y_domain_size, ...
+                                                   2*obj.discretization, ...
+                                                   init_wg_fill );
+                
+                % run waveguide simulation
+                % sim settings
+                guess_n             = 1.0 * max( waveguide.N(:) );                                      % guess index. I wonder if there's a better guessk for this?
+                guessk              = guess_n * 2*pi/obj.lambda;                                        % units rad/'units'
+                num_wg_modes        = 5;
+                BC                  = 0;                                                                % 0 = PEC
+                pml_options_wg      = [0, 200, 20, 2];                                                  % now that I think about it... there's no reason for the user to set the pml options
+                % run sim
+                waveguide   = waveguide.runSimulation( num_wg_modes, BC, pml_options_wg, obj.k0, guessk );
+                
+                % update guessk (units rad/'units')
+                guessk = waveguide.k;
+                
+                % grab waveguide k
+                waveguide_k = waveguide.k;                                      % units of rad/'units'                    
+                
+                % calculate analytical period which would approximately phase
+                % match to desired output angle
+                guess_period = predict_phasematch_period( obj, waveguide_k );
+    
+                % ugh this is really annoying but i have to extend the
+                % waveguide's e z overlap
+                [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
+    %             waveguide.E_z_for_overlap       = e_z_overlap_ext;
+                
+                % initially start with waveguide GC
+    %             guess_GC = waveguide;
+            else
+                % set the period, guessk, and ez overlap based on the
+                % optionally specified starting cell
+                guessk = init_gc_cell.k;
+                guess_period = predict_phasematch_period( obj, guessk );
+                e_z_overlap_ext = init_gc_cell.E_z_for_overlap;
+            end
             
             % set grating solver settings
             num_modes   = 5;
