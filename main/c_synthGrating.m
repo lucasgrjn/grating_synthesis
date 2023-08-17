@@ -134,6 +134,7 @@ classdef c_synthGrating
         % GC_vs_fill
         % overlap_predict_vs_fill - if uniform design is run
         sweep_variables;
+        design_space_cells; % cell struct version of sweep variables, preemptively declaring here for future refactor
         
         % struct that stores final design parameters
         % currently stores the following:
@@ -143,6 +144,9 @@ classdef c_synthGrating
         % N
         % 
         synthesized_design;
+        synthesized_N_dist = struct('N', [], 'x', [], 'y', []); % for cell struct version of sweep variables, preemptively declaring here for future refactor
+
+        desired_field_profile = struct('field_profile', [], 'x', [], 'alpha_des', [], 'MFD', []);
          
     end
 
@@ -728,6 +732,11 @@ classdef c_synthGrating
                                       10.^(best_alpha_power) );
             obj.synthesized_design = catstruct( obj.synthesized_design, synthesized_design );   % combine structs
             obj.synthesized_design.input_wg_type = input_wg_type;
+
+            % save desired field profile
+            obj.desired_field_profile.field_profile = desired_field;
+            obj.desired_field_profile.x = xvec;
+            obj.desired_field_profile.alpha_des = alpha_des;
             
             % build final index distribution
             obj = obj.build_final_index();
@@ -840,8 +849,9 @@ classdef c_synthGrating
             d0          = 0;                                                            % take slice at waist
             % generate x coordinates for the gaussian mode
             % must be large enough to fit mode
-%             xvec_fib        = 0 : obj.discretization : MFD*4.5 - obj.discretization;
-            xvec_fib        = 0 : obj.discretization : MFD*6 - obj.discretization;
+%             xvec_fib        = 0 : obj.discretization : MFD*3 - obj.discretization;
+            xvec_fib        = 0 : obj.discretization : MFD*4.5 - obj.discretization;
+%             xvec_fib        = 0 : obj.discretization : MFD*6 - obj.discretization;
             xvec_fib        = xvec_fib - xvec_fib(round(end/2));                                % shift origin over to middle
             [obj, field_profile]  = obj.fiber_mode_gaussian(  w0, zvec, xvec_fib, obj.optimal_angle, d0, obj.background_index );
             field_profile         = field_profile./max( abs(field_profile) );
