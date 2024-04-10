@@ -388,10 +388,7 @@ classdef c_synthGrating
                 % ugh this is really annoying but i have to extend the
                 % waveguide's e z overlap
                 [ waveguide, e_z_overlap_ext ]  = waveguide.stitch_E_field( waveguide.Phi, real(waveguide.k), round(guess_period/waveguide.domain_size(2)) );
-    %             waveguide.E_z_for_overlap       = e_z_overlap_ext;
-                
-                % initially start with waveguide GC
-    %             guess_GC = waveguide;
+
             else
                 % set the period, guessk, and ez overlap based on the
                 % optionally specified starting cell
@@ -449,16 +446,6 @@ classdef c_synthGrating
                 end
                 guessk                  = GC.k;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-                
-%                 % decide whether to sweep larger or smaller periods
-%                 % based on the angle
-%                 if angles_vs_period(1) > obj.optimal_angle
-%                     % only sweep smaller periods
-%                     delta_period = -obj.discretization;
-%                 else
-%                     % only sweep larger periods
-%                     delta_period = obj.discretization;
-%                 end
             
                 i_period = 2;
                 while true
@@ -467,7 +454,6 @@ classdef c_synthGrating
                     
                     % update period
                     guess_period = predict_phasematch_period( obj, k_vs_period(end) );
-%                     guess_period = guess_period + delta_period;
 
                     % check for period convergence
                     if guess_period == periods(end)
@@ -976,7 +962,7 @@ classdef c_synthGrating
 %             alpha_des       = alpha_des * obj.units.scale;                                  % in units 1/units
 % 
             % limit the xvec and alpha to certain radiated output threshold
-            threshold   = 1 - 1e-30;
+            threshold   = 1 - 1e-10;
             xvec        = xvec( integral_f <= threshold );
             alpha_des   = alpha_des( integral_f <= threshold );
             field_profile = field_profile( integral_f <= threshold );
