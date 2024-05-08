@@ -95,6 +95,9 @@ classdef c_twoLevelGratingCell < c_gratingCell
             
             % grab period
             a = obj.domain_size(2);
+
+            % wrap the offsets to be between 0 and period
+            wgs_offsets = mod(wgs_offsets, a);
             
             % add first grating tooth
             tooth1_length   = a*wgs_duty_cycles(1);
