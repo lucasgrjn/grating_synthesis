@@ -1188,6 +1188,13 @@ classdef c_synthGrating
             
         end     % end function predict_overlap_for_optimization()
         
+    function [ obj ] = calc_best_mfd_from_alpha( obj )
+        % calculates theoretically best MFD for a uniform grating with
+        % strength alpha, using the formula from mark wade's thesis
+        % to be run after a design space has been generated
+        obj.sweep_variables.MFD_vs_fills = 2./(1.4625.*obj.sweep_variables.scatter_str_vs_fills);
+    end
+
     end     % End methods section
     
 end     % end class definition

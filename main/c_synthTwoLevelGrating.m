@@ -231,7 +231,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             guess_offset        = 0;
             
             % number of times to iterate over optimizatio loop
-            n_optimize_loops = 2;
+            n_optimize_loops = 1;
             
             % sort fills so they are in descending order
             fill_bots = sort( fill_bots, 'descend' );
@@ -664,11 +664,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             GC_vs_offset  = {};
 
             % new version of sweeping offsets, local search
-            cur_offset   = guess_offset;
-            offsets      = [];
-            delta_offset = obj.discretization;  % start with positive delta offset
-            i_offset     = 1;
-            while true
+            % cur_offset   = guess_offset;
+            % offsets      = [];
+            % delta_offset = obj.discretization;  % start with positive delta offset
+            % i_offset     = 1;
+            offsets = 0:obj.discretization:(best_period-obj.discretization);
+            for i_offset = 1:length(offsets)
+
+                cur_offset = offsets(i_offset);
                
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
@@ -701,30 +704,31 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 GC_vs_offset{i_offset}  = GC;
                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
                 
-                offsets( i_offset ) = cur_offset;
+                % offsets( i_offset ) = cur_offset; % TEMP
 
+                % TEMP
                 % Check if we need to switch directions
-                if i_offset > 1
-                    
-                    if delta_offset > 0 && directivities( i_offset ) < directivities( i_offset-1 ) + 1e-12
-                        % Switch directions, we hit a max.
-                        delta_offset            = -delta_offset;
-                        OPTS.mode_to_overlap    = guess_gc.E_z_for_overlap;
-                        cur_offset              = guess_offset;
-                    elseif delta_offset < 0 && directivities( i_offset ) < max( directivities( 1:end-1) )
-                        % Quit loop, we're done
-                        break;
-                    end
-                    
-                end
+                % if i_offset > 1
+                % 
+                %     if delta_offset > 0 && directivities( i_offset ) < directivities( i_offset-1 )
+                %         % Switch directions, we hit a max.
+                %         delta_offset            = -delta_offset;
+                %         OPTS.mode_to_overlap    = guess_gc.E_z_for_overlap;
+                %         cur_offset              = guess_offset;
+                %     elseif delta_offset < 0 && directivities( i_offset ) < max( directivities( 1:end-1) )
+                %         % Quit loop, we're done
+                %         break;
+                %     end
+                % 
+                % end
                 
                 % update for next loop
-                cur_offset      = cur_offset + delta_offset;
-                i_offset        = i_offset + 1;
+                % cur_offset      = cur_offset + delta_offset;
+                % i_offset        = i_offset + 1;
                     
             end
 
-            fprintf('Offsets converged on iteration %i\n', i_offset );
+            % fprintf('Offsets converged on iteration %i\n', i_offset )
 %             toc;
 
             % DEBUG field
