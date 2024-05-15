@@ -1188,12 +1188,18 @@ classdef c_synthGrating
             
         end     % end function predict_overlap_for_optimization()
         
-    function [ obj ] = calc_best_mfd_from_alpha( obj )
-        % calculates theoretically best MFD for a uniform grating with
-        % strength alpha, using the formula from mark wade's thesis
-        % to be run after a design space has been generated
-        obj.sweep_variables.MFD_vs_fills = 2./(1.4625.*obj.sweep_variables.scatter_str_vs_fills);
-    end
+        function [ obj ] = calc_best_mfd_from_alpha( obj )
+            % calculates theoretically best MFD for a uniform grating with
+            % strength alpha, using the formula from mark wade's thesis
+            % to be run after a design space has been generated
+            obj.sweep_variables.MFD_vs_fills = 2./(1.4625.*obj.sweep_variables.scatter_str_vs_fills);
+        end
+    
+        function [ obj ] = calc_predicted_transmission( obj )
+            % calculates what the predicted power transmission is from the
+            % directionality, assuming zero power lost to reflection
+            obj.sweep_variables.T_vs_fills = 1./(1 + 1./(obj.sweep_variables.directivities_vs_fills));
+        end
 
     end     % End methods section
     
@@ -1205,60 +1211,60 @@ end     % end class definition
 % Begin auxiliary non-class methods
 % -------------------------------------------------------------------------
 
-function GC = makeGratingCell( synth_obj, period, fill_top, fill_bot, offset_ratio )
-% currently deprecated
-% makes and returns a c_twoLevelGratingCell object
+% function GC = makeGratingCell( synth_obj, period, fill_top, fill_bot, offset_ratio )
+% % currently deprecated
+% % makes and returns a c_twoLevelGratingCell object
+% % 
+% % inputs:
+% %   synth_obj
+% %       type: c_synthGrating object AS STRUCT
+% %       desc: c_synthGrating object AS STRUCT
+% %   period
+% %       type: double, scalar
+% %       desc: period of the grating cell
+% %   fill_top
+% %       type: double, scalar
+% %       desc: ratio of top layer to period
+% %   fill_bot
+% %       type: double, scalar
+% %       desc: ratio of bottom layer to bottom layer
+% %   offset_ratio
+% %       type: double, scalar
+% %       desc: ratio of bottom layer offset to period
+% %
+% % outputs:
+% %   GC
+% %       type: c_twoLevelGratingCell object
+% %       desc: two level grating cell object
 % 
-% inputs:
-%   synth_obj
-%       type: c_synthGrating object AS STRUCT
-%       desc: c_synthGrating object AS STRUCT
-%   period
-%       type: double, scalar
-%       desc: period of the grating cell
-%   fill_top
-%       type: double, scalar
-%       desc: ratio of top layer to period
-%   fill_bot
-%       type: double, scalar
-%       desc: ratio of bottom layer to bottom layer
-%   offset_ratio
-%       type: double, scalar
-%       desc: ratio of bottom layer offset to period
-%
-% outputs:
-%   GC
-%       type: c_twoLevelGratingCell object
-%       desc: two level grating cell object
-
-
-% set domain 
-domain_size     = synth_obj.domain_size;
-domain_size(2)  = period;
-
-% make grating cell
-GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
-                            'units', synth_obj.units.name, ...
-                            'lambda', synth_obj.lambda, ...
-                            'domain_size', domain_size, ...
-                            'background_index', synth_obj.background_index );
-
-                        
-% wrap offsets to range 0 to 1
-offset_ratio = mod( offset_ratio, 1 );
-                        
-% draw cell
-% draw two levels using two level builder function
-% the inputs are organized [ top level, bottom level ]
-wg_thick        = 100.0 / ( 1e9 * synth_obj.units.scale ) * ones(1,2);      % hardcoded to 100nm
-wg_index        = [3.45, 3.45];                                             % hardcoded to 3.45
-wg_min_y        = [ domain_size(1)/2, domain_size(1)/2-wg_thick(1) ];
-wgs_duty_cycles = [ fill_top, fill_bot ];
-wgs_offsets     = [ 0, offset_ratio*period ];
-GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
-                                        wgs_duty_cycles, wgs_offsets );
-            
-end
+% 
+% % set domain 
+% domain_size     = synth_obj.domain_size;
+% domain_size(2)  = period;
+% 
+% % make grating cell
+% GC = c_twoLevelGratingCell( 'discretization', synth_obj.discretization, ...
+%                             'units', synth_obj.units.name, ...
+%                             'lambda', synth_obj.lambda, ...
+%                             'domain_size', domain_size, ...
+%                             'background_index', synth_obj.background_index );
+% 
+% 
+% % wrap offsets to range 0 to 1
+% offset_ratio = mod( offset_ratio, 1 );
+% 
+% % draw cell
+% % draw two levels using two level builder function
+% % the inputs are organized [ top level, bottom level ]
+% wg_thick        = 100.0 / ( 1e9 * synth_obj.units.scale ) * ones(1,2);      % hardcoded to 100nm
+% wg_index        = [3.45, 3.45];                                             % hardcoded to 3.45
+% wg_min_y        = [ domain_size(1)/2, domain_size(1)/2-wg_thick(1) ];
+% wgs_duty_cycles = [ fill_top, fill_bot ];
+% wgs_offsets     = [ 0, offset_ratio*period ];
+% GC              = GC.twoLevelBuilder(   wg_min_y, wg_thick, wg_index, ...
+%                                         wgs_duty_cycles, wgs_offsets );
+% 
+% end
 
 
 
