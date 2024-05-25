@@ -308,17 +308,14 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 % print iteration
                 fprintf('Right side of domain, fill iteration %i of %i\n', i_ff_bot, length(fill_bots) );
 
-                % DEBUG
-                if i_ff_bot == 6
-                    fprintf('debug\n');
-                end
-
                 % Optimize period and offset
                 if fill_bots(i_ff_bot) < 1 && fill_tops(1) < 1
                     % Only run optimization if theres a perturbation of
                     % both layers
+
                     for ii = 1:n_optimize_loops
                         % run optimization loop
+                        if i_ff_bot == 1 && ii == 1
                         [ ~, ...
                           guess_period, ...
                           guess_offset, ...
@@ -333,7 +330,26 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                                       guess_period,...
                                                       guessk, ...
                                                       sim_opts, ...
-                                                      guess_GC );
+                                                      guess_GC, ...
+                                                      true);
+                        else
+                            [ ~, ...
+                          guess_period, ...
+                          guess_offset, ...
+                          directivities_vs_fills( i_ff_bot, 1 ), ...
+                          angles_vs_fills( i_ff_bot, 1 ), ...
+                          scatter_str_vs_fills( i_ff_bot, 1 ), ...
+                          guess_GC, ...
+                          guessk ] = ...
+                            obj.optimize_period_offset( guess_offset, ...
+                                                      fill_tops(1), ...
+                                                      fill_bots(i_ff_bot), ...
+                                                      guess_period,...
+                                                      guessk, ...
+                                                      sim_opts, ...
+                                                      guess_GC, ...
+                                                      false);
+                        end
                     end
 
                     % save the optimized period, offset, GC, and k
@@ -430,7 +446,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                                           guess_period,...
                                                           guessk, ...
                                                           sim_opts, ...
-                                                          guess_GC );
+                                                          guess_GC, ...
+                                                          false );
                         end
                             
                         % save data
@@ -508,12 +525,8 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             
         end     % end start_parpool()
 
-        
-        
-        function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
-                    best_GC, best_k, DEBUG ] ...
-                    = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc )
-            % for given fill ratios, optimizes period and offset for best angle/directivity
+        function [obj, best_GC, best_period] = optimize_period(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc)
+            % for given fill ratios, optimizes period for best angle
             %
             % Inputs:
             %   guess_offset
@@ -542,37 +555,15 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       type: grating coupler object
             %       desc: initial grating coupler object to start with (for mode
             %       overlapping)
-            %       
             %
             % Outputs:
-            %   best_period
-            %       type: scalar, double
-            %       desc: optimal period
-            %   best_offset
-            %       type: scalar, double
-            %       desc: absolute value of offset, in 'units'
-            %   best_directivity
-            %       type: scalar, double
-            %       desc: optimal directivity
-            %   best_angle
-            %       type: scalar, double
-            %       desc: optimal angle
-            %   best_scatter_str
-            %       type: scalar, double
-            %       desc: optimal scatering strength
             %   best_GC
             %       type: c_twoLevelGratingCell
-            %       desc: two level grating cell
-            %   best_k
-            %       type: scalar, double
-            %       desc: optimal k
-            %   dir_b4_period_vs_fill
-            %       type: scalar, double
-            %       desc: directivity b4 period sweep, mostly for debugging purposes 
-            %   DEBUG
-            %       type: struct
-            %       desc: as name suggests, holds fields for debugging
-            
+            %       desc: optimized GC unit cell
+            %   best_period
+            %       type: double, scalar
+            %       desc: optimized period
+
             % grab mode to overlap with
             OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
 
@@ -597,11 +588,6 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                         break;
                     end
                 end
-
-%                 % DEBUG
-%                 if ~isreal(guess_period)
-%                     fprintf('period is complex valued\n');
-%                 end
 
                 % make grating cell
                 GC = obj.h_makeGratingCell( obj.discretization, ...
@@ -649,13 +635,58 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             end     % end period sweep
 
             fprintf('on period iteration %i\n', i_period );
-%             toc;
 
             % pick best period
             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
             best_GC                         = GC_vs_period{ indx_best_period };
             best_period = periods( indx_best_period );
-            guessk = k_vs_period(indx_best_period);
+
+        end
+
+        function [obj, best_GC, best_offset, DEBUG] = optimize_offset_local(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc)
+            % for given geometry, optimizes for best offset
+            % this version of the code does a local optimization for speed
+            %
+            % Inputs:
+            %   guess_offset
+            %       type: scalar, double
+            %       desc: guess offset position to start from, in units
+            %             'units'
+            %   fill_top
+            %       type: scalar, double
+            %       desc: ratio of top waveguide to period
+            %   fill_bot
+            %       type: scalar, double
+            %       desc: ratio of bottom waveguide to period
+            %   guess_period
+            %       type: scalar, double
+            %       desc: starting period to sweep from, in units 'units'
+            %   guessk
+            %       type: scalar, double
+            %       desc: starting guess k
+            %   sim_opts
+            %       type: struct
+            %       desc: structure with these fields:  
+            %               num_modes
+            %               BC
+            %               pml_options
+            %   guess_gc
+            %       type: grating coupler object
+            %       desc: initial grating coupler object to start with (for mode
+            %       overlapping)
+            %
+            % Outputs:
+            %   best_GC
+            %       type: c_twoLevelGratingCell
+            %       desc: optimized GC unit cell
+            %   best_offset
+            %       type: double, scalar
+            %       desc: optimized offset
+            %   DEBUG
+            %       desc: struct with optional debug data
+
+            % grab mode to overlap with
+            OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
 
             % sweep offsets
             directivities = [];
@@ -674,10 +705,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 GC = obj.h_makeGratingCell( obj.discretization, ...
                                                obj.background_index, ...
                                                obj.y_domain_size, ...
-                                               best_period, ...
+                                               guess_period, ...
                                                fill_top, ...
                                                fill_bot, ...
-                                               cur_offset./best_period );
+                                               cur_offset./guess_period );
                 
                 % run sim
                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, obj.k0, guessk, OPTS );
@@ -724,19 +755,198 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                     
             end
 
-            fprintf('Offsets converged on iteration %i\n', i_offset )
+            fprintf('Offsets converged on iteration %i\n', i_offset );
 %             toc;
 
             % DEBUG field
             DEBUG.GC_vs_offset = GC_vs_offset;
 
             % pick best offset
-            [ ~, indx_best_offset ]     = max( directivities );
+            [ ~, indx_best_offset ] = max( directivities );
 
             % return data
-            % best offset is already set
+            best_offset = offsets(indx_best_offset);
             best_GC = GC_vs_offset{ indx_best_offset };
+
+        end
+
+        function [obj, best_GC, best_offset, DEBUG] = optimize_offset_global(obj, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc)
+            % for given geometry, optimizes for best offset
+            % this version sweeps all possible offsets 
+            %
+            % Inputs:
+            %   fill_top
+            %       type: scalar, double
+            %       desc: ratio of top waveguide to period
+            %   fill_bot
+            %       type: scalar, double
+            %       desc: ratio of bottom waveguide to period
+            %   guess_period
+            %       type: scalar, double
+            %       desc: starting period to sweep from, in units 'units'
+            %   guessk
+            %       type: scalar, double
+            %       desc: starting guess k
+            %   sim_opts
+            %       type: struct
+            %       desc: structure with these fields:  
+            %               num_modes
+            %               BC
+            %               pml_options
+            %   guess_gc
+            %       type: grating coupler object
+            %       desc: initial grating coupler object to start with (for mode
+            %       overlapping)
+            %
+            % Outputs:
+            %   best_GC
+            %       type: c_twoLevelGratingCell
+            %       desc: optimized GC unit cell
+            %   best_offset
+            %       type: double, scalar
+            %       desc: optimized offset
+            %   DEBUG
+            %       desc: struct with optional debug data
+
+            fprintf('first offset optimization, sweeping all possibilities\n');
+
+            % grab mode to overlap with
+            OPTS = struct( 'mode_to_overlap', guess_gc.E_z_for_overlap );
+
+            % sweep offsets
+            directivities = [];
+            k_vs_offset   = [];
+            angles        = [];
+            GC_vs_offset  = {};
+
+            offsets      = 0:obj.discretization:(guess_period-obj.discretization);
+
+            for i_offset = 1:length(offsets)
+               
+                fprintf('offset %i of %i\n', i_offset, length(offsets));
+                % make grating cell
+                GC = obj.h_makeGratingCell( obj.discretization, ...
+                                               obj.background_index, ...
+                                               obj.y_domain_size, ...
+                                               guess_period, ...
+                                               fill_top, ...
+                                               fill_bot, ...
+                                               offsets(i_offset)./guess_period );
+                
+                % run sim
+                GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, obj.k0, guessk, OPTS );
+                
+                % save directivity
+                if strcmp( obj.coupling_direction, 'up' )
+                    % coupling direction is upwards
+                    directivities( i_offset ) = GC.directivity;
+                    angles( i_offset ) = GC.max_angle_up;
+                else
+                    % coupling direction is downwards
+                    directivities( i_offset ) = 1./( GC.directivity );
+                    angles( i_offset ) = GC.max_angle_down;
+                end
+
+                % update the guessk (units rad/'units')
+                guessk = GC.k;
+                k_vs_offset( i_offset ) = GC.k;
+                
+                % update the mode overlap field
+                GC_vs_offset{i_offset} = GC;
+                OPTS.mode_to_overlap = GC.E_z_for_overlap;
+                    
+            end
+
+            % DEBUG field
+            DEBUG = [];
+
+            % pick best offset
+            [ ~, indx_best_offset ] = max( directivities );
+
+            % return data
+            best_offset = offsets(indx_best_offset);
+            best_GC = GC_vs_offset{ indx_best_offset };
+
+        end
+
+        function [  obj, best_period, best_offset, best_directivity, best_angle, best_scatter_str, ...
+                    best_GC, best_k, DEBUG ] ...
+                    = optimize_period_offset(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc, first_optimization )
+            % for given fill ratios, optimizes period and offset for best angle/directivity
+            %
+            % Inputs:
+            %   guess_offset
+            %       type: scalar, double
+            %       desc: guess offset position to start from, in units
+            %             'units'
+            %   fill_top
+            %       type: scalar, double
+            %       desc: ratio of top waveguide to period
+            %   fill_bot
+            %       type: scalar, double
+            %       desc: ratio of bottom waveguide to period
+            %   guess_period
+            %       type: scalar, double
+            %       desc: starting period to sweep from, in units 'units'
+            %   guessk
+            %       type: scalar, double
+            %       desc: starting guess k
+            %   sim_opts
+            %       type: struct
+            %       desc: structure with these fields:  
+            %               num_modes
+            %               BC
+            %               pml_options
+            %   guess_gc
+            %       type: grating coupler object
+            %       desc: initial grating coupler object to start with (for mode
+            %       overlapping)
+            %   first_optimization
+            %       type: bool
+            %       desc: if true then run a global
+            %           optimization of offset because its the first
+            %           optimization in the design space generation loop
+            %       
+            %
+            % Outputs:
+            %   best_period
+            %       type: scalar, double
+            %       desc: optimal period
+            %   best_offset
+            %       type: scalar, double
+            %       desc: absolute value of offset, in 'units'
+            %   best_directivity
+            %       type: scalar, double
+            %       desc: optimal directivity
+            %   best_angle
+            %       type: scalar, double
+            %       desc: optimal angle
+            %   best_scatter_str
+            %       type: scalar, double
+            %       desc: optimal scatering strength
+            %   best_GC
+            %       type: c_twoLevelGratingCell
+            %       desc: two level grating cell
+            %   best_k
+            %       type: scalar, double
+            %       desc: optimal k
+            %   dir_b4_period_vs_fill
+            %       type: scalar, double
+            %       desc: directivity b4 period sweep, mostly for debugging purposes 
+            %   DEBUG
+            %       type: struct
+            %       desc: as name suggests, holds fields for debugging
             
+            % first optimize period
+            [obj, GC_bestperiod, best_period] = optimize_period(obj, guess_offset, fill_top, fill_bot, guess_period, guessk, sim_opts, guess_gc);
+
+            if first_optimization
+                [obj, best_GC, best_offset, DEBUG] = optimize_offset_global(obj, fill_top, fill_bot, best_period, GC_bestperiod.k, sim_opts, GC_bestperiod);
+            else
+                % then locally optimize offset
+                [obj, best_GC, best_offset, DEBUG] = optimize_offset_local(obj, guess_offset, fill_top, fill_bot, best_period, GC_bestperiod.k, sim_opts, GC_bestperiod);
+            end
+
             if strcmp( obj.coupling_direction, 'up' )
                 % coupling direction is upwards
                 best_directivity    = best_GC.directivity;
@@ -749,123 +959,10 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                 best_scatter_str    = best_GC.alpha_down;
             end
             
-            best_period = periods( indx_best_period );
-            best_k      = best_GC.k;
-            best_offset_ratio = offsets( indx_best_offset )./best_period;
+            best_k = best_GC.k;
+            best_offset_ratio = best_offset./best_period;
             best_offset = round( best_offset_ratio * best_period / obj.discretization ) .* obj.discretization;  % snap to grid
 
-            
-%             best_offset_k               = k_vs_offset( indx_best_offset );
-%             best_offset_angle           = angles( indx_best_offset );
-%             
-%             % update mode overlap
-%             OPTS.mode_to_overlap    = GC_vs_offset{indx_best_offset}.E_z_for_overlap;
-% 
-%             % here's an output variable
-%             dir_b4_period_vs_fill = max( directivities );
-% 
-%             % now sweep periods
-%             % decide whether to sweep larger or smaller periods
-%             % based on the angle
-%             if best_offset_angle > obj.optimal_angle
-%                 % only sweep smaller periods
-%                 delta_period = -obj.discretization;
-%             else
-%                 % only sweep larger periods
-%                 delta_period = obj.discretization;
-%             end
-% 
-%             % init saving variables
-%             angles_vs_period    = []; 
-%             k_vs_period         = [];
-%             GC_vs_period        = {};
-%             periods             = [];
-%             
-%             % initial period sweep values
-%             guessk              = best_offset_k;
-%             periods(1)          = guess_period;
-%             GC_vs_period{1}     = GC_vs_offset{indx_best_offset};
-%             k_vs_period(1)      = best_offset_k;
-%             angles_vs_period(1) = best_offset_angle;
-%                        
-%             i_period    = 2;
-%             while true
-%              
-%                 % verbose printing
-%                 if obj.debug_options.verbose == true
-%                     fprintf('Sweeping period %i\n', i_period );
-%                 end
-%                 
-%                 % update period
-%                 guess_period = guess_period + delta_period;
-%                 
-%                 % make grating cell
-%                 GC = obj.h_makeGratingCell( obj.discretization, ...
-%                                                obj.background_index, ...
-%                                                obj.y_domain_size, ...
-%                                                guess_period, ...
-%                                                fill_top, ...
-%                                                fill_bot, ...
-%                                                best_offset_ratio );
-% 
-%                 % run sim
-%                 GC = GC.runSimulation( sim_opts.num_modes, sim_opts.BC, sim_opts.pml_options, obj.k0, guessk, OPTS );
-% 
-%                 % save angle
-%                 if strcmp( obj.coupling_direction, 'up' )
-%                     % coupling direction is upwards
-%                     angles_vs_period( i_period ) = GC.max_angle_up;
-%                 else
-%                     % coupling direction is downwards
-%                     angles_vs_period( i_period ) = GC.max_angle_down;
-%                 end
-% 
-%                 % update for next iteration
-%                 periods(i_period)       = guess_period;
-%                 GC_vs_period{i_period}  = GC;
-%                 k_vs_period(i_period)   = GC.k;
-%                 guessk                  = GC.k;
-%                 OPTS.mode_to_overlap    = GC.E_z_for_overlap;
-%                 
-%                 % check for exit condition (if error in angle gets worse)
-%                 cur_angle_err   = abs( angles_vs_period( i_period ) - obj.optimal_angle );
-%                 prev_angle_err  = abs( angles_vs_period( i_period-1 ) - obj.optimal_angle );
-%                 if cur_angle_err > prev_angle_err
-%                     % optimization over, break
-%                     break;
-%                 end
-%                 
-%                 i_period = i_period + 1;
-% 
-%             end     % end period sweep
-% 
-%             % DEBUG field
-%             DEBUG.GC_vs_period = GC_vs_period;
-%             
-%             % pick best period
-%             [angle_error, indx_best_period] = min( abs( obj.optimal_angle - angles_vs_period ) );
-%             best_period_k                   = k_vs_period( indx_best_period );
-%             
-%             % return data
-%             % best offset is already set
-%             best_GC = GC_vs_period{ indx_best_period };
-%             
-%             if strcmp( obj.coupling_direction, 'up' )
-%                 % coupling direction is upwards
-%                 best_directivity    = best_GC.directivity;
-%                 best_angle          = best_GC.max_angle_up;
-%                 best_scatter_str    = best_GC.alpha_up;
-%             else
-%                 % coupling direction is downwards
-%                 best_directivity    = 1./best_GC.directivity;
-%                 best_angle          = best_GC.max_angle_down;
-%                 best_scatter_str    = best_GC.alpha_down;
-%             end
-%             
-%             best_period = periods( indx_best_period );
-%             best_k      = best_GC.k;
-%             best_offset = round( best_offset_ratio * best_period / obj.discretization ) .* obj.discretization;  % snap to grid
-%                     
         end     % end function optimize_period_offset()
               
         
