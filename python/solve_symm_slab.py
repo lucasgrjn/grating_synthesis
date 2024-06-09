@@ -162,12 +162,12 @@ def solve_symm_slab(
             Hy[ii-1, idright+1:] = C * np.exp(-alpha[-1] * x[idright+1:])
 
             # Make H field
-            Ex[ii-1, :] = -(beta_ii / (omega0 * MU0)) * Ey[ii-1, :]
+            Ex[ii-1, :] = -(beta_ii / (omega0 * MU0)) * Hy[ii-1, :]
             Ez[ii-1, :idleft] = 1j / (omega0 * MU0) * alpha[-1] * D * np.exp(alpha[-1] * x[:idleft])
             Ez[ii-1, idleft:idright+1] = -1j / (omega0 * MU0) * kx[-1] * np.sin(kx[-1] * x[idleft:idright+1])
             Ez[ii-1, idright+1:] = -1j / (omega0 * MU0) * alpha[-1] * C * np.exp(-alpha[-1] * x[idright+1:])
 
-        x_lim = [ii * PI / 2, (ii + 1) * PI / 2] # Move to next interval
+        x_lims = [ii * PI / 2, (ii + 1) * PI / 2] # Move to next interval
     
     Field = {
         "x": x,
