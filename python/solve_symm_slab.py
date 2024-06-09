@@ -73,12 +73,12 @@ def solve_symm_slab(
 
     # Initialize field coordinates and variables
     x = np.linspace(-2 * d, 2 * d, 100)
-    Ex = np.zeros((n_modes, len(x))) # Field, dimensions of mode x field
-    Ey = np.zeros((n_modes, len(x)))
-    Ez = np.zeros((n_modes, len(x)))
-    Hx = np.zeros((n_modes, len(x))) # Field, dimensions of mode x field
-    Hy = np.zeros((n_modes, len(x)))
-    Hz = np.zeros((n_modes, len(x)))
+    Ex = np.zeros((n_modes, len(x)), dtype=complex) # Field, dimensions of mode x field
+    Ey = np.zeros((n_modes, len(x)), dtype=complex)
+    Ez = np.zeros((n_modes, len(x)), dtype=complex)
+    Hx = np.zeros((n_modes, len(x)), dtype=complex) # Field, dimensions of mode x field
+    Hy = np.zeros((n_modes, len(x)), dtype=complex)
+    Hz = np.zeros((n_modes, len(x)), dtype=complex)
 
     # # # # # # # # # # # #
     # Solve for the modes
@@ -138,20 +138,31 @@ def solve_symm_slab(
             D = -C
 
         # Solving for field distributions
+        # Supplementary step to index on the boundaries
+        idleft = np.argmin(np.abs(x + d / 2))
+        idright= np.argmin(np.abs(x - d / 2))
         if pol == "TE": # Solve for the TE modes
-            # Supplementary step to index on the boundaries
-            idleft = np.argmin(np.abs(x + d / 2))
-            idright= np.argmin(np.abs(x - d / 2))
             # Make E field
-            Ey[ii, :idleft] = C * np.exp(alpha[-1] * x[:idleft])
-            Ey[ii, idleft:idright+1] = np.cos(kx[-1] * x[idleft:idright+1])
-            Ey[ii, idright+1:] = D * np.exp(-alpha[-1] * x[idright+1:])
+            Ey[ii-1, :idleft] = D * np.exp(alpha[-1] * x[:idleft])
+            Ey[ii-1, idleft:idright+1] = np.cos(kx[-1] * x[idleft:idright+1])
+            Ey[ii-1, idright+1:] = C * np.exp(-alpha[-1] * x[idright+1:])
 
             # Make H field
-            Hx[ii, :] = -(beta_ii / (omega0 * MU0)) * Ey[ii, :]
-            Hz[ii, :idleft] = 1j / (omega0 * MU0) * C * np.exp(alpha[-1] * x[:idleft])
-            Hz[ii, idleft:idright+1] = -1j / (omega0 * MU0) * kx[-1] * np.sin(kx[-1] * x[idleft:idright+1])
-            Hz[ii, idright+1:] = -1j / (omega0 * MU0) * D * np.exp(-alpha[-1] * x[idright+1:])
+            Hx[ii-1, :] = -(beta_ii / (omega0 * MU0)) * Ey[ii-1, :]
+            Hz[ii-1, :idleft] = 1j / (omega0 * MU0) * alpha[-1] * D * np.exp(alpha[-1] * x[:idleft])
+            Hz[ii-1, idleft:idright+1] = -1j / (omega0 * MU0) * kx[-1] * np.sin(kx[-1] * x[idleft:idright+1])
+            Hz[ii-1, idright+1:] = -1j / (omega0 * MU0) * alpha[-1] * C * np.exp(-alpha[-1] * x[idright+1:])
+        elif pol == "TM":
+            # Make H field
+            Hy[ii-1, :idleft] = D * np.exp(alpha[-1] * x[:idleft])
+            Hy[ii-1, idleft:idright+1] = np.cos(kx[-1] * x[idleft:idright+1])
+            Hy[ii-1, idright+1:] = C * np.exp(-alpha[-1] * x[idright+1:])
+
+            # Make H field
+            Ex[ii-1, :] = -(beta_ii / (omega0 * MU0)) * Ey[ii-1, :]
+            Ez[ii-1, :idleft] = 1j / (omega0 * MU0) * alpha[-1] * D * np.exp(alpha[-1] * x[:idleft])
+            Ez[ii-1, idleft:idright+1] = -1j / (omega0 * MU0) * kx[-1] * np.sin(kx[-1] * x[idleft:idright+1])
+            Ez[ii-1, idright+1:] = -1j / (omega0 * MU0) * alpha[-1] * C * np.exp(-alpha[-1] * x[idright+1:])
 
         x_lim = [ii * PI / 2, (ii + 1) * PI / 2] # Move to next interval
     
