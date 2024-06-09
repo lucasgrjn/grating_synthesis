@@ -45,9 +45,9 @@ def solve_symm_slab(
         u4 = u1.copy() + 3 / 2 *  PI
 
         v1_te = u1 * np.tan(u1)
-        v2_te = -u2 *np.cot(u2)
+        v2_te = -u2 / np.tan(u2)
         v3_te = u3 * np.tan(u3)
-        v4_te = -u4 * np.cot(u4)
+        v4_te = -u4 / np.tan(u4)
 
         # Plotting
         plt.figure()
