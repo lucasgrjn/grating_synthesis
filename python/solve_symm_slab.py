@@ -34,12 +34,12 @@ def solve_symm_slab(
     if show_plot is True:
         # Coordinates for a circle
         NUM_PTS = 201
-        rad = np.linspace(0, PI/2, num=NUM_PTS)
+        rad = np.linspace(0, PI/4, num=NUM_PTS)
         x_V = V * np.cos(rad)
         y_V = V * np.sin(rad)
 
         # v = utan(u) and v = -utan(u)
-        u1 = np.linspace(0, PI/2, num=NUM_PTS)
+        u1 = np.linspace(0, PI/4, num=NUM_PTS)
         u2 = u1.copy() + PI / 2
         u3 = u1.copy() + PI
         u4 = u1.copy() + 3 / 2 *  PI
@@ -58,6 +58,9 @@ def solve_symm_slab(
         plt.plot(u4, v4_te, label='TE odd')
 
         plt.ylim((0 , 2 * PI))
+        # plt.xlim([0, np.max(u4)])
+        plt.xlim(left=0)
+        plt.gca().set_aspect('equal')
         plt.xlabel("u")
         plt.ylabel("u")
         plt.legend()
