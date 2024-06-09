@@ -129,6 +129,26 @@ def solve_symm_slab(
         beta.append(beta_ii)
         neff_ii = beta_ii / k0 # neff
         neff.append(neff_ii)
+        # if pol == "TE":
+        #    # Calculate A, B, C, D
+        #     if ii % 2 == 1: # "Even" mode takes on odd mode
+        #         alpha.append(kx[-1] * np.tan(kx[-1] * d / 2))
+        #         C = np.cos(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
+        #         D = C
+        #     else:
+        #         alpha.append(-kx[-1] / np.tan(kx[-1] * d / 2))
+        #         C = np.sin(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
+        #         D = -C
+        # elif pol == "TM":
+        #    # Calculate A, B, C, D
+        #     if ii % 2 == 1: # "Even" mode takes on odd mode
+        #         alpha.append((ncl / nco)**2 * kx[-1] * np.tan(kx[-1] * d / 2))
+        #         C = np.cos(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
+        #         D = C
+        #     else:
+        #         alpha.append(-(ncl / nco)**2 * kx[-1] / np.tan(kx[-1] * d / 2))
+        #         C = np.sin(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
+        #         D = -C
 
         # Calculate A, B, C, D
         if ii % 2 == 1: # "Even" mode takes on odd mode
@@ -139,6 +159,9 @@ def solve_symm_slab(
             alpha.append(-kx[-1] / np.tan(kx[-1] * d / 2))
             C = np.sin(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
             D = -C
+        if pol == "TM":
+            # Negative sign came from the non-symmetry of the Maxwell equation
+            alpha[-1] *= -(ncl / nco)**2
 
         # Solving for field distributions
         # Supplementary step to index on the boundaries
