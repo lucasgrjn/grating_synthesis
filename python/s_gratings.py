@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from solve_symm_slab import solve_symm_slab
-
+from complexk_mode_solver_2D_PML_TM import f_bloch_complexk_mode_solver_2D_PML
 
 PI = np.pi
 
@@ -15,7 +15,7 @@ index_clad = 1.444#1.5#1.45
 index_core = 3.473#2.0#3.47
 # index_clad = 1.5#1.5#1.45
 # index_core = 1.6#2.0#3.47
-y_size = 10000
+y_size = 1000
 
 # Grating dimensions
 si_thick = 220
@@ -70,3 +70,25 @@ for ix, ax in enumerate(axes.flatten()):
 fig.suptitle("Mode field")
 fig.savefig("field.png")
 plt.close(fig)
+
+# Mode solver settings
+guessk = beta[0]
+num_modes = 10
+BC = 1 # 0 for PEC, 1 for PMC
+pol = "TM" # 'TE' or 'TM'
+# PML_options[0]: PML in y direction (yes=1 or no=0)
+# PML_options[1]: length of PML layer in nm
+# PML_options[2]: strength of PML in the complex plane
+# PML_options[3]: PML polynomial order (1, 2, 3...)
+pml_options = [ 1, 200, 10, 2 ]
+
+Phi_solved, k_solved, _, _ = f_bloch_complexk_mode_solver_2D_PML(
+    N,
+    disc,
+    k0,
+    num_modes,
+    guessk,
+    BC,
+    pol,
+    pml_options
+)
