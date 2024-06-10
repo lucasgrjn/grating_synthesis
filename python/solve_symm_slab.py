@@ -1,3 +1,4 @@
+import warnings
 from typing import Literal
 
 import matplotlib.pyplot as plt
@@ -125,26 +126,6 @@ def solve_symm_slab(
         beta.append(beta_ii)
         neff_ii = beta_ii / k0 # neff
         neff.append(neff_ii)
-        # if pol == "TE":
-        #    # Calculate A, B, C, D
-        #     if ii % 2 == 1: # "Even" mode takes on odd mode
-        #         alpha.append(kx[-1] * np.tan(kx[-1] * d / 2))
-        #         C = np.cos(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
-        #         D = C
-        #     else:
-        #         alpha.append(-kx[-1] / np.tan(kx[-1] * d / 2))
-        #         C = np.sin(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
-        #         D = -C
-        # elif pol == "TM":
-        #    # Calculate A, B, C, D
-        #     if ii % 2 == 1: # "Even" mode takes on odd mode
-        #         alpha.append((ncl / nco)**2 * kx[-1] * np.tan(kx[-1] * d / 2))
-        #         C = np.cos(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
-        #         D = C
-        #     else:
-        #         alpha.append(-(ncl / nco)**2 * kx[-1] / np.tan(kx[-1] * d / 2))
-        #         C = np.sin(kx[-1] * d / 2) / np.exp(-alpha[-1] * d / 2)
-        #         D = -C
 
         # Calculate A, B, C, D
         if ii % 2 == 1: # "Even" mode takes on odd mode
@@ -175,6 +156,11 @@ def solve_symm_slab(
             Hz[ii-1, idleft:idright+1] = -1j / (omega0 * MU0) * kx[-1] * np.sin(kx[-1] * x[idleft:idright+1])
             Hz[ii-1, idright+1:] = -1j / (omega0 * MU0) * alpha[-1] * C * np.exp(-alpha[-1] * x[idright+1:])
         elif pol == "TM":
+            warnings.warn(
+                "The Field profile was simply copied from the TE mode and are wrong. "
+                + "Don't use it."
+            )
+
             # Make H field
             Hy[ii-1, :idleft] = D * np.exp(alpha[-1] * x[:idleft])
             Hy[ii-1, idleft:idright+1] = np.cos(kx[-1] * x[idleft:idright+1])
