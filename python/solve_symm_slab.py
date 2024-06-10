@@ -6,7 +6,7 @@ from scipy import optimize as sopt
 
 
 # Define constants
-PI = 2 * np.pi
+PI = np.pi
 C0 = 299792458 # m/s
 MU0 = 4 * PI * 1e-7
 
@@ -33,13 +33,13 @@ def solve_symm_slab(
     # Plotting transcendentals
     if show_plot is True:
         # Coordinates for a circle
-        NUM_PTS = 201
-        rad = np.linspace(0, PI/4, num=NUM_PTS)
+        NUM_PTS = 1001
+        rad = np.linspace(0, PI / 2, num=NUM_PTS)
         x_V = V * np.cos(rad)
         y_V = V * np.sin(rad)
 
         # v = utan(u) and v = -utan(u)
-        u1 = np.linspace(0, PI/4, num=NUM_PTS)
+        u1 = np.linspace(0, PI/2, num=NUM_PTS)
         u2 = u1.copy() + PI / 2
         u3 = u1.copy() + PI
         u4 = u1.copy() + 3 / 2 *  PI
@@ -75,7 +75,7 @@ def solve_symm_slab(
     kx = []
 
     # Initialize field coordinates and variables
-    x = np.linspace(-2 * d, 2 * d, 100)
+    x = np.linspace(-5 * d, 5 * d, 1001)
     Ex = np.zeros((n_modes, len(x)), dtype=complex) # Field, dimensions of mode x field
     Ey = np.zeros((n_modes, len(x)), dtype=complex)
     Ez = np.zeros((n_modes, len(x)), dtype=complex)
@@ -94,34 +94,30 @@ def solve_symm_slab(
             if ii % 2 == 1: # "Even" mode takes on odd mode
                 def symslab_TE_even(u, V):
                     return V**2 - u**2 - (u * np.tan(u))**2
-                sol = sopt.root_scalar(
-                    lambda x: symslab_TE_even(x, V), bracket=x_lims
+                u = sopt.brentq(
+                    lambda x: symslab_TE_even(x, V), a=x_lims[0], b=x_lims[-1],
                 )
-                u = sol.root
             else:
                 def symslab_TE_odd(u, V):
                     return V**2 - u**2 - (u / np.tan(u))**2
-                sol = sopt.root_scalar(
-                    lambda x: symslab_TE_odd(x, V), bracket=x_lims
+                u = sopt.brentq(
+                    lambda x: symslab_TE_odd(x, V), a=x_lims[0], b=x_lims[-1],
                 )
-                u = sol.root
         elif pol == "TM":
             # Find the intersects of the mode/wave equations
             # the intersect is "u"
             if ii % 2 == 1: # "Even" mode takes on odd mode
                 def symslab_TM_even(u, V, n1, n2):
                     return V**2 - u**2 - (((n1**2) / (n2**2)) * u * np.tan(u))**2
-                sol = sopt.root_scalar(
-                    lambda x: symslab_TM_even(x, V, ncl, nco), bracket=x_lims
+                u = sopt.brentq(
+                    lambda x: symslab_TM_even(x, V, ncl, nco), a=x_lims[0], b=x_lims[-1],
                 )
-                u = sol.root
             else:
                 def symslab_TM_odd(u, V, n1, n2):
                     return V**2 - u**2 - (((n1**2) / (n2**2)) * u / np.tan(u))**2
-                sol = sopt.root_scalar(
-                    lambda x: symslab_TM_odd(x, V, ncl, nco), bracket=x_lims
+                u = sopt.brentq(
+                    lambda x: symslab_TM_odd(x, V, ncl, nco), a=x_lims[0], b=x_lims[-1],
                 )
-                u = sol.root
 
         # Convert "u" to neff and beta
         kx.append(2 * u / d)
@@ -161,7 +157,7 @@ def solve_symm_slab(
             D = -C
         if pol == "TM":
             # Negative sign came from the non-symmetry of the Maxwell equation
-            alpha[-1] *= -(ncl / nco)**2
+            alpha[-1] *= (ncl / nco)**2
 
         # Solving for field distributions
         # Supplementary step to index on the boundaries
