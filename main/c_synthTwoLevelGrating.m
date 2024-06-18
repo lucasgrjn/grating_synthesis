@@ -1230,12 +1230,15 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %       type: double, scalar
             %       desc: bottom layer fill (duty cycle) to use
                                
+            obj = obj.calc_best_mfd_from_alpha();
+
             directivities   = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.directivities_vs_fills, filltop, fillbot );
             angles          = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.angles_vs_fills, filltop, fillbot ); 
             periods         = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.periods_vs_fills, filltop, fillbot );
             offsets         = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.offsets_vs_fills, filltop, fillbot );
             scatter_strs    = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.scatter_str_vs_fills, filltop, fillbot );
             ks              = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.k_vs_fills, filltop, fillbot );
+            mfd = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.MFD_vs_fills, filltop, fillbot );
             
             % generate final design
             grat_len            = 4./scatter_strs;
@@ -1252,6 +1255,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                              ks );
             obj.synthesized_design = synthesized_des;
             obj.synthesized_design.input_wg_type = input_wg_type;
+            obj.synthesized_design.mfd = mfd;
             
             % build final index distribution
             obj = obj.build_final_index();
