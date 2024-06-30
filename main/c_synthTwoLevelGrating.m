@@ -1929,6 +1929,37 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             makeFigureNice( OPTS );
             
         end
+
+        function [obj, passes_DRC] = passes_drc( obj, enforce_min_feat_size_func )
+            % returns boolean matrix of unit cells that pass drc
+            % also saves to obj.sweep_variables
+            % 
+            % args
+            %   enforce_min_feat_size_func
+            %       type: function handle
+            %       desc: a function that takes in top fill, bottom fill,
+            %           period and offset and returns whether that unit cell
+            %           passes DRC
+            sweep_vars = obj.sweep_variables;
+            
+            fill_bots = sweep_vars.fill_bots;
+            fill_tops = sweep_vars.fill_tops;
+            periods   = sweep_vars.periods_vs_fills;
+            offsets   = sweep_vars.offsets_vs_fills;
+
+            % matrix to save whether cell passes min feat size rules
+            passes_DRC = zeros(length(fill_bots), length(fill_tops)); % dimensions bot fill vs. top fill
+            
+            for i_bot = 1:length(fill_bots)
+                for i_top = 1:length(fill_tops)
+                    passes_DRC(i_bot, i_top) = enforce_min_feat_size_func( periods(i_bot,i_top),...
+                                                        fill_tops(i_top), fill_bots(i_bot), offsets(i_bot,i_top) );
+                end
+            end
+
+            obj.sweep_variables.passes_DRC = passes_DRC;
+
+        end
         
     end     % End methods section
     
