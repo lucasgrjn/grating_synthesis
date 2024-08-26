@@ -93,6 +93,13 @@ switch single_or_dual
         ylim( [ min(1e3*synth_obj.synthesized_design.scatter_str) - max(1e3*synth_obj.synthesized_design.scatter_str)*0.2, 1.2*max(1e3*synth_obj.synthesized_design.scatter_str) ] );
         makeFigureNice( OPTS );
         
+        % directivity vs unit cell
+        subplot(5,1,5);
+        plot( 1:length(synth_obj.synthesized_design.directivity), synth_obj.synthesized_design.directivity, '.', 'markersize', 20 );
+        xlabel('unit cell #'); ylabel('Directivity (a.u)');
+        ylim( [ min(synth_obj.synthesized_design.directivity) - 0.1, max(synth_obj.synthesized_design.directivity) + 0.1] );
+        makeFigureNice( OPTS );
+
 end
 
 
