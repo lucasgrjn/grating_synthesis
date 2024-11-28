@@ -50,12 +50,8 @@ input_wg_type = 'full'; % set this depending on what the input geometry looks li
                         % input waveguide type is "full" e.g. starting from
                         % 100% duty cycle
 
-
-% TODO: add DRC checking function example
-
 % this function generates an apodized grating for fiber-coupling
-synth_obj = synth_obj.generate_final_design_apodized_gaussian( MFD, input_wg_type );
-
+synth_obj = synth_obj.generate_final_design_apodized_gaussian( MFD, input_wg_type, @f_enforce_min_feat_size );
 
 % save the final synthesis object and workspace
 save( [ loadsave_dir filesep 'synthobjfinal' ] );

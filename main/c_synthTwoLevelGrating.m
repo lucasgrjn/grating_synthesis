@@ -968,7 +968,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         
         
         function obj = generate_final_design_apodized( obj, desired_field, input_wg_type, enforce_min_feat_size_func, ...
-                                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both )
+                                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both, chosen_unit_cells)
             % function for generating the final synthesized design
             % parameters
             %
@@ -1001,6 +1001,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %               or both
             %             either 'top', 'bottom', or 'both'
             %             default to 'top'
+            %   chosen_unit_cells
+            %       type: struct
+            %       desc: OPTIONAL pre-chosen unit cells
             %   
             %
             % The final design is saved as:
@@ -1010,8 +1013,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             [ obj, xvec, alpha_des, desired_field ] = obj.calculate_desired_scattering( desired_field );
             
             % select cells to use
-            obj = obj.choose_unit_cells( input_wg_type, enforce_min_feat_size_func, ...
-                                        fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+            if nargin < 8
+                obj = obj.choose_unit_cells( input_wg_type, enforce_min_feat_size_func, ...
+                                            fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+            else
+                obj.chosen_cells = chosen_unit_cells;
+            end
 
                      
             % optimize start alpha
@@ -1058,7 +1065,7 @@ classdef c_synthTwoLevelGrating < c_synthGrating
         end     % end function generate_final_design_apodized()
         
         function obj = generate_final_design_apodized_gaussian( obj, MFD, input_wg_type, ...
-                enforce_min_feat_size_func, fill_top_override, fill_bot_override, fill_vs_top_bot_both )
+                enforce_min_feat_size_func, fill_top_override, fill_bot_override, fill_vs_top_bot_both, chosen_unit_cells )
             % Synthesizes an apodized grating that radiates desired Gaussian field profile
             %
             % Inputs:
@@ -1084,6 +1091,9 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             %               or both
             %             either 'top', 'bottom', or 'both'
             %             default to 'top'
+            %   chosen_unit_cells
+            %       type: struct
+            %       desc: OPTIONAL pre-chosen unit cells
             
             % generate a fiber gaussian mode
             [ obj, field_profile ] = obj.make_gaussian_profile( MFD );
@@ -1094,9 +1104,12 @@ classdef c_synthTwoLevelGrating < c_synthGrating
             elseif nargin < 7
                 obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func, ...
                                                             fill_top_override, fill_bot_override );
-            else
+            elseif nargin < 8
                 obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func, ...
                                                             fill_top_override, fill_bot_override, fill_vs_top_bot_both );
+            else
+                obj = obj.generate_final_design_apodized( field_profile, input_wg_type, enforce_min_feat_size_func, ...
+                                                            fill_top_override, fill_bot_override, fill_vs_top_bot_both, chosen_unit_cells );
             end
             
             % save MFD
@@ -1516,7 +1529,51 @@ classdef c_synthTwoLevelGrating < c_synthGrating
                                     
         end % end choose_unit_cells()
         
-       
+        function obj = choose_unit_cells_startend_interp( obj, start_filltopbot, end_filltopbot, nsamps )
+            % chooses unit cells from a finished design space by
+            % interpolating between the start filltopbot and end fill top
+            % bot
+            %
+            % args
+            %   start_filltopbot: starting (top fill, bot fill)
+            %   end_filltopbot: ending (top fill, bot fill)
+            %   nsamps: number of samples
+
+            topfills = linspace(start_filltopbot(1), end_filltopbot(1), nsamps);
+            botfills = linspace(start_filltopbot(2), end_filltopbot(2), nsamps);
+
+            chosen_angles = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.angles_vs_fills, topfills, botfills );
+            chosen_periods = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.periods_vs_fills, topfills, botfills );
+            chosen_offsets = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.offsets_vs_fills, topfills, botfills );
+            chosen_scatter_str = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.scatter_str_vs_fills, topfills, botfills );
+            chosen_ks = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.k_vs_fills, topfills, botfills );
+            chosen_dirs = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.angles_vs_fills, topfills, botfills );
+            chosen_angles = interp2( obj.sweep_variables.fill_tops, obj.sweep_variables.fill_bots, obj.sweep_variables.angles_vs_fills, topfills, botfills );
+
+            chosen_top_fills = topfills;
+            chosen_bot_fills = botfills;
+
+            % sorting on scattering strength (might not be needed)
+            [ chosen_scatter_str, indx_sort ] = sort( chosen_scatter_str );
+            chosen_angles       = chosen_angles( indx_sort );
+            chosen_periods      = chosen_periods( indx_sort );
+            chosen_offsets      = chosen_offsets( indx_sort );
+            chosen_ks           = chosen_ks( indx_sort );
+            chosen_top_fills    = chosen_top_fills( indx_sort );
+            chosen_bot_fills    = chosen_bot_fills( indx_sort );
+            chosen_dirs         = chosen_dirs( indx_sort );
+
+            % save the chosen cells for use in design
+            obj.chosen_cells = struct( 'chosen_angles', chosen_angles, ...
+                                    'chosen_periods', chosen_periods, ...
+                                    'chosen_offsets', chosen_offsets, ...
+                                    'chosen_scatter_str', chosen_scatter_str, ...
+                                    'chosen_ks', chosen_ks, ...
+                                    'chosen_top_fills', chosen_top_fills, ...
+                                    'chosen_bot_fills', chosen_bot_fills, ...
+                                    'chosen_dirs', chosen_dirs );
+                                    
+        end % end choose_unit_cells_startend_interp()    
         
         function [ obj, best_alpha_power ] = optimize_start_alpha( obj, xvec, alpha_des, chosen_dirs, ...
                                               chosen_bot_fills, chosen_top_fills, ...
